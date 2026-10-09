@@ -62,6 +62,8 @@ iOS doesn't let any app read health data while the phone is locked, and backgrou
 docker cp export.json vitalis-app:/tmp/ && docker exec vitalis-app node dist/src/cli.js import /tmp/export.json
 ```
 
+Or pull the history straight from the phone: with Health Auto Export's MCP server running (Premium, app on screen, same network), `scripts/backfill-from-hae-mcp.py` fetches day-grouped metrics and workouts in 60-day chunks and pushes them to `/ingest`. Its header lists the environment variables.
+
 ## Agents
 
 Any MCP client that sends a bearer header works. Claude Code:
