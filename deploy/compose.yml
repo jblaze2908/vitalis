@@ -16,8 +16,8 @@ services:
     mem_limit: 256m
     pids_limit: 128
     ports:
-      # Loopback only: put your TLS reverse proxy in front.
-      - "127.0.0.1:8350:8350"
+      # Loopback only: put your TLS reverse proxy in front. Under scale0, publish on its TARGET instead.
+      - "${VITALIS_PUBLISH:-127.0.0.1:8350}:8350"
     volumes:
       - /srv/vitalis:/srv/vitalis
     env_file: ["${VITALIS_CONFIG_DIR:-/etc/vitalis}/vitalis.env"]

@@ -74,13 +74,11 @@ If you run [Engram](https://github.com/jblaze2908/engram), add Vitalis there onc
 
 ## Backups
 
-Everything is in `/srv/vitalis/vitalis.db`. Back up with SQLite's online copy:
+Everything is in `/srv/vitalis/vitalis.db`. `deploy/backup.sh` writes a consistent copy (`VACUUM INTO`, run in the app's own image) to `/var/backups/vitalis/` and keeps the newest 14. Run it from cron or a systemd timer, and ship the copies off the machine (restic, rclone). Raw pushes are kept in the database too, so a restore can also re-parse.
 
-```sh
-sqlite3 /srv/vitalis/vitalis.db ".backup /var/backups/vitalis-$(date +%F).db"
-```
+## Scale to zero (optional)
 
-Run it from cron or a systemd timer, and ship the copy off the machine (restic, rclone). Raw pushes are kept in the database too, so a restore can also re-parse.
+Vitalis only answers requests: no timers, no polling. That makes it a good fit for [scale0](https://github.com/jblaze2908/scale0), which stops the container when it's idle and wakes it on the next request. The phone's push waits through the cold start. `deploy/app.conf` registers it with scale0's deployer: set `VITALIS_PUBLISH` to scale0's `TARGET`, point the proxy and `health` at `LISTEN`, then run `scale0 enable vitalis` and `scale0 deploy add vitalis /opt/vitalis`.
 
 ## Updates
 
