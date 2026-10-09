@@ -6,6 +6,8 @@ services:
     image: vitalis-app:${VITALIS_TAG:-local}
     build: ../app
     container_name: vitalis-app
+    # One container needs no project network of its own; the default bridge also avoids using up Docker's address pools.
+    network_mode: bridge
     restart: unless-stopped
     user: "1650:1650"
     read_only: true
