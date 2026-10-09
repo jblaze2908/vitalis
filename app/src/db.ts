@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS sets (
 CREATE INDEX IF NOT EXISTS sets_session ON sets(session_id, ord);
 CREATE INDEX IF NOT EXISTS sets_exercise ON sets(exercise_id, performed_at);
 
+-- Outbound events, one per (event, day), so a resent push never fires twice.
+CREATE TABLE IF NOT EXISTS hook_events (
+  event TEXT NOT NULL, day TEXT NOT NULL, created_at INTEGER NOT NULL, sent_at INTEGER, status TEXT, attempts INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (event, day));
+
 -- Append-only record of every MCP call and push: who, what, outcome. Counts only, never values.
 CREATE TABLE IF NOT EXISTS calls (
   id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, token_id TEXT, tool TEXT NOT NULL, ok INTEGER NOT NULL,

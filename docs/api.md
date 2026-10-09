@@ -8,7 +8,7 @@ Three endpoints. Everything else is the CLI.
 | `POST /mcp` | `read` or `write` token | Agents (MCP, stateless Streamable HTTP) |
 | `GET /health` | none | The reverse proxy and Docker health check |
 
-Tokens are bearer tokens (`Authorization: Bearer vtl_…`). They are created with `vitalis token create <name> --scope ingest|read|write` and stored only as SHA-256. A `read` token sees the read tools; a `write` token also sees the write tools; an `ingest` token can only push.
+Tokens are bearer tokens (`Authorization: Bearer vtl_…`). `/ingest` also takes the bare token (`Authorization: vtl_…`) or `X-Api-Key: vtl_…`, for senders whose header editor can't hold a space. They are created with `vitalis token create <name> --scope ingest|read|write` and stored only as SHA-256. A `read` token sees the read tools; a `write` token also sees the write tools; an `ingest` token can only push.
 
 ## Semantics every consumer needs
 
@@ -104,6 +104,10 @@ The server's `instructions` (sent on `initialize`) restate the semantics above i
 | `create_exercise` | `name`, `primary[]`, `secondary[]?`, `equipment?`, `aliases[]?` | Returns the existing exercise if the name is taken. |
 
 Every call is recorded in `calls`: the tool, whether it succeeded, how long it took, and counts only, never values.
+
+## Outbound event (optional)
+
+With `VITALIS_HOOK_URL` and `VITALIS_HOOK_SECRET` (`whsec_…`) set, Vitalis POSTs `{"type":"sleep.ready","day":"2026-10-10","timestamp":…}` the first time a push brings the night ending today. It fires once per day: old nights from a backfill and later pushes the same day stay silent. It is signed with Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature: v1,<HMAC-SHA256>`). The payload carries no health values; the receiver reads them over MCP. Delivery is tried 3 times. `get_freshness.last_event` shows the last attempt.
 
 ## CLI
 

@@ -52,6 +52,13 @@ test("hourly data and unsummarised sleep are skipped with a warning, the rest st
   assert.equal(one("SELECT COUNT(*) n FROM metric_days WHERE metric='steps' AND day='2026-09-20'").n, 0);
 });
 
+test("the token works bare (no Bearer, no space) and in X-Api-Key", async () => {
+  const p = body(payload("2026-09-25", 1));
+  assert.equal((await http("POST", "/ingest", { raw: p, headers: { authorization: ingestTok } })).status, 200);
+  assert.equal((await http("POST", "/ingest", { raw: p, headers: { "x-api-key": ingestTok } })).status, 200);
+  assert.equal((await http("POST", "/ingest", { raw: p, headers: { authorization: "vtl_wrong" } })).status, 401);
+});
+
 test("ingest refuses bad tokens, read tokens and non-JSON", async () => {
   assert.equal((await http("POST", "/ingest", { raw: "{}" })).status, 401);
   assert.equal((await http("POST", "/ingest", { token: readTok, raw: "{}" })).status, 401);

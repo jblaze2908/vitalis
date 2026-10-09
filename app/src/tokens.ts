@@ -18,8 +18,9 @@ export function createToken(name: string, scope: Scope) {
   return { id, name: name.trim(), scope, token: secret };
 }
 
+// "Bearer vtl_…" or the bare token: some senders (Health Auto Export's header editor) can't put a space in a value.
 export function authenticate(header: string | undefined): Token | null {
-  const m = /^Bearer\s+(\S+)$/i.exec(header ?? "");
+  const m = /^(?:Bearer\s+)?(vtl_\S+)$/i.exec((header ?? "").trim());
   if (!m || !m[1].startsWith(PREFIX)) return null;
   const h = sha(m[1]);
   const row = one<Token & { hash: string; last_used_at: number | null }>("SELECT id,name,scope,hash,last_used_at FROM tokens WHERE hash=? AND revoked_at IS NULL", h);

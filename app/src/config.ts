@@ -10,6 +10,9 @@ export const BIND = process.env.VITALIS_BIND ?? "127.0.0.1";
 export const HOST = process.env.VITALIS_HOST ?? "";
 // The owner's zone decides what "today" and "last night" mean when a caller gives no date.
 export const TZ = process.env.VITALIS_TZ ?? process.env.TZ ?? "UTC";
+// Optional outbound webhook (Standard Webhooks signing): "sleep.ready" once a day, when that day's night first arrives.
+export const HOOK_URL = process.env.VITALIS_HOOK_URL ?? "";
+export const HOOK_SECRET = process.env.VITALIS_HOOK_SECRET ?? "";
 export const MAX_INGEST_BYTES = Number(process.env.VITALIS_MAX_INGEST_MB ?? 50) << 20;
 
 export const now = () => Date.now();

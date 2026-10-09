@@ -5,6 +5,7 @@ import { httpErr } from "./config.js";
 import { all, one } from "./db.js";
 import { BASELINE_DAYS, baseline, compare, daily, decimals, heartRateBand, hm, nights, round, type Compared } from "./stats.js";
 import { addDays, clock, daysBetween, eveningMinutes, fromEveningMinutes, isoAt, ownerOffsetMin, today } from "./time.js";
+import { lastHook } from "./hooks.js";
 import { daysSinceTrained, lastTraining } from "./training.js";
 
 export const NO_ROW = "A day with no value means nothing reached Vitalis for it (phone locked, sync not run yet), not zero.";
@@ -44,6 +45,7 @@ export function freshness() {
     latest_day: latest,
     latest_strength_session: session ? isoAt(session.s, session.off) : null,
     latest_watch_workout: one<{ d: string | null }>("SELECT MAX(day) d FROM hk_workouts")?.d ?? null,
+    last_event: lastHook(),
     other_metrics_stored: Object.keys(latest).filter((k) => !known.has(k) && !BY_KEY.has(k)),
     note: NO_ROW,
   };

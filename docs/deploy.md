@@ -47,7 +47,7 @@ Each token is shown once. Revoke one with `token revoke <name>`.
 
 In Health Auto Export, create an automation:
 - **REST API**, URL `https://<VITALIS_HOST>/ingest`
-- header `Authorization: Bearer <ingest token>`
+- header `Authorization` with the ingest token as its value (`vtl_…`; "Bearer " is optional)
 - JSON, Export Version 2
 - Time Grouping Day, Summarize Data on
 - Since Last Sync, Batch Requests on

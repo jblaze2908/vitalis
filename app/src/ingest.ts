@@ -9,7 +9,7 @@ import { all, one, run, tx } from "./db.js";
 import { localDay, parseStamp } from "./time.js";
 
 export type IngestMeta = { origin: string; automation?: string | null; aggregation?: string | null; period?: string | null };
-export type IngestResult = { payload_id: number; duplicate: boolean; counts: Counts; warnings: string[] };
+export type IngestResult = { payload_id: number; duplicate: boolean; counts: Counts; warnings: string[]; new_nights?: string[] };
 type Counts = { metric_days: number; sleep_nights: number; workouts: number; skipped_metrics: number };
 
 type Row = Record<string, unknown>;
@@ -42,13 +42,13 @@ export const payloadIds = () => all<{ id: number }>("SELECT id FROM payloads ORD
 const zero = (): Counts => ({ metric_days: 0, sleep_nights: 0, workouts: 0, skipped_metrics: 0 });
 
 function apply(id: number, data: Row): IngestResult {
-  const counts = zero(), warnings: string[] = [];
+  const counts = zero(), warnings: string[] = [], newNights: string[] = [];
   try {
     tx(() => {
       for (const m of Array.isArray(data.metrics) ? (data.metrics as Row[]) : []) {
         const name = str(m.name);
         try {
-          if (name === "sleep_analysis") counts.sleep_nights += sleep(id, m, warnings);
+          if (name === "sleep_analysis") counts.sleep_nights += sleep(id, m, warnings, newNights);
           else { const n = metric(id, m, warnings); if (n < 0) counts.skipped_metrics++; else counts.metric_days += n; }
         } catch (e) { counts.skipped_metrics++; warnings.push(`${name || "unnamed metric"}: ${(e as Error).message}`); }
       }
@@ -62,7 +62,7 @@ function apply(id: number, data: Row): IngestResult {
     run("UPDATE payloads SET error=? WHERE id=?", (e as Error).message.slice(0, 500), id);
     warnings.push(`not parsed: ${(e as Error).message}`);
   }
-  return { payload_id: id, duplicate: false, counts, warnings };
+  return { payload_id: id, duplicate: false, counts, warnings, new_nights: newNights };
 }
 
 /** Rows written, or -1 when the metric was skipped. */
@@ -100,7 +100,7 @@ function metric(id: number, m: Row, warnings: string[]): number {
   return parsed.length;
 }
 
-function sleep(id: number, m: Row, warnings: string[]): number {
+function sleep(id: number, m: Row, warnings: string[], newNights: string[]): number {
   let n = 0;
   for (const r of Array.isArray(m.data) ? (m.data as Row[]) : []) {
     if (r.startDate !== undefined && r.date === undefined) {
@@ -115,6 +115,7 @@ function sleep(id: number, m: Row, warnings: string[]): number {
     const asleep = staged > 0 ? staged : stage("totalSleep");
     if (asleep <= 0) continue;
     const at = (k: string) => parseStamp(r[k])?.iso ?? null;
+    if (!one("SELECT 1 FROM sleep_nights WHERE day=?", t.day)) newNights.push(t.day);
     run(`INSERT INTO sleep_nights(day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,payload_id,updated_at)
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
          in_bed_start=excluded.in_bed_start,in_bed_end=excluded.in_bed_end,asleep_h=excluded.asleep_h,core_h=excluded.core_h,deep_h=excluded.deep_h,
