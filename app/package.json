@@ -1,0 +1,25 @@
+{
+  "name": "vitalis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vitalis: a self-hosted health ledger for agents. Apple Health data and a strength-training log, served over MCP.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/src/server.js",
+    "cli": "node dist/src/cli.js",
+    "test": "TZ=UTC node --test tests/*.test.mjs"
+  },
+  "engines": { "node": ">=22.13" },
+  "dependencies": {
+    "@hono/node-server": "2.1.1",
+    "@modelcontextprotocol/server": "2.1.0",
+    "hono": "4.13.9",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "typescript": "7.0.2"
+  }
+}
