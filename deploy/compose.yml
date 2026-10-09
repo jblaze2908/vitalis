@@ -1,0 +1,26 @@
+# Vitalis on one Docker host. Config lives outside the repo in ${VITALIS_CONFIG_DIR:-/etc/vitalis}/vitalis.env
+# (see .env.example). Data lives in /srv/vitalis on the host; create it owned by 1650:1650 before the first start.
+name: vitalis
+services:
+  app:
+    image: vitalis-app:${VITALIS_TAG:-local}
+    build: ../app
+    container_name: vitalis-app
+    restart: unless-stopped
+    user: "1650:1650"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    mem_limit: 256m
+    pids_limit: 128
+    ports:
+      # Loopback only: put your TLS reverse proxy in front.
+      - "127.0.0.1:8350:8350"
+    volumes:
+      - /srv/vitalis:/srv/vitalis
+    env_file: ["${VITALIS_CONFIG_DIR:-/etc/vitalis}/vitalis.env"]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

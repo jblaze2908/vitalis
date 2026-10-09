@@ -51,7 +51,7 @@ const span = (a: { from?: string; to?: string }, days: number) => {
 const READ = { readOnlyHint: true, openWorldHint: false };
 
 const SetIn = z.object({
-  id: z.string().min(8).max(64).optional().describe("your own id for this set (a UUID); a set id seen before is skipped, so retries are safe"),
+  id: z.string().min(1).max(64).optional().describe("your own id for this set (a UUID); a set id seen before is skipped, so retries are safe"),
   exercise: z.string().min(1).max(120).describe("exercise name or id, e.g. 'bench press' or 'barbell-bench-press-medium-grip'"),
   kind: z.enum(KINDS).optional().describe("warmup sets never count toward volume or records; default normal"),
   weight_kg: z.number().min(0).max(1000).nullable().optional().describe("load in kg; for dumbbells, one dumbbell"),
@@ -67,7 +67,7 @@ export function buildServer(token: Token) {
   const s = new McpServer({ name: "vitalis", version: "0.1.0" }, { instructions: INSTRUCTIONS });
 
   s.registerTool("get_brief", { title: "Today's check", annotations: READ, outputSchema: Out,
-    description: "Today's check: last night's sleep, resting heart rate, HRV and breathing against the person's usual; yesterday's activity; weight trend; last training and muscles not trained for 7+ days; a rule-based call (easy, as planned, normal, good) and a summary paragraph to quote. Start here for 'how did I sleep', 'should I train hard today', 'how am I doing'.",
+    description: "Today's check: last night's sleep, resting heart rate, HRV and breathing against the person's usual; yesterday's activity; weight trend; last training and muscles not trained for 7+ days; a rule-based call (easy, as_planned_no_records, normal, good, or unknown when there is no data or under 7 days of history) and a summary paragraph to quote. Start here for 'how did I sleep', 'should I train hard today', 'how am I doing'.",
     inputSchema: z.object({ day: day.optional().describe("the day to check; default today in the person's time zone") }) },
   wrap(ctx, "get_brief", (a: { day?: string }) => brief(a.day)));
 
@@ -116,7 +116,7 @@ export function buildServer(token: Token) {
 
   s.registerTool("log_sets", { title: "Log strength sets", annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, outputSchema: Out,
     description: "Log one or more strength-training sets. Sets join the open session whose last set was within 3 hours, else start a new one; pass session_id to choose (a new id starts a session with that id). Give each set your own id so a retry can't double-log. An unclear exercise name logs nothing and returns candidates to choose from.",
-    inputSchema: z.object({ sets: z.array(SetIn).min(1).max(100), session_id: z.string().min(8).max(64).optional(), title: z.string().max(80).optional().describe("session title, e.g. 'Push'") }) },
+    inputSchema: z.object({ sets: z.array(SetIn).min(1).max(100), session_id: z.string().min(1).max(64).optional(), title: z.string().max(80).optional().describe("session title, e.g. 'Push'") }) },
   wrap(ctx, "log_sets", (a: { sets: z.infer<typeof SetIn>[]; session_id?: string; title?: string }) => logSets(a, `mcp:${token.name}`),
     (r) => `${(r as { logged: unknown[] }).logged.length} sets`));
 

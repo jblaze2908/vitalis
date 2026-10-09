@@ -4,7 +4,7 @@ import { BY_KEY, METRICS, SLEEP_METRICS } from "./catalog.js";
 import { httpErr } from "./config.js";
 import { all, one } from "./db.js";
 import { BASELINE_DAYS, baseline, compare, daily, decimals, heartRateBand, hm, nights, round, type Compared } from "./stats.js";
-import { addDays, clock, daysBetween, eveningMinutes, isoAt, ownerOffsetMin, today } from "./time.js";
+import { addDays, clock, daysBetween, eveningMinutes, fromEveningMinutes, isoAt, ownerOffsetMin, today } from "./time.js";
 import { daysSinceTrained, lastTraining } from "./training.js";
 
 export const NO_ROW = "A day with no value means nothing reached Vitalis for it (phone locked, sync not run yet), not zero.";
@@ -146,7 +146,7 @@ export function getSleep(from: string, to: string) {
   const nb = baseline("bedtime", addDays(to, 1));
   return {
     range: `${from}..${to}`, keyed_by: "the day you woke up", nights_with_data: ns.length, nights_in_range: daysBetween(from, to) + 1,
-    average: { asleep: avgH === null ? null : hm(avgH), fell_asleep: avgBed === null ? null : compare("bedtime", from, avgBed).value },
+    average: { asleep: avgH === null ? null : hm(avgH), fell_asleep: avgBed === null ? null : fromEveningMinutes(avgBed) },
     usual_before_range: { asleep: bSleep.usual === null ? null : hm(Number(bSleep.usual)), fell_asleep: bBed.usual, days: bSleep.days, window: bSleep.window },
     ...(nb.usual !== null && { usual_fell_asleep_now: nb.usual }),
     nights: list, freshness: freshFor(["sleep_h"]), note: NO_ROW,
@@ -162,7 +162,7 @@ export function getMetrics(keys: string[], from: string, to: string, every: "day
   const series = keys.map((key) => {
     const def = BY_KEY.get(key), d = decimals(key);
     const vals = daily(key, from, to);
-    const fmt = (v: number) => (key === "bedtime" ? compare("bedtime", from, v).value : round(v, d));
+    const fmt = (v: number) => (key === "bedtime" ? fromEveningMinutes(v) : round(v, d));
     const points = every === "day"
       ? [...vals].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, value: fmt(v) }))
       : weekly(vals).map((w) => ({ week_of: w.start, value: fmt(w.avg), days: w.n }));

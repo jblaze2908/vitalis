@@ -74,7 +74,8 @@ function metric(id: number, m: Row, warnings: string[]): number {
   for (const r of rows) {
     const t = parseStamp(r.date);
     if (!t) continue;
-    if (!/[ T]00:00(:00)?/.test(str(r.date)) && str(r.date).length > 10) {
+    // A day-grouped value is stamped local midnight, however the phone's locale writes it ("12:00:00 AM" included).
+    if ((t.ms + t.offsetMin * 60_000) % 86_400_000 !== 0) {
       warnings.push(`${name}: sent per hour or finer; set the automation's Time Grouping to Day`);
       return -1;
     }

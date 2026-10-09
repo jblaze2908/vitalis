@@ -174,7 +174,8 @@ export function listWorkouts(from: string, to: string) {
   const sessions = all<SessionRow>("SELECT * FROM sessions WHERE deleted_at IS NULL AND started_at BETWEEN ? AND ? ORDER BY started_at DESC", a, b);
   const sets = liveSets(sessions.map((s) => s.id));
   const strength = sessions.map((s) => sessionView(s, sets.filter((x) => x.session_id === s.id), false))
-    .filter((v) => v.day >= from && v.day <= to);
+    // A session whose sets were all deleted isn't a workout.
+    .filter((v) => v.day >= from && v.day <= to && v.exercises.length > 0);
   const attached = new Set(strength.map((s) => (typeof s.watch === "object" ? s.watch.workout_id : "")));
   const watch = all<{ id: string; name: string; start: string; end: string; day: string; duration_s: number; active_kcal: number | null;
     hr_avg: number | null; hr_max: number | null; distance_km: number | null }>(
@@ -249,7 +250,7 @@ export function trainingSummary(from: string, to: string) {
   const [a, b] = dayBounds(from, to);
   const records = all<{ exercise_id: string; weight_kg: number; reps: number; performed_at: number; prior: number | null }>(`
     SELECT t.exercise_id, t.weight_kg, t.reps, t.performed_at,
-      (SELECT MAX(p.weight_kg * (1 + p.reps / 30.0)) FROM sets p JOIN sessions ps ON ps.id=p.session_id
+      (SELECT MAX(CASE WHEN p.reps = 1 THEN p.weight_kg ELSE p.weight_kg * (1 + p.reps / 30.0) END) FROM sets p JOIN sessions ps ON ps.id=p.session_id
         WHERE p.exercise_id=t.exercise_id AND p.performed_at < ? AND p.deleted_at IS NULL AND ps.deleted_at IS NULL AND p.kind!='warmup' AND p.reps BETWEEN 1 AND 12) prior
     FROM sets t JOIN sessions s ON s.id=t.session_id
     WHERE t.performed_at BETWEEN ? AND ? AND t.deleted_at IS NULL AND s.deleted_at IS NULL AND t.kind!='warmup' AND t.reps BETWEEN 1 AND 12 AND t.weight_kg > 0`, a, a, b)
