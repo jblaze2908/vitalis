@@ -90,8 +90,10 @@ function judge(sleep: { flag?: string; reading?: string; usual: unknown; delta?:
   const better = have.filter(([, c]) => c!.reading === "better").map(([n]) => n);
   const rule = "Rule: compare last night's sleep, resting heart rate and HRV with the 30-day usual range (10th–90th percentile). Two or more worse: easy. One worse: as planned, no records. Two or more better: good. Otherwise: normal.";
   if (!have.length) return { call: "unknown", reason: "No sleep, resting heart rate or HRV for this day yet.", worse, better, rule };
-  const nb = baseline("sleep_h", day).days;
-  if (nb < 7) return { call: "unknown", reason: `Only ${nb} days of history; a usual range needs 7.`, worse, better, rule };
+  // Judge only once some signal present today has a usual range to be judged against.
+  const keyOf: Record<string, string> = { sleep: "sleep_h", "resting heart rate": "resting_hr", HRV: "hrv" };
+  const nb = Math.max(...have.map(([n]) => baseline(keyOf[n], day).days));
+  if (nb < 7) return { call: "unknown", reason: `Only ${nb} days of history before ${day}; a usual range needs 7.`, worse, better, rule };
   if (worse.length >= 2) return { call: "easy", reason: `${worse.join(" and ")} are outside your usual range on the bad side.`, worse, better, rule };
   if (worse.length === 1) return { call: "as_planned_no_records", reason: `${worse[0]} is off your usual; the rest is normal.`, worse, better, rule };
   if (better.length >= 2) return { call: "good", reason: `${better.join(" and ")} are better than usual.`, worse, better, rule };

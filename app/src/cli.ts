@@ -5,6 +5,7 @@ import { all } from "./db.js";
 import { seedExercises } from "./exercises.js";
 import { freshness } from "./health.js";
 import { ingest, payloadIds, reparse } from "./ingest.js";
+import { isoAt, ownerOffsetMin } from "./time.js";
 import { createToken, listTokens, revokeToken, SCOPES, type Scope } from "./tokens.js";
 
 const HELP = `vitalis <command>
@@ -16,7 +17,8 @@ const HELP = `vitalis <command>
   syncs [n]                                       the last n pushes (default 20)
   freshness                                       what data is here and how current`;
 
-const iso = (ms: number | null) => (ms ? new Date(ms).toISOString().slice(0, 16).replace("T", " ") : "—");
+// Owner's local time, as agents see it.
+const iso = (ms: number | null) => (ms ? isoAt(ms, ownerOffsetMin(ms)).slice(0, 16).replace("T", " ") : "—");
 
 function main(argv: string[]) {
   const [cmd, sub, ...rest] = argv;
