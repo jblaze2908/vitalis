@@ -41,7 +41,13 @@ function main(argv: string[]) {
     }
   } else if (cmd === "reparse") {
     const ids = sub === "--all" ? payloadIds() : [Number(sub)];
-    for (const id of ids) { const r = reparse(id); console.log(`payload ${id}: ${JSON.stringify(r.counts)}${r.warnings.length ? ` (${r.warnings.length} warnings)` : ""}`); }
+    for (const id of ids) {
+      try { const r = reparse(id); console.log(`payload ${id}: ${JSON.stringify(r.counts)}${r.warnings.length ? ` (${r.warnings.length} warnings)` : ""}`); }
+      catch (e) {
+        if (sub !== "--all") throw e;
+        console.error(`payload ${id}: ${(e as Error).message}`); process.exitCode = 1;
+      }
+    }
   } else if (cmd === "syncs") {
     const rows = all<{ id: number; received_at: number; origin: string; automation: string | null; bytes: number; counts: string | null; warnings: string | null; error: string | null }>(
       "SELECT id,received_at,origin,automation,bytes,counts,warnings,error FROM payloads ORDER BY id DESC LIMIT ?", Number(sub ?? 20));

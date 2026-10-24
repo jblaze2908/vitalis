@@ -1,0 +1,126 @@
+{
+  "profile": "/home/jblaze2908/projects/vitalis/app/.data/profiles/CPU.20261024.060959.23160.0.001.cpuprofile",
+  "duration_ms": 7873.585,
+  "top_self_ms": [
+    {
+      "frame": "transactionSQL file:///home/jblaze2908/projects/vitalis/app/dist/src/db.js:174",
+      "self_ms": 2722.752000000002
+    },
+    {
+      "frame": "run file:///home/jblaze2908/projects/vitalis/app/dist/src/db.js:140",
+      "self_ms": 1043.7770000000012
+    },
+    {
+      "frame": "canonical file:///home/jblaze2908/projects/vitalis/app/dist/src/v2.js:14",
+      "self_ms": 590.3480000000008
+    },
+    {
+      "frame": "all file:///home/jblaze2908/projects/vitalis/app/dist/src/db.js:162",
+      "self_ms": 491.6700000000001
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/app/dist/src/v2.js:77",
+      "self_ms": 402.69500000000056
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/app/dist/src/v2.js:18",
+      "self_ms": 251.86099999999993
+    },
+    {
+      "frame": "update node:internal/crypto/hash:132",
+      "self_ms": 214.43599999999995
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/app/bench/profile-ingest.mjs:15",
+      "self_ms": 182.83800000000005
+    },
+    {
+      "frame": "(garbage collector) :0",
+      "self_ms": 159.91699999999994
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/app/bench/profile-ingest.mjs:1",
+      "self_ms": 146.01599999999996
+    },
+    {
+      "frame": "dayAt file:///home/jblaze2908/projects/vitalis/app/dist/src/v2-metrics.js:37",
+      "self_ms": 143.472
+    },
+    {
+      "frame": "inst._zod.parse file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:1695",
+      "self_ms": 143.28599999999997
+    },
+    {
+      "frame": "applyV2 file:///home/jblaze2908/projects/vitalis/app/dist/src/v2.js:39",
+      "self_ms": 137.01999999999992
+    },
+    {
+      "frame": "Hash node:internal/crypto/hash:88",
+      "self_ms": 93.73499999999997
+    },
+    {
+      "frame": "projectSample file:///home/jblaze2908/projects/vitalis/app/dist/src/v2-derived.js:246",
+      "self_ms": 73.97599999999998
+    },
+    {
+      "frame": "sourceId file:///home/jblaze2908/projects/vitalis/app/dist/src/v2.js:86",
+      "self_ms": 61.892
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/app/dist/src/v2-schema.js:4",
+      "self_ms": 47.77100000000001
+    },
+    {
+      "frame": "deviceId file:///home/jblaze2908/projects/vitalis/app/dist/src/v2.js:95",
+      "self_ms": 46.61300000000001
+    },
+    {
+      "frame": "digest node:internal/crypto/hash:150",
+      "self_ms": 43.91799999999999
+    },
+    {
+      "frame": "(anonymous) :3",
+      "self_ms": 43.578999999999986
+    },
+    {
+      "frame": "group file:///home/jblaze2908/projects/vitalis/app/dist/src/v2-derived.js:61",
+      "self_ms": 42.371999999999986
+    },
+    {
+      "frame": "ordered file:///home/jblaze2908/projects/vitalis/app/dist/src/v2-schema.js:25",
+      "self_ms": 34.628
+    },
+    {
+      "frame": "processChunkSync node:zlib:408",
+      "self_ms": 33.827
+    },
+    {
+      "frame": "runChecks file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:34",
+      "self_ms": 33.74400000000001
+    },
+    {
+      "frame": "tx file:///home/jblaze2908/projects/vitalis/app/dist/src/db.js:187",
+      "self_ms": 31.591
+    },
+    {
+      "frame": "(idle) :0",
+      "self_ms": 27.406000000000002
+    },
+    {
+      "frame": "inst._zod.run file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:97",
+      "self_ms": 26.927
+    },
+    {
+      "frame": "stampParts file:///home/jblaze2908/projects/vitalis/app/dist/src/v2-time.js:2",
+      "self_ms": 26.167
+    },
+    {
+      "frame": "inst._zod.parse file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:2085",
+      "self_ms": 25.282000000000004
+    },
+    {
+      "frame": "hexWrite :0",
+      "self_ms": 25.160999999999998
+    }
+  ]
+}

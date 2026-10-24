@@ -14,6 +14,9 @@ export const TZ = process.env.VITALIS_TZ ?? process.env.TZ ?? "UTC";
 export const HOOK_URL = process.env.VITALIS_HOOK_URL ?? "";
 export const HOOK_SECRET = process.env.VITALIS_HOOK_SECRET ?? "";
 export const MAX_INGEST_BYTES = Number(process.env.VITALIS_MAX_INGEST_MB ?? 50) << 20;
+// One native batch holds the single ingest writer for its whole transaction, so it is capped (413 above these).
+export const MAX_BATCH_OBJECTS = 5000; // upserts + deletions
+export const MAX_BATCH_DAILY = 5000;   // daily_stats
 
 export const now = () => Date.now();
 

@@ -1,0 +1,256 @@
+{
+  "label": "set-based",
+  "commit": "a76c2b9c94999b717c3cb7cc7b09a01f51514e41",
+  "node": "v22.23.1",
+  "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+  "generated_samples": 1005000,
+  "sample_count": 1012000,
+  "batch_size": 5000,
+  "batches": {
+    "heart_rate": {
+      "batches": 115,
+      "objects": 575000,
+      "samples_per_second": 5218.3115885285715,
+      "p50_ms": 987.1128499999977,
+      "p95_ms": 1117.341981000005,
+      "max_ms": 1142.3605340000067
+    },
+    "cumulative": {
+      "batches": 75,
+      "objects": 375000,
+      "samples_per_second": 4276.33192993714,
+      "p50_ms": 1164.9985039999883,
+      "p95_ms": 1232.1658179999795,
+      "max_ms": 1266.9090039999865
+    },
+    "sleep": {
+      "batches": 8,
+      "objects": 40000,
+      "samples_per_second": 3083.6230951448165,
+      "p50_ms": 1582.119543000008,
+      "p95_ms": 1731.7099940000044,
+      "max_ms": 1731.7099940000044
+    },
+    "strength": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 3930.0883932843803,
+      "p50_ms": 1272.2360160000098,
+      "p95_ms": 1272.2360160000098,
+      "max_ms": 1272.2360160000098
+    },
+    "routes": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 3214.7516920842336,
+      "p50_ms": 1555.330077999999,
+      "p95_ms": 1555.330077999999,
+      "max_ms": 1555.330077999999
+    },
+    "cardiac": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 3420.4768283296057,
+      "p50_ms": 1461.784497000015,
+      "p95_ms": 1461.784497000015,
+      "max_ms": 1461.784497000015
+    },
+    "deletions": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 5008.034861082884,
+      "p50_ms": 998.3956060000055,
+      "p95_ms": 998.3956060000055,
+      "max_ms": 998.3956060000055
+    },
+    "reupserts": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 19727.622608496316,
+      "p50_ms": 253.45172599999933,
+      "p95_ms": 253.45172599999933,
+      "max_ms": 253.45172599999933
+    },
+    "steady_state": {
+      "batches": 20,
+      "objects": 2000,
+      "samples_per_second": 2596.9707043109706,
+      "p50_ms": 22.185939999995753,
+      "p95_ms": 74.43996600000537,
+      "max_ms": 74.43996600000537
+    },
+    "concurrent_cumulative": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 3800.04160695953,
+      "p50_ms": 1315.7750670000096,
+      "p95_ms": 1315.7750670000096,
+      "max_ms": 1315.7750670000096
+    }
+  },
+  "batch_wall": {
+    "p50_ms": 1090.5754420000012,
+    "p95_ms": 1315.7750670000096,
+    "max_ms": 1731.7099940000044
+  },
+  "longest_event_loop_block_ms": 1731.8256159999873,
+  "read_during_ingest_ms": 1328.4545090000029,
+  "reads": {
+    "status": {
+      "p50_ms": 0.40477500000270084,
+      "p95_ms": 0.4903119999798946,
+      "max_ms": 0.4903119999798946
+    },
+    "freshness": {
+      "p50_ms": 67.3883119999955,
+      "p95_ms": 69.58641000001808,
+      "max_ms": 69.58641000001808
+    },
+    "metrics_90d": {
+      "p50_ms": 15.842720000015106,
+      "p95_ms": 31.672409999999218,
+      "max_ms": 31.672409999999218
+    },
+    "sleep_30n": {
+      "p50_ms": 8.104484999988927,
+      "p95_ms": 10.684219999995548,
+      "max_ms": 10.684219999995548
+    },
+    "list_workouts": {
+      "p50_ms": 6.000566999980947,
+      "p95_ms": 9.678290999989258,
+      "max_ms": 9.678290999989258
+    }
+  },
+  "cold_start": {
+    "empty": {
+      "p50_ms": 341.9476859999995,
+      "p95_ms": 392.3921010000049,
+      "max_ms": 392.3921010000049
+    },
+    "million": {
+      "p50_ms": 313.23139800000354,
+      "p95_ms": 354.43451699998695,
+      "max_ms": 354.43451699998695
+    }
+  },
+  "storage": {
+    "checkpoint_bytes": 1253040128,
+    "sample_bytes": 1193455616,
+    "bytes_per_sample": 1179.3039683794466,
+    "point_bytes": 19464192,
+    "generated_points": 126000,
+    "bytes_per_point": 154.47771428571428,
+    "retained_payload_bytes": 30202488,
+    "retained_payload_share": 0.024103368539526934,
+    "tables": {
+      "calls": 49152,
+      "calls_at": 4096,
+      "exercises": 106496,
+      "hk_batches": 32768,
+      "hk_batches_received": 4096,
+      "hk_daily_stats": 741376,
+      "hk_heartbeat_beats": 1695744,
+      "hk_quantity_points": 7880704,
+      "hk_route_points": 2924544,
+      "hk_sample_values": 123015168,
+      "hk_samples": 593969152,
+      "hk_samples_end": 58847232,
+      "hk_samples_source": 85676032,
+      "hk_samples_start": 58847232,
+      "hk_sleep_bounds": 4096,
+      "hk_sleep_day": 1572864,
+      "hk_sleep_members": 2867200,
+      "hk_tombstones": 450560,
+      "hk_type_status": 4096,
+      "hk_values_day": 53010432,
+      "hk_values_time": 76095488,
+      "hk_values_window": 38334464,
+      "hk_workouts": 28672,
+      "hk_workouts_source_window": 4096,
+      "hk_workouts_start": 4096,
+      "hook_events": 4096,
+      "metric_days": 774144,
+      "metric_days_day": 245760,
+      "payloads": 30326784,
+      "payloads_received": 4096,
+      "sessions": 4096,
+      "sessions_started": 4096,
+      "sets": 4096,
+      "sets_exercise": 4096,
+      "sets_session": 4096,
+      "sleep_nights": 196608,
+      "sqlite_autoindex_exercises_1": 28672,
+      "sqlite_autoindex_hk_batches_1": 4096,
+      "sqlite_autoindex_hk_daily_stats_1": 258048,
+      "sqlite_autoindex_hk_heartbeat_beats_1": 1654784,
+      "sqlite_autoindex_hk_quantity_points_1": 3862528,
+      "sqlite_autoindex_hk_route_points_1": 1445888,
+      "sqlite_autoindex_hk_sample_values_1": 53813248,
+      "sqlite_autoindex_hk_samples_1": 51146752,
+      "sqlite_autoindex_hk_sleep_bounds_1": 4096,
+      "sqlite_autoindex_hk_sleep_members_1": 1990656,
+      "sqlite_autoindex_hk_tombstones_1": 249856,
+      "sqlite_autoindex_hk_type_status_1": 4096,
+      "sqlite_autoindex_hk_workouts_1": 12288,
+      "sqlite_autoindex_hook_events_1": 4096,
+      "sqlite_autoindex_metric_days_1": 557056,
+      "sqlite_autoindex_payloads_1": 24576,
+      "sqlite_autoindex_sessions_1": 4096,
+      "sqlite_autoindex_sets_1": 4096,
+      "sqlite_autoindex_sleep_nights_1": 65536,
+      "sqlite_autoindex_tokens_1": 4096,
+      "sqlite_autoindex_tokens_2": 4096,
+      "sqlite_schema": 16384,
+      "sqlite_sequence": 4096,
+      "tokens": 4096
+    },
+    "point_kinds": {
+      "layout": "child-rows-and-ecg-json",
+      "kinds": {
+        "quantity": {
+          "points": 69000,
+          "allocated_bytes": 11743232,
+          "allocated_bytes_per_point": 170.19176811594204
+        },
+        "route": {
+          "points": 27000,
+          "allocated_bytes": 4370432,
+          "allocated_bytes_per_point": 161.86785185185184
+        },
+        "heartbeat": {
+          "points": 30000,
+          "allocated_bytes": 3350528,
+          "allocated_bytes_per_point": 111.68426666666667
+        },
+        "ecg": {
+          "points": 15000,
+          "encoded_bytes": 283439,
+          "encoded_bytes_per_point": 18.895933333333332,
+          "allocated_bytes": null,
+          "allocated_bytes_per_point": null
+        }
+      },
+      "allocation_note": "Child table and index pages measured directly. ECG JSON shares sample pages; only its logical bytes are attributed."
+    },
+    "checkpoint_bytes_per_sample": 1238.1819446640316,
+    "retained_payload_allocated_bytes": 30355456
+  },
+  "compression": {
+    "gzip": {
+      "input_bytes": 2405034,
+      "bytes": 131185,
+      "p50_ms": 18.12716299999738,
+      "p95_ms": 20.97964000000502,
+      "max_ms": 20.97964000000502
+    },
+    "zstd": {
+      "input_bytes": 2405034,
+      "bytes": 132030,
+      "p50_ms": 6.108172000007471,
+      "p95_ms": 7.374796999996761,
+      "max_ms": 7.374796999996761
+    }
+  },
+  "db_path": "/home/jblaze2908/projects/vitalis/.data/setbased-src/app/.data/bench/vitalis-bench-KdS08f/bench.db"
+}

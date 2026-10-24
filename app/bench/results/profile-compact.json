@@ -1,0 +1,19 @@
+{
+  "batches": 12,
+  "warmup_batches": 3,
+  "average": {
+    "bytes": 2371089.222222222,
+    "wall_ms": 825.3081420000003,
+    "parse_ms": 15.009870888888903,
+    "validate_ms": 41.97891811110761,
+    "sqlite_ms": 282.1129754444395,
+    "derive_ms": 8.12953977777771,
+    "compress_ms": 13.297435111111302,
+    "hash_ms": 84.77827433334511,
+    "other_ms": 380.00112833333014,
+    "scalar_samples_per_second": 6058.3432363617685
+  },
+  "phases_path": ".data/profiles/ingest-FHOk9R/phases.jsonl",
+  "db_path": "/home/jblaze2908/projects/vitalis/.data/compact-src/app/.data/bench/vitalis-bench-faEaOY/bench.db",
+  "instrumentation_note": "Diagnostic before transaction-clock correction: COMMIT/checkpoint time is in other_ms, not sqlite_ms. The named-zone validation measurement is unaffected. Final profile includes transaction time in SQLite."
+}
