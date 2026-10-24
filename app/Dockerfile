@@ -1,5 +1,5 @@
 # Vitalis: one Node process (Hono + MCP SDK + node:sqlite). The SQLite file lives under /srv/vitalis, mounted from the host.
-FROM node:22-bookworm-slim AS build
+FROM node:22.23.1-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
@@ -9,7 +9,7 @@ COPY data ./data
 COPY tests ./tests
 RUN npm run build && npm test && npm prune --omit=dev
 
-FROM node:22-bookworm-slim
+FROM node:22.23.1-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production VITALIS_ROOT=/srv/vitalis VITALIS_BIND=0.0.0.0 PORT=8350 NODE_OPTIONS=--no-warnings=ExperimentalWarning
 COPY --from=build /app/package.json ./

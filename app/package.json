@@ -12,7 +12,7 @@
     "test": "TZ=UTC node --test tests/*.test.mjs",
     "bench": "npm run build && node bench/v2-bench.mjs"
   },
-  "engines": { "node": ">=22.13" },
+  "engines": { "node": ">=22.15" },
   "dependencies": {
     "@hono/node-server": "2.1.1",
     "@modelcontextprotocol/server": "2.1.0",
