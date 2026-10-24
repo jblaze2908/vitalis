@@ -4,12 +4,35 @@ import { join } from "node:path";
 import { profile } from "./v2-profile.js";
 import { rebuildISO } from "./v2-time.js";
 import { ROOT } from "./config.js";
+import { HK_METRICS } from "./v2-metrics.js";
 
 export const db = new DatabaseSync(process.env.VITALIS_DB ?? join(ROOT, "vitalis.db"));
 // Keep existing files' page size; choose the measured 4K layout only before a fresh file gets pages.
 if (db.prepare("PRAGMA page_count").get()!.page_count === 0) db.exec("PRAGMA page_size=4096");
 db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=3000; PRAGMA foreign_keys=ON;
   PRAGMA cache_size=-65536; PRAGMA mmap_size=268435456; PRAGMA temp_store=MEMORY; PRAGMA wal_autocheckpoint=8192;`);
+
+// The first v2 layout (dcfe6d3) keyed hk_samples by uuid with no type_id. Everything in it is derivable from payloads, so
+// drop it and let the current DDL rebuild it. payloads and the non-hk tables are never touched; hk_workouts predates v2.
+const OLD_LAYOUT_VIEWS = ["hk_raw", "hk_values"];
+// Children before parents: foreign_keys=ON makes DROP TABLE check references.
+const OLD_LAYOUT_TABLES = ["hk_quantity_points", "hk_route_points", "hk_heartbeat_beats", "hk_sample_values", "hk_sleep_members", "hk_blobs",
+  "hk_value_days", "hk_samples", "hk_tombstones", "hk_daily_stats", "hk_batches", "hk_type_status", "hk_sleep_bounds", "hk_types", "hk_sources", "hk_devices"];
+const oldLayout = () => {
+  const cols = db.prepare("PRAGMA table_info(hk_samples)").all();
+  return cols.length > 0 && !cols.some(c => c.name === "type_id");
+};
+if (oldLayout()) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    if (oldLayout()) { // another connection may have migrated while this one waited
+      for (const v of OLD_LAYOUT_VIEWS) db.exec(`DROP VIEW IF EXISTS ${v}`);
+      for (const t of OLD_LAYOUT_TABLES) db.exec(`DROP TABLE IF EXISTS ${t}`);
+      console.warn("db: dropped the old (dcfe6d3) hk_* native layout; payloads are untouched. Run `vitalis reparse --all` to rebuild it.");
+    }
+    db.exec("COMMIT");
+  } catch (e) { db.exec("ROLLBACK"); throw e; }
+}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS tokens (
@@ -121,6 +144,19 @@ const hasCodec = () => db.prepare("PRAGMA table_info(payloads)").all().some(c =>
 if (!hasCodec()) {
   try { db.exec("ALTER TABLE payloads ADD COLUMN codec TEXT NOT NULL DEFAULT 'gzip'"); }
   catch (e) { if (!hasCodec()) throw e; } // another connection may have added it while this one waited
+}
+
+// hk_types rows are created once, but the HK_METRICS mapping can change: make the table follow it at every start.
+// Rows already derived under the old mapping need `vitalis reparse --all`.
+{
+  const sync = db.prepare("UPDATE hk_types SET metric=?,cumulative=? WHERE identifier=? AND (metric IS NOT ? OR cumulative<>?)");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const [identifier, m] of HK_METRICS) sync.run(m.def.key, m.cumulative ? 1 : 0, identifier, m.def.key, m.cumulative ? 1 : 0);
+    db.prepare(`UPDATE hk_types SET metric=NULL,cumulative=0 WHERE (metric IS NOT NULL OR cumulative<>0)
+      AND identifier NOT IN (SELECT value FROM json_each(?))`).run(JSON.stringify([...HK_METRICS.keys()]));
+    db.exec("COMMIT");
+  } catch (e) { db.exec("ROLLBACK"); throw e; }
 }
 
 // Bound dynamic-query growth while reusing the hot statements on this connection.
