@@ -34,8 +34,16 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
     const parsed = envelopeSchema.safeParse(json);
     if (!parsed.success) throw httpErr(400, `Invalid sync envelope: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
     const envelope = parsed.data;
+    const touchedTypes = new Set<string>();
+    const counter = (type: string, live: number, deleted: number) => {
+      touchedTypes.add(type);
+      run(`INSERT INTO hk_type_status(type,live,deleted) VALUES(?,?,?) ON CONFLICT(type)
+        DO UPDATE SET live=live+excluded.live,deleted=deleted+excluded.deleted`, type, live, deleted);
+    };
     const previous = one<Batch>("SELECT * FROM hk_batches WHERE batch_id=?", envelope.batch_id);
     if (previous && (!replay || previous.payload_id !== id)) {
+      const stored = one<{ sha256: string }>("SELECT sha256 FROM payloads WHERE id=?", previous.payload_id)!;
+      if (stored.sha256 !== hash(body)) throw httpErr(409, "batch_id already used with a different payload");
       recordPayload(id, JSON.parse(previous.counts_json), JSON.parse(previous.rejected_json));
       return result(previous, true);
     }
@@ -55,7 +63,12 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         const contentHash = hash(canonical(s));
         if (old?.content_hash === contentHash && !replay) { counts.unchanged++; continue; }
         if (old) derived.touch(old);
-        const deletedAt = one<{ deleted_at: number }>("SELECT deleted_at FROM hk_tombstones WHERE uuid=?", s.uuid)?.deleted_at ?? old?.deleted_at ?? null;
+        const tombstone = one<{ type: string; deleted_at: number }>("SELECT type,deleted_at FROM hk_tombstones WHERE uuid=?", s.uuid);
+        if (tombstone && tombstone.type !== s.type) { reject(object, "Upsert type does not match tombstone"); continue; }
+        const deletedAt = tombstone?.deleted_at ?? old?.deleted_at ?? null;
+        if (old) counter(old.type, old.deleted_at === null ? -1 : 0, old.deleted_at !== null ? -1 : 0);
+        else if (deletedAt !== null) counter(s.type, 0, -1); // the unknown tombstone already counted
+        counter(s.type, deletedAt === null ? 1 : 0, deletedAt !== null ? 1 : 0);
         const extra: Record<string, unknown> = { ...s };
         for (const key of ["uuid", "type", "start", "end", "tz", "source", "device", "metadata"]) delete extra[key];
         if (s.kind === "quantity") { delete extra.value; delete extra.unit; delete extra.series; }
@@ -73,7 +86,9 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
           s.kind === "quantity" ? s.value : null, s.kind === "quantity" ? s.unit : null, s.kind === "category" ? s.value : null,
           s.source.name, s.source.bundle_id, JSON.stringify(s.source), s.device === undefined ? null : JSON.stringify(s.device),
           s.metadata === undefined ? null : JSON.stringify(s.metadata), JSON.stringify(extra), contentHash, id, now(), now(), deletedAt);
-        children(s);
+        if (s.type === "HKCategoryTypeIdentifierSleepAnalysis" && deletedAt === null) run(`INSERT INTO hk_sleep_bounds(source,duration_ms) VALUES(?,?)
+          ON CONFLICT(source) DO UPDATE SET duration_ms=MAX(duration_ms,excluded.duration_ms)`, s.source.name, Date.parse(s.end) - Date.parse(s.start));
+        if (deletedAt === null) children(s); else clearContent(s.uuid);
         derived.project(s, deletedAt === null);
         derived.touch(one<RawRow>("SELECT * FROM hk_samples WHERE uuid=?", s.uuid)!);
         if (!old) counts.inserted++; else if (old.content_hash === contentHash) counts.unchanged++; else counts.updated++;
@@ -88,6 +103,8 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         const tombstone = one<{ deleted_at: number }>("SELECT deleted_at FROM hk_tombstones WHERE uuid=?", uuid)!;
         run("UPDATE hk_samples SET deleted_at=?,updated_at=? WHERE uuid=? AND deleted_at IS NULL", tombstone.deleted_at, now(), uuid);
         run("DELETE FROM hk_sample_values WHERE uuid=?", uuid);
+        clearContent(uuid);
+        if (marker.changes) counter(type, old?.deleted_at === null ? -1 : 0, old?.deleted_at !== null && old ? 0 : 1);
         counts.deleted += Number(marker.changes);
       }
       for (const object of envelope.daily_stats) {
@@ -104,6 +121,8 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         derived.daily(s); counts.daily_stats++;
       }
       derived.finish();
+      for (const type of touchedTypes) run(`UPDATE hk_type_status SET newest_end=(SELECT end_iso FROM hk_samples
+        WHERE type=? AND deleted_at IS NULL ORDER BY end_ms DESC,uuid LIMIT 1) WHERE type=?`, type, type);
       const received = one<{ received_at: number }>("SELECT received_at FROM payloads WHERE id=?", id)!.received_at;
       run(`INSERT INTO hk_batches(batch_id,payload_id,received_at,counts_json,rejected_json) VALUES(?,?,?,?,?) ON CONFLICT(batch_id)
         DO UPDATE SET counts_json=excluded.counts_json,rejected_json=excluded.rejected_json`, envelope.batch_id, id, received, JSON.stringify(counts), JSON.stringify(rejected));
@@ -119,6 +138,13 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
 function recordPayload(id: number, counts: Counts, rejected: Rejection[]) {
   run("UPDATE payloads SET parsed_at=?,counts=?,warnings=?,error=NULL WHERE id=?", now(), JSON.stringify(counts),
     JSON.stringify(rejected.map((r) => `${r.uuid ?? "object"}: ${r.reason}`)), id);
+}
+
+function clearContent(uuid: string) {
+  for (const table of ["hk_quantity_points", "hk_route_points", "hk_heartbeat_beats"]) run(`DELETE FROM ${table} WHERE uuid=?`, uuid);
+  // Retain only the identity and deleted state. Empty sentinels satisfy this undeployed schema's NOT NULL fields.
+  run(`UPDATE hk_samples SET kind='other',start_ms=0,end_ms=0,start_iso='',end_iso='',tz=NULL,value=NULL,unit=NULL,
+    category_value=NULL,source_name='',source_bundle='',source_json='{}',device_json=NULL,metadata_json=NULL,extra_json='{}' WHERE uuid=?`, uuid);
 }
 
 function children(s: Sample) {
@@ -139,12 +165,8 @@ function children(s: Sample) {
 
 export function syncStatus() {
   const batches = all<Batch>("SELECT * FROM hk_batches ORDER BY received_at DESC,payload_id DESC LIMIT 20");
-  const types = all<{ type: string; live: number; deleted: number; newest_end: string | null }>(`WITH objects AS (
-    SELECT type,deleted_at,end_iso,end_ms FROM hk_samples UNION ALL
-    SELECT t.type,t.deleted_at,NULL,NULL FROM hk_tombstones t WHERE NOT EXISTS (SELECT 1 FROM hk_samples s WHERE s.uuid=t.uuid)
-  ) SELECT type,SUM(deleted_at IS NULL) live,SUM(deleted_at IS NOT NULL) deleted,
-    (SELECT s.end_iso FROM hk_samples s WHERE s.type=objects.type AND s.deleted_at IS NULL ORDER BY s.end_ms DESC,s.uuid LIMIT 1) newest_end
-    FROM objects GROUP BY type ORDER BY type`);
+  const types = all<{ type: string; live: number; deleted: number; newest_end: string | null }>(
+    "SELECT type,live,deleted,newest_end FROM hk_type_status WHERE live+deleted>0 ORDER BY type");
   return { last_batch_at: batches.length ? new Date(batches[0].received_at).toISOString() : null, types,
     batches: batches.map((b) => ({ batch_id: b.batch_id, payload_id: b.payload_id, received_at: new Date(b.received_at).toISOString(),
       counts: JSON.parse(b.counts_json) as Counts, rejected: JSON.parse(b.rejected_json) as Rejection[] })) };

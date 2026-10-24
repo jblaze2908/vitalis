@@ -11,11 +11,17 @@ type MetricRow = { day: string; source: string; qty: number | null; min: number 
 export type Night = { day: string; source: string; sleep_start: string | null; sleep_end: string | null; in_bed_start: string | null;
   in_bed_end: string | null; asleep_h: number; core_h: number | null; deep_h: number | null; rem_h: number | null; awake_h: number | null };
 
-// When several sources report one day, the merged total ('') wins, then the Watch, then whatever came first.
+// Explicit Apple-merged rows always win. Cumulative fallback uses the largest total; discrete ties use source name.
 const rank = (s: string) => (s === "" ? 0 : /watch/i.test(s) ? 1 : 2);
-function pickPerDay<T extends { day: string; source: string }>(rows: T[]): Map<string, T> {
+function pickPerDay<T extends { day: string; source: string; qty?: number | null }>(rows: T[], cumulative = false): Map<string, T> {
   const m = new Map<string, T>();
-  for (const r of rows) { const cur = m.get(r.day); if (!cur || rank(r.source) < rank(cur.source)) m.set(r.day, r); }
+  for (const r of rows) {
+    const cur = m.get(r.day);
+    if (!cur) { m.set(r.day, r); continue; }
+    const cmp = r.source === "" || cur.source === "" ? rank(r.source) - rank(cur.source)
+      : cumulative ? (cur.qty ?? -Infinity) - (r.qty ?? -Infinity) : rank(r.source) - rank(cur.source);
+    if (cmp < 0 || (cmp === 0 && r.source < cur.source)) m.set(r.day, r);
+  }
   return m;
 }
 
@@ -35,7 +41,7 @@ export function daily(key: string, from: string, to: string): Map<string, number
     return out;
   }
   const rows = all<MetricRow>("SELECT day,source,qty,min,avg,max FROM metric_days WHERE metric=? AND day BETWEEN ? AND ?", key, from, to);
-  for (const [day, r] of pickPerDay(rows)) { const v = r.qty ?? r.avg; if (v !== null) out.set(day, v); }
+  for (const [day, r] of pickPerDay(rows, rows.some((r) => r.qty !== null))) { const v = r.qty ?? r.avg; if (v !== null) out.set(day, v); }
   return out;
 }
 

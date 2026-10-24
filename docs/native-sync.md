@@ -16,7 +16,7 @@ not a server rule).
 ```json
 {
   "schema": 1,
-  "batch_id": "6F1C…",                 // client UUID; a batch_id seen before is a no-op (200, duplicate: true)
+  "batch_id": "6F1C…",                 // client UUID; same batch_id and payload is a no-op (200, duplicate: true)
   "client": { "install_id": "…", "app_version": "0.1.0", "os": "iOS 26.1", "model": "iPhone17,1" },
   "upserts":   [ /* Sample, below */ ],
   "deletions": [ { "uuid": "…", "type": "HKQuantityTypeIdentifierStepCount" } ],
@@ -81,6 +81,7 @@ that any sample in the batch touches. These feed the existing `metric_days` rows
 - The whole body is stored gzipped in `payloads` (origin `v2`) before parsing, as `/ingest` does, so a
   parser fix can be replayed with `vitalis reparse`.
 - The batch is applied in one transaction. A malformed envelope is `400` and nothing is applied.
+- Reusing a `batch_id` with a different payload SHA-256 returns `409`; no objects are applied.
 - A single bad object is `rejected` with a reason. The rest still apply.
 - The phone advances its HealthKit anchor only after a `200`. A rejected object is logged on the phone
   and not re-sent; the stored body lets the server recover it after a fix.
@@ -95,8 +96,8 @@ keeps working:
 - `metric_days` with source `''` from `daily_stats`. Per-source rows come from raw samples.
 - `sleep_nights` from sleep-stage samples, grouped into nights by the existing rule: the night belongs
   to the day the sleeper woke up.
-- `hk_workouts` from workout samples. Heart rate min, avg and max come from heart rate samples inside
-  the workout.
+- `hk_workouts` from workout samples. Heart rate min, avg and max come from workout statistics,
+  falling back to heart rate samples inside the workout. Distance uses the first present distance statistic.
 
 ## GET /v2/sync/status
 
@@ -142,10 +143,10 @@ The following choices resolve details not fixed by the original contract:
   object key order alone is unchanged. Array order and absent versus null fields remain significant.
 - Counts describe raw row operations: the first accepted UUID is inserted, changed content is
   updated, identical content is unchanged. A first deletion marker counts as deleted even for an
-  unknown UUID; repeated deletions do not. A late upsert may insert/update raw content but remains
-  deleted. Upserts run before deletions in a batch, so deletion wins. A deletion whose type differs
+  unknown UUID; repeated deletions do not. A late upsert stores only identity and the deleted state, with no sample content. Deletion
+  clears series, route, heartbeat and ECG content from the ledger; raw bodies remain for replay. Upserts run before deletions in a batch, so deletion wins. A deletion whose type differs
   from an existing sample is rejected. Duplicate batches return the original counts/rejections with
-  `duplicate: true`, including when a different body reuses the batch id. Rejections without a
+  `duplicate: true`, only for an identical payload SHA-256; a different body returns `409`. Rejections without a
   usable sample UUID (including bad daily statistics) use `uuid: null`.
 - A sample's IANA `tz`, when present, determines historical local days; otherwise its own ISO offset
   does. A cumulative quantity interval crossing midnight is split proportionally by elapsed time,
@@ -161,14 +162,15 @@ The following choices resolve details not fixed by the original contract:
   Native `%` values use [HKUnit.percent()](https://developer.apple.com/documentation/healthkit/hkunit/percent%28%29):
   1.0 means 100%, converted to the existing catalog's 0–100 scale for both oxygen and body fat.
 - Sleep segments from the same source form a session when they overlap or the gap is at most three
-  hours, including an enclosing in-bed interval. The session belongs to the local day its last segment
-  ends; separate sessions waking on the same day combine in that day's row. Asleep includes raw enum
+  hours, including an enclosing in-bed interval. The session belongs to the local day its last asleep segment
+  ends (falling back to all members only when none are asleep); separate sessions waking on the same day combine in that day's row. Asleep includes raw enum
   values 1/3/4/5 (unspecified/core/deep/REM); awake is 2, in-bed is 0. Overlapping intervals count once
   within each stage and across total asleep. Bed edges come from in-bed segments; sleep edges come
-  from asleep segments. Stage columns are zero when a night exists but that stage is absent.
-- Workout HR uses live heart-rate scalar samples or series points fully inside the workout window,
-  including endpoints, matching both its source name and bundle id. Means are arithmetic. No readings
-  means null HR columns. Later HR batches and deletions refresh overlapping native workouts. Workout
+  from asleep segments. Core/deep/REM columns are null when the source has no staged segments (3/4/5); otherwise
+  absent stages are zero. Awake is null when the source has no awake segments.
+- Workout HR uses its own heart-rate statistics first. When absent, live scalar samples or series
+  points fully inside the window (including endpoints) are used: prefer matching source name and
+  bundle id, otherwise use all sources. Means are arithmetic. No readings means null HR columns. Later HR batches and deletions refresh overlapping native workouts. Workout
   energy/distance use their statistics sums with conversion to the catalog units.
 - Accepted-size bodies are durably gzipped with origin `v2` before JSON/envelope validation; malformed
   envelopes retain their body and `payloads.error` but apply no batch or derived changes. Both wire and

@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS hk_samples (
 CREATE INDEX IF NOT EXISTS hk_samples_start ON hk_samples(type, start_ms);
 CREATE INDEX IF NOT EXISTS hk_samples_end ON hk_samples(type, end_ms);
 CREATE INDEX IF NOT EXISTS hk_samples_source ON hk_samples(type, source_name, start_ms, end_ms);
+CREATE TABLE IF NOT EXISTS hk_type_status (
+  type TEXT PRIMARY KEY, live INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0, newest_end TEXT);
+CREATE TABLE IF NOT EXISTS hk_sleep_bounds (source TEXT PRIMARY KEY, duration_ms INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS hk_tombstones (
   uuid TEXT PRIMARY KEY, type TEXT NOT NULL, deleted_at INTEGER NOT NULL, payload_id INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS hk_quantity_points (
@@ -46,6 +49,7 @@ CREATE TABLE IF NOT EXISTS hk_sample_values (
   source TEXT NOT NULL, source_bundle TEXT NOT NULL, value REAL NOT NULL, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
   PRIMARY KEY(uuid, ord));
 CREATE INDEX IF NOT EXISTS hk_values_day ON hk_sample_values(metric, day, source);
+CREATE INDEX IF NOT EXISTS hk_values_window ON hk_sample_values(metric,start_ms,end_ms);
 CREATE INDEX IF NOT EXISTS hk_values_time ON hk_sample_values(metric, source, source_bundle, start_ms, end_ms);
 CREATE TABLE IF NOT EXISTS hk_sleep_members (
   uuid TEXT PRIMARY KEY REFERENCES hk_samples(uuid), day TEXT NOT NULL, source TEXT NOT NULL);

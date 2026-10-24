@@ -88,7 +88,7 @@ export class Derivations {
     this.sleep();
     for (const w of this.merge(this.hrWindows, 24 * HOUR)) {
       // Refresh existing workouts too when heart rate arrives in a later batch or is removed.
-      for (const r of all<{ id: string }>("SELECT id FROM hk_workouts WHERE source=? AND start_ms<=? AND end_ms>=?", w.source, w.end, w.start)) this.workouts.add(r.id);
+      for (const r of all<{ id: string }>("SELECT id FROM hk_workouts WHERE start_ms<=? AND end_ms>=?", w.end, w.start)) this.workouts.add(r.id);
     }
     for (const id of this.workouts) this.workout(id);
   }
@@ -122,8 +122,9 @@ export class Derivations {
     const rows = new Map<string, RawRow>();
     for (const w of windows) {
       let from = w.start, to = w.end;
+      const duration = one<{ duration_ms: number }>("SELECT duration_ms FROM hk_sleep_bounds WHERE source=?", w.source)?.duration_ms ?? 0;
       for (;;) {
-        const found = all<RawRow>(`SELECT * FROM hk_samples WHERE type=? AND source_name=? AND start_ms<=? AND end_ms>=?`, SLEEP_TYPE, w.source, to + 3 * HOUR, from - 3 * HOUR);
+        const found = all<RawRow>(`SELECT * FROM hk_samples WHERE type=? AND source_name=? AND start_ms BETWEEN ? AND ? AND end_ms>=?`, SLEEP_TYPE, w.source, from - 3 * HOUR - duration, to + 3 * HOUR, from - 3 * HOUR);
         let nextFrom = from, nextTo = to;
         for (const r of found) {
           // Include tombstoned segments as bridges when finding the old session; never count their hours.
@@ -141,7 +142,8 @@ export class Derivations {
     const nights = new Map<string, RawRow[]>();
     for (const g of groups) {
       const members = [...rows.values()].filter((r) => r.deleted_at === null && r.source_name === g.source && r.start_ms >= g.start && r.end_ms <= g.end);
-      const last = members.reduce((a, b) => a.end_ms >= b.end_ms ? a : b);
+      const asleep = members.filter((r) => [1, 3, 4, 5].includes(r.category_value!));
+      const last = (asleep.length ? asleep : members).reduce((a, b) => a.end_ms >= b.end_ms ? a : b);
       const day = dayAt(last.end_ms, last.end_iso, last.tz), key = JSON.stringify([day, g.source]);
       affected.set(key, { day, source: g.source }); nights.set(key, [...(nights.get(key) ?? []), ...members]);
       for (const r of members) run("INSERT INTO hk_sleep_members(uuid,day,source) VALUES(?,?,?)", r.uuid, day, g.source);
@@ -166,7 +168,11 @@ export class Derivations {
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
         in_bed_start=excluded.in_bed_start,in_bed_end=excluded.in_bed_end,asleep_h=excluded.asleep_h,core_h=excluded.core_h,deep_h=excluded.deep_h,
         rem_h=excluded.rem_h,awake_h=excluded.awake_h,payload_id=excluded.payload_id,updated_at=excluded.updated_at`, day, source, edge(asleep, false), edge(asleep, true),
-        edge(bed, false), edge(bed, true), hours([1, 3, 4, 5]), hours([3]), hours([4]), hours([5]), hours([2]), this.payloadId, now());
+        edge(bed, false), edge(bed, true), hours([1, 3, 4, 5]),
+        rs.some((r) => [3, 4, 5].includes(r.category_value!)) ? hours([3]) : null,
+        rs.some((r) => [3, 4, 5].includes(r.category_value!)) ? hours([4]) : null,
+        rs.some((r) => [3, 4, 5].includes(r.category_value!)) ? hours([5]) : null,
+        rs.some((r) => r.category_value === 2) ? hours([2]) : null, this.payloadId, now());
     }
   }
 
@@ -177,8 +183,18 @@ export class Derivations {
       run("DELETE FROM hk_workouts WHERE id=? AND payload_id IN (SELECT id FROM payloads WHERE origin='v2')", id); return;
     }
     const extra = JSON.parse(r.extra_json) as Extract<Sample, { kind: "workout" }>;
-    const hr = one<{ min: number | null; avg: number | null; max: number | null }>(`SELECT MIN(value) min,AVG(value) avg,MAX(value) max FROM hk_sample_values
-      WHERE metric='heart_rate' AND source=? AND source_bundle=? AND start_ms>=? AND start_ms<=? AND end_ms<=?`, r.source_name, r.source_bundle, r.start_ms, r.end_ms, r.end_ms)!;
+    const statistic = extra.statistics[HR_TYPE];
+    let hr: { min: number | null; avg: number | null; max: number | null };
+    if (statistic) {
+      const cv = (v: number | null | undefined) => v == null ? null : nativeValue("heart_rate", v, statistic.unit);
+      hr = { min: cv(statistic.min), avg: cv(statistic.avg), max: cv(statistic.max) };
+    } else {
+      const preferred = one<{ n: number }>(`SELECT COUNT(*) n FROM hk_sample_values WHERE metric='heart_rate'
+        AND source=? AND source_bundle=? AND start_ms>=? AND start_ms<=? AND end_ms<=?`, r.source_name, r.source_bundle, r.start_ms, r.end_ms, r.end_ms)!.n;
+      hr = one<{ min: number | null; avg: number | null; max: number | null }>(`SELECT MIN(value) min,AVG(value) avg,MAX(value) max FROM hk_sample_values
+        WHERE metric='heart_rate' AND start_ms>=? AND start_ms<=? AND end_ms<=?` + (preferred ? " AND source=? AND source_bundle=?" : ""),
+        r.start_ms, r.end_ms, r.end_ms, ...(preferred ? [r.source_name, r.source_bundle] : []))!;
+    }
     const statValue = (type: string, key: string) => { const s = extra.statistics[type]; return s?.sum == null ? null : nativeValue(key, s.sum, s.unit); };
     run(`INSERT INTO hk_workouts(id,name,start,end,start_ms,end_ms,day,duration_s,active_kcal,hr_min,hr_avg,hr_max,distance_km,source,payload_id,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,start=excluded.start,end=excluded.end,start_ms=excluded.start_ms,
@@ -186,6 +202,6 @@ export class Derivations {
       hr_max=excluded.hr_max,distance_km=excluded.distance_km,source=excluded.source,payload_id=excluded.payload_id,updated_at=excluded.updated_at`,
       id, extra.activity_name, r.start_iso, r.end_iso, r.start_ms, r.end_ms, dayAt(r.start_ms, r.start_iso, r.tz), extra.duration_s,
       statValue("HKQuantityTypeIdentifierActiveEnergyBurned", "active_kcal"), hr.min, hr.avg, hr.max,
-      statValue("HKQuantityTypeIdentifierDistanceWalkingRunning", "distance_km"), r.source_name, this.payloadId, now());
+      statValue(Object.keys(extra.statistics).find((t) => t.startsWith("HKQuantityTypeIdentifierDistance")) ?? "", "distance_km"), r.source_name, this.payloadId, now());
   }
 }

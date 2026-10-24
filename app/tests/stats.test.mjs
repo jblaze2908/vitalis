@@ -29,3 +29,18 @@ test("under 7 days of history gives no baseline and says why", () => {
   assert.equal(b.usual, null);
   assert.match(b.reason, /only 3 of the 7 days/);
 });
+
+test("source selection prefers merged rows, largest cumulative qty, and deterministic discrete ties", async () => {
+  const { run } = await import("../dist/src/db.js");
+  const { daily } = await import("../dist/src/stats.js");
+  const put = (metric, day, source, qty, avg) => run(`INSERT INTO metric_days(metric,day,source,qty,avg,unit,updated_at) VALUES(?,?,?,?,?,'test',0)`, metric, day, source, qty, avg);
+  put("steps", "2027-02-01", "A Native Watch", 200, null);
+  put("steps", "2027-02-01", "Z Merged Watch", 9000, null);
+  assert.equal(daily("steps", "2027-02-01", "2027-02-01").get("2027-02-01"), 9000);
+  put("steps", "2027-02-01", "", 8000, null);
+  assert.equal(daily("steps", "2027-02-01", "2027-02-01").get("2027-02-01"), 8000);
+  put("resting_hr", "2027-02-01", "Z Watch", null, 75);
+  put("resting_hr", "2027-02-01", "A Watch", null, 60);
+  put("resting_hr", "2027-02-01", "Phone", null, 90);
+  assert.equal(daily("resting_hr", "2027-02-01", "2027-02-01").get("2027-02-01"), 60);
+});
