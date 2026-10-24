@@ -41,7 +41,7 @@ public struct SyncHistory: Codable, Sendable {
             deletions: batch.deletions.count, dailyStats: batch.daily_stats.count,
             counts: response.counts, rejected: response.rejected), at: 0)
         if batches.count > 20 { batches.removeLast(batches.count - 20) }
-        lastSuccess = Date()
+        lastSuccess = Date(); lastError = nil
     }
     private func isNewer(_ value: String, than previous: String?) -> Bool {
         guard let previous else { return true }
