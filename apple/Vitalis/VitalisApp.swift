@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import VitalisUI
 
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 struct VitalisApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var model = AppModel.shared
+    init() { VFont.register() }
     var body: some Scene {
         WindowGroup {
             TabView {

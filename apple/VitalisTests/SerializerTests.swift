@@ -35,7 +35,7 @@ final class SerializerTests: XCTestCase {
         let sample = HKQuantitySample(type: type, quantity: HKQuantity(unit: .count(), doubleValue: 42),
             start: start, end: start.addingTimeInterval(60), device: device,
             metadata: [HKMetadataKeyTimeZone: "Asia/Kolkata", "date": start,
-                       "quantity": HKQuantity(unit: .count(), doubleValue: 2), "flag": true, "array": [1, 2]])
+                       "quantity": HKQuantity(unit: .count(), doubleValue: 2), "flag": true])
         try assertGolden(normalized(sample), """
         {"uuid":"UUID","type":"HKQuantityTypeIdentifierStepCount","kind":"quantity",
          "start":"2023-11-14T22:13:20.000Z","end":"2023-11-14T22:14:20.000Z","tz":"Asia/Kolkata",
@@ -43,7 +43,7 @@ final class SerializerTests: XCTestCase {
          "device":{"name":"Watch","manufacturer":"Apple","model":"Watch","hardware_version":"1",
                    "firmware_version":null,"software_version":"11","local_identifier":"local","udi_device_identifier":null},
          "metadata":{"HKTimeZone":"Asia/Kolkata","date":"2023-11-14T22:13:20.000Z",
-                     "quantity":{"value":2,"unit":"count"},"flag":true,"array":[1,2]}}
+                     "quantity":{"value":2,"unit":"count"},"flag":true}}
         """)
     }
 

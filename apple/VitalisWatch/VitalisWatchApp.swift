@@ -1,8 +1,10 @@
 import SwiftUI
 import VitalisKit
+import VitalisUI
 
 @main
 struct VitalisWatchApp: App {
+    init() { VFont.register() }
     var body: some Scene {
         WindowGroup {
             VStack(spacing: 12) {

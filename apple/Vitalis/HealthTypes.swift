@@ -111,7 +111,7 @@ struct HealthTypes: Sendable {
             (.heartRateVariabilitySDNN, .secondUnit(with: .milli)), (.heartRateRecoveryOneMinute, bpm),
             (.atrialFibrillationBurden, percent), (.oxygenSaturation, percent), (.bodyTemperature, .degreeCelsius()),
             (.bloodPressureDiastolic, .millimeterOfMercury()), (.bloodPressureSystolic, .millimeterOfMercury()),
-            (.respiratoryRate, bpm), (.appleSleepingBreathingDisturbances, count.unitDivided(by: .hour())),
+            (.respiratoryRate, bpm), (.appleSleepingBreathingDisturbances, count),
             // Lab values, medication, falls.
             (.bloodGlucose, mg.unitDivided(by: .literUnit(with: .deci))),
             (.electrodermalActivity, .siemenUnit(with: .micro)), (.forcedExpiratoryVolume1, .liter()),

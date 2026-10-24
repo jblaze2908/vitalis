@@ -25,6 +25,8 @@ targets:
     sources: [Vitalis]
     dependencies:
       - package: VitalisKit
+      - package: VitalisKit
+        product: VitalisUI
       - target: VitalisWatch
         embed: true  # XcodeGen embeds a watchOS app dependency in "Embed Watch Content" (…/Watch)
     settings:
@@ -41,6 +43,8 @@ targets:
     sources: [VitalisWatch]
     dependencies:
       - package: VitalisKit
+      - package: VitalisKit
+        product: VitalisUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.watchkitapp
@@ -57,6 +61,8 @@ targets:
     dependencies:
       - target: Vitalis
       - package: VitalisKit
+      - package: VitalisKit
+        product: VitalisUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.tests
