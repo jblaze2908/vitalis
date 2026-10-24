@@ -82,8 +82,9 @@ struct HistoryProgress: Equatable, Sendable {
         let history = snapshot.history
         let sent = history.types.values.reduce(0) { $0 + $1.objectsSent }
         let pageDate = snapshot.currentType.flatMap { history.types[$0]?.newestEnd }.flatMap(APIDate.parse)
-        let done = snapshot.phase == "Idle" && startedAt != nil
-            && (history.lastSuccess.map { s in startedAt.map { s >= $0 } ?? false } ?? false)
+        // Idle after a successful upload is caught up, even when a relaunch lost this step's start time.
+        let done = snapshot.phase == "Idle"
+            && (history.lastSuccess.map { s in startedAt.map { s >= $0 } ?? true } ?? false)
 
         var percent: Int?
         if done {

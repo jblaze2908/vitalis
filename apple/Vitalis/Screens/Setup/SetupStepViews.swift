@@ -161,6 +161,12 @@ struct HistoryStep: View {
     let store: SetupStore
 
     var body: some View {
+        historyBody
+            // A relaunch mid-backfill leaves the exporter idle until something asks; this step asks.
+            .task { await AppModel.shared.syncNow() }
+    }
+
+    @ViewBuilder private var historyBody: some View {
         let p = store.progress()
         SetupChrome(step: .history, showsPulse: false) {
             VStack(alignment: .leading, spacing: 0) {
