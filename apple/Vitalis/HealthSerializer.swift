@@ -114,10 +114,11 @@ struct HealthSerializer: Sendable {
                 .secondUnit(with: .milli), .degreeCelsius(), .kilocalorie(), .watt(),
                 .count().unitDivided(by: .minute()), .meter().unitDivided(by: .second()),
                 .millimeterOfMercury(), .liter(), .hertz(), .siemenUnit(with: .micro),
-                .decibelAWeightedSoundPressureLevel(), .internationalUnit(), .diopter(), .degreeAngle()]
-            // Never call doubleValue with an incompatible unit (it raises an ObjC exception).
+                .decibelAWeightedSoundPressureLevel(), .internationalUnit(), .diopter(), .degreeAngle(), .lux()]
+            // Never call doubleValue with an incompatible unit (it raises an ObjC exception). An unknown unit keeps
+            // HealthKit's own text ("1250 lx") rather than failing the whole sync on one metadata key.
             guard let unit = candidates.first(where: { quantity.is(compatibleWith: $0) }) else {
-                throw HealthReadError.unsupportedUnit("metadata quantity on \(type?.identifier ?? "workout")")
+                return .string(quantity.description)
             }
             return .object(["value": .finite(quantity.doubleValue(for: unit)), "unit": .string(unit.unitString)])
         }
