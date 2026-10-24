@@ -11,6 +11,24 @@ type MetricGroup = { metric: string; day: string; source: string };
 type Window = { source: string; start: number; end: number };
 const HOUR = 3_600_000;
 
+// Keep the small touched groups outside the range seeks: SQLite otherwise flattens json_each into a ledger scan.
+export const METRIC_AGGREGATE_SQL = `
+      WITH touched AS MATERIALIZED (
+        SELECT t.id type_id,json_extract(j.value,'$.metric') metric,json_extract(j.value,'$.day') day,json_extract(j.value,'$.source') source
+        FROM json_each(?) j JOIN hk_types t ON t.metric=json_extract(j.value,'$.metric')
+      ), pieces AS (
+        SELECT g.metric,g.day,g.source,COUNT(*) n,SUM(s.native_value) total,MIN(s.native_value) min,MAX(s.native_value) max
+        FROM touched g CROSS JOIN hk_sources src ON src.name=g.source
+        CROSS JOIN hk_samples s INDEXED BY hk_samples_day ON s.type_id=g.type_id AND s.day=g.day AND s.source_id=src.id
+        WHERE s.deleted_at IS NULL AND s.day IS NOT NULL AND s.native_value IS NOT NULL GROUP BY g.metric,g.day,g.source
+        UNION ALL
+        SELECT g.metric,g.day,g.source,SUM(v.n),SUM(v.total),MIN(v.min),MAX(v.max)
+        FROM touched g CROSS JOIN hk_value_days v INDEXED BY hk_value_days_day ON v.day=g.day CROSS JOIN hk_samples s ON s.id=v.sample_id AND s.type_id=g.type_id
+        CROSS JOIN hk_sources src ON src.id=s.source_id AND src.name=g.source WHERE s.deleted_at IS NULL GROUP BY g.metric,g.day,g.source
+      ), totals AS (SELECT metric,day,source,SUM(n) n,SUM(total) total,MIN(min) min,MAX(max) max FROM pieces GROUP BY metric,day,source)
+      SELECT g.metric,g.day,g.source,COALESCE(a.n,0) n,a.total sum,a.min,a.total/a.n avg,a.max FROM touched g
+      LEFT JOIN totals a ON a.metric=g.metric AND a.day=g.day AND a.source=g.source`;
+
 export class Derivations {
   private metrics = new Map<string, MetricGroup>();
   private sleepWindows: Window[] = [];
@@ -65,22 +83,7 @@ export class Derivations {
   }
 
   finish() {
-    const aggregates = all<MetricGroup & { n: number; sum: number; min: number; avg: number; max: number }>(`
-      WITH touched AS (
-        SELECT t.id type_id,json_extract(j.value,'$.metric') metric,json_extract(j.value,'$.day') day,json_extract(j.value,'$.source') source
-        FROM json_each(?) j JOIN hk_types t ON t.metric=json_extract(j.value,'$.metric')
-      ), pieces AS (
-        SELECT g.metric,g.day,g.source,COUNT(*) n,SUM(s.native_value) total,MIN(s.native_value) min,MAX(s.native_value) max
-        FROM touched g JOIN hk_sources src ON src.name=g.source
-        JOIN hk_samples s ON s.type_id=g.type_id AND s.day=g.day AND s.source_id=src.id
-        WHERE s.deleted_at IS NULL AND s.day IS NOT NULL AND s.native_value IS NOT NULL GROUP BY g.metric,g.day,g.source
-        UNION ALL
-        SELECT g.metric,g.day,g.source,SUM(v.n),SUM(v.total),MIN(v.min),MAX(v.max)
-        FROM touched g JOIN hk_value_days v ON v.day=g.day JOIN hk_samples s ON s.id=v.sample_id AND s.type_id=g.type_id
-        JOIN hk_sources src ON src.id=s.source_id AND src.name=g.source WHERE s.deleted_at IS NULL GROUP BY g.metric,g.day,g.source
-      ), totals AS (SELECT metric,day,source,SUM(n) n,SUM(total) total,MIN(min) min,MAX(max) max FROM pieces GROUP BY metric,day,source)
-      SELECT g.metric,g.day,g.source,COALESCE(a.n,0) n,a.total sum,a.min,a.total/a.n avg,a.max FROM touched g
-      LEFT JOIN totals a ON a.metric=g.metric AND a.day=g.day AND a.source=g.source`, JSON.stringify([...this.metrics.values()]));
+    const aggregates = all<MetricGroup & { n: number; sum: number; min: number; avg: number; max: number }>(METRIC_AGGREGATE_SQL, JSON.stringify([...this.metrics.values()]));
     for (const a of aggregates) {
       const { metric, day, source } = a;
       if (!a.n) {
