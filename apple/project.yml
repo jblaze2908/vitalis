@@ -26,11 +26,7 @@ targets:
     dependencies:
       - package: VitalisKit
       - target: VitalisWatch
-        embed: true
-        # Modern single-target watch apps are Foundation extensions in Xcode 26.
-        copyPhase:
-          destination: plugins
-          subpath: ""
+        embed: true  # XcodeGen embeds a watchOS app dependency in "Embed Watch Content" (…/Watch)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis
