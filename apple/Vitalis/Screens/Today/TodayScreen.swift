@@ -244,7 +244,8 @@ struct TodayScreen: View {
 
     @ViewBuilder private func training(_ t: TodayResponse?) -> some View {
         let tr = t?.training
-        let empty = tr.map { $0.due == nil && $0.freshLabel == nil && $0.loadedLabel == nil && $0.heat.values.allSatisfy { $0 == 0 } } ?? false
+        // Heat 0 everywhere = no working set in 30 days; a "Legs fresh" label over a blank body would mislead.
+        let empty = tr.map { $0.heat.values.allSatisfy { $0 == 0 } } ?? false
         let lines: [(String, Color)] = empty ? [("No workouts yet", VColor.bone)]
             : [tr?.freshLabel.map { ($0, VColor.bone) }, tr?.loadedLabel.map { ($0, VColor.steel) }].compactMap { $0 }
         HStack(alignment: .center, spacing: TodayLayout.mapGap) {
