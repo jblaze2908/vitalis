@@ -1,6 +1,6 @@
 // Bearer tokens, stored only as SHA-256. Scopes: ingest (pushes + native sync status), read (reads), write (reads and writes).
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { all, one, run } from "./db.js";
+import { all, auditWrite, one, run } from "./db.js";
 import { httpErr, now } from "./config.js";
 
 export type Scope = "ingest" | "read" | "write";
@@ -26,7 +26,7 @@ export function authenticate(header: string | undefined): Token | null {
   const row = one<Token & { hash: string; last_used_at: number | null }>("SELECT id,name,scope,hash,last_used_at FROM tokens WHERE hash=? AND revoked_at IS NULL", h);
   if (!row || !timingSafeEqual(Buffer.from(row.hash), Buffer.from(h))) return null;
   // One write a minute at most per token; a busy agent shouldn't turn reads into writes.
-  if (!row.last_used_at || now() - row.last_used_at > 60_000) run("UPDATE tokens SET last_used_at=? WHERE id=?", now(), row.id);
+  if (!row.last_used_at || now() - row.last_used_at > 60_000) auditWrite("UPDATE tokens SET last_used_at=? WHERE id=?", now(), row.id);
   return { id: row.id, name: row.name, scope: row.scope };
 }
 
@@ -41,5 +41,5 @@ export function revokeToken(idOrName: string) {
 }
 
 export function logCall(tokenId: string | null, tool: string, ok: boolean, ms: number, detail: string | null) {
-  run("INSERT INTO calls(at,token_id,tool,ok,ms,detail) VALUES(?,?,?,?,?,?)", now(), tokenId, tool, ok ? 1 : 0, ms, detail);
+  auditWrite("INSERT INTO calls(at,token_id,tool,ok,ms,detail) VALUES(?,?,?,?,?,?)", now(), tokenId, tool, ok ? 1 : 0, ms, detail);
 }

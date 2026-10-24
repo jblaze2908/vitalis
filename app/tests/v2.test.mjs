@@ -247,7 +247,7 @@ test("reparse repairs v2 projections and never undoes newer samples, daily stats
 test("a batch transaction failure rolls back all objects and records its error for retry", async () => {
   const s = sample(), b = batch([s]);
   const countersBefore = all("SELECT * FROM hk_type_status ORDER BY type");
-  db.exec("CREATE TEMP TRIGGER v2_fail BEFORE INSERT ON hk_batches BEGIN SELECT RAISE(ABORT, 'simulated batch failure'); END");
+  db.exec("CREATE TRIGGER v2_fail BEFORE INSERT ON hk_batches BEGIN SELECT RAISE(ABORT, 'simulated batch failure'); END");
   try {
     assert.equal((await post(b)).status, 500); assert.equal(row(s), undefined);
     assert.deepEqual(all("SELECT * FROM hk_type_status ORDER BY type"), countersBefore);
@@ -516,4 +516,37 @@ test("compressed series summaries retain point-weighted means across samples and
 test("malformed primitive daily stats remain per-object rejections in a batch lookup", async () => {
   const r = await post(batch([sample()], { daily_stats: ["bad", 1, null, true, []] }));
   assert.equal(r.status, 200, r.text); assert.equal(r.json.counts.inserted, 1); assert.equal(r.json.counts.rejected, 5);
+});
+
+test("health answers while a 5000-object native batch is still running in the worker", async () => {
+  const samples = Array.from({ length: 5000 }, (_, i) => sample({ start: at("2027-03-04", "10:00"), end: at("2027-03-04", "10:01"), value: i % 100 }));
+  let finished = false;
+  const pending = post(batch(samples)).then(r => { finished = true; return r; });
+  await new Promise(resolve => setTimeout(resolve, 1));
+  const health = await http("GET", "/health");
+  assert.equal(health.status, 200); assert.equal(finished, false, "ingest must not monopolize the read thread");
+  const result = await pending; assert.equal(result.status, 200, result.text); assert.equal(result.json.counts.inserted, 5000);
+});
+
+test("MCP reads and token-use auditing do not wait on another connection's write transaction", async () => {
+  const { Worker } = await import('node:worker_threads');
+  const { join } = await import('node:path');
+  const { flushAudits } = await import('../dist/src/db.js');
+  const { call } = await import('./_env.mjs');
+  const token = tokens.createToken('unused read token during writer', 'read');
+  const before = one("SELECT COUNT(*) n FROM calls WHERE token_id=?", token.id).n;
+  const writer = new Worker(`const {parentPort,workerData}=require('node:worker_threads'); const {DatabaseSync}=require('node:sqlite');
+    const db=new DatabaseSync(workerData); db.exec('BEGIN IMMEDIATE'); parentPort.postMessage('locked');
+    parentPort.once('message',()=>{db.exec('COMMIT');db.close();parentPort.close();});`, { eval: true, workerData: join(process.env.VITALIS_ROOT, 'vitalis.db') });
+  await new Promise((resolve, reject) => { writer.once('message', resolve); writer.once('error', reject); });
+  const started = performance.now();
+  try {
+    const status = await http('GET', '/v2/sync/status', { token: token.token }); assert.equal(status.status, 200);
+    const read = await call(token.token, 'get_freshness'); assert.equal(read.isError, false);
+    assert.ok(performance.now() - started < 1000, 'read waited for SQLite busy_timeout');
+  } finally {
+    const exited = new Promise(resolve => writer.once('exit', resolve)); writer.postMessage('release'); await exited; flushAudits();
+  }
+  assert.equal(one("SELECT COUNT(*) n FROM calls WHERE token_id=?", token.id).n, before + 1);
+  assert.ok(one("SELECT last_used_at FROM tokens WHERE id=?", token.id).last_used_at);
 });

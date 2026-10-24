@@ -2,14 +2,14 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { fileURLToPath } from "node:url";
-import { gunzipSync } from "node:zlib";
 import { BIND, HttpError, MAX_INGEST_BYTES, PORT } from "./config.js";
 import { seedExercises } from "./exercises.js";
 import { afterIngest } from "./hooks.js";
 import { ingest } from "./ingest.js";
 import { mcpRoute } from "./mcp.js";
 import { authenticate, logCall } from "./tokens.js";
-import { ingestV2, syncStatus } from "./v2.js";
+import { ingestV2Async } from "./v2-client.js";
+import { syncStatus } from "./v2.js";
 
 seedExercises();
 
@@ -62,17 +62,9 @@ app.post("/v2/samples", async (c) => {
         }
       } finally { reader.releaseLock(); }
     }
-    let body = Buffer.concat(chunks);
-    if (encoding === "gzip") {
-      try { body = gunzipSync(body, { maxOutputLength: MAX_INGEST_BYTES }); }
-      catch (e) {
-        if ((e as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") throw new HttpError(413, "Decompressed body exceeds ingest size limit");
-        throw new HttpError(400, "Invalid gzip body");
-      }
-    }
-    const r = ingestV2(body);
-    logCall(token.id, "v2/samples", true, Date.now() - t0, `${body.length} bytes, ${JSON.stringify(r.counts)}${r.duplicate ? ", duplicate" : ""}`);
-    void afterIngest(r.new_nights);
+    const body = Buffer.concat(chunks), bodyBytes = body.length;
+    const r = await ingestV2Async(body, encoding);
+    logCall(token.id, "v2/samples", true, Date.now() - t0, `${bodyBytes} bytes, ${JSON.stringify(r.counts)}${r.duplicate ? ", duplicate" : ""}`);
     const { new_nights: _n, ...out } = r;
     return c.json(out);
   } catch (e) {

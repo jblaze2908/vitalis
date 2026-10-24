@@ -172,3 +172,26 @@ SELECT s.uuid,s.id,t.metric,v.day,src.name,src.bundle,v.total,v.n,v.min,v.max,s.
 FROM hk_value_days v JOIN hk_samples s ON s.id=v.sample_id JOIN hk_types t ON t.id=s.type_id JOIN hk_sources src ON src.id=s.source_id
 WHERE s.deleted_at IS NULL;
 `);
+// Read endpoints must not wait on the ingest worker's write lock merely to record audit metadata.
+const auditQueue: { sql: string; params: SQLInputValue[] }[] = [];
+let auditTimer: NodeJS.Timeout | undefined;
+function tryAudit(sql: string, params: SQLInputValue[]) {
+  db.exec('PRAGMA busy_timeout=0');
+  try { run(sql, ...params); return true; }
+  catch (e) { if ([5, 6].includes(((e as { errcode?: number }).errcode ?? 0) & 255)) return false; throw e; }
+  finally { db.exec('PRAGMA busy_timeout=3000'); }
+}
+export function flushAudits() {
+  if (auditTimer) { clearTimeout(auditTimer); auditTimer = undefined; }
+  while (auditQueue.length) {
+    const { sql, params } = auditQueue[0];
+    if (!tryAudit(sql, params)) break;
+    auditQueue.shift();
+  }
+  if (auditQueue.length) auditTimer = setTimeout(flushAudits, 10).unref();
+}
+export function auditWrite(sql: string, ...params: SQLInputValue[]) {
+  if (tryAudit(sql, params)) return;
+  auditQueue.push({ sql, params });
+  if (!auditTimer) auditTimer = setTimeout(flushAudits, 10).unref();
+}
