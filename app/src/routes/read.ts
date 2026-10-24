@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { dayParam, handle, routeKey, withEtag } from "../http.js";
 import { sleepDay, sleepWeek } from "../sleep-view.js";
+import { bodyDay } from "../weight.js";
 import { getTargets } from "../targets.js";
 import { digestBody, todayBody } from "../today.js";
 
@@ -11,3 +12,4 @@ readRoutes.get("/v2/today", handle("v2/today", "read", (c) => withEtag(c, routeK
 readRoutes.get("/v2/digest", handle("v2/digest", "read", (c) => withEtag(c, routeKey(c), () => digestBody(dayParam(c)), { clock: true })));
 readRoutes.get("/v2/sleep", handle("v2/sleep", "read", (c) => withEtag(c, routeKey(c), () => sleepDay(dayParam(c)))));
 readRoutes.get("/v2/sleep/week", handle("v2/sleep/week", "read", (c) => withEtag(c, routeKey(c), () => sleepWeek(dayParam(c, "end")))));
+readRoutes.get("/v2/body", handle("v2/body", "read", (c) => withEtag(c, routeKey(c), () => bodyDay(dayParam(c)))));
