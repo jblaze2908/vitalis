@@ -18,14 +18,21 @@ export class Derivations {
   private workouts = new Set<string>();
   private hrWindows: Window[] = [];
   readonly newNights: string[] = [];
-  constructor(private payloadId: number) {}
+  private priorGroups = new Map<string, MetricGroup[]>();
+  private priorNights = new Map<string, { day: string; source: string }>();
+  constructor(private payloadId: number, uuids: string) {
+    for (const r of all<MetricGroup & { uuid: string }>("SELECT DISTINCT uuid,metric,day,source FROM hk_sample_values WHERE uuid IN (SELECT value FROM json_each(?))", uuids)) {
+      const groups = this.priorGroups.get(r.uuid) ?? []; groups.push(r); this.priorGroups.set(r.uuid, groups);
+    }
+    for (const r of all<{ uuid: string; day: string; source: string }>("SELECT * FROM hk_sleep_members WHERE uuid IN (SELECT value FROM json_each(?))", uuids)) this.priorNights.set(r.uuid, r);
+  }
 
   touch(row: RawRow) {
-    for (const g of all<MetricGroup>("SELECT DISTINCT metric,day,source FROM hk_sample_values WHERE uuid=?", row.uuid)) this.group(g);
+    for (const g of this.priorGroups.get(row.uuid) ?? []) this.group(g);
     if (row.type === SLEEP_TYPE) {
       this.sleepWindows.push({ source: row.source_name, start: row.start_ms, end: row.end_ms });
       this.sleepTouched.add(row.uuid);
-      const old = one<{ day: string; source: string }>("SELECT day,source FROM hk_sleep_members WHERE uuid=?", row.uuid);
+      const old = this.priorNights.get(row.uuid);
       if (old) this.sleepAffected.set(JSON.stringify([old.day, old.source]), old);
     }
     if (row.kind === "workout") this.workouts.add(row.uuid);
@@ -75,9 +82,12 @@ export class Derivations {
   }
 
   finish() {
-    for (const { metric, day, source } of this.metrics.values()) {
-      const a = one<{ n: number; sum: number; min: number; avg: number; max: number }>(
-        "SELECT COUNT(*) n,SUM(value) sum,MIN(value) min,AVG(value) avg,MAX(value) max FROM hk_sample_values WHERE metric=? AND day=? AND source=?", metric, day, source)!;
+    const aggregates = all<MetricGroup & { n: number; sum: number; min: number; avg: number; max: number }>(`
+      WITH touched AS (SELECT json_extract(value,'$.metric') metric,json_extract(value,'$.day') day,json_extract(value,'$.source') source FROM json_each(?))
+      SELECT t.metric,t.day,t.source,COUNT(v.uuid) n,SUM(v.value) sum,MIN(v.value) min,AVG(v.value) avg,MAX(v.value) max
+      FROM touched t LEFT JOIN hk_sample_values v ON v.metric=t.metric AND v.day=t.day AND v.source=t.source GROUP BY t.metric,t.day,t.source`, JSON.stringify([...this.metrics.values()]));
+    for (const a of aggregates) {
+      const { metric, day, source } = a;
       if (!a.n) {
         run("DELETE FROM metric_days WHERE metric=? AND day=? AND source=? AND payload_id IN (SELECT id FROM payloads WHERE origin='v2')", metric, day, source);
       } else {

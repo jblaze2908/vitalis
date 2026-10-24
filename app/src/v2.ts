@@ -34,11 +34,10 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
     const parsed = envelopeSchema.safeParse(json);
     if (!parsed.success) throw httpErr(400, `Invalid sync envelope: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
     const envelope = parsed.data;
-    const touchedTypes = new Set<string>();
+    const touchedTypes = new Map<string, { live: number; deleted: number }>();
     const counter = (type: string, live: number, deleted: number) => {
-      touchedTypes.add(type);
-      run(`INSERT INTO hk_type_status(type,live,deleted) VALUES(?,?,?) ON CONFLICT(type)
-        DO UPDATE SET live=live+excluded.live,deleted=deleted+excluded.deleted`, type, live, deleted);
+      const delta = touchedTypes.get(type) ?? { live: 0, deleted: 0 };
+      delta.live += live; delta.deleted += deleted; touchedTypes.set(type, delta);
     };
     const previous = one<Batch>("SELECT * FROM hk_batches WHERE batch_id=?", envelope.batch_id);
     if (previous && (!replay || previous.payload_id !== id)) {
@@ -48,22 +47,30 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
       return result(previous, true);
     }
     const counts: Counts = { inserted: 0, updated: 0, unchanged: 0, deleted: 0, daily_stats: 0, rejected: 0 }, rejected: Rejection[] = [];
-    const derived = new Derivations(id);
     const reject = (v: unknown, reason: string) => {
       const uuid = v && typeof v === "object" && "uuid" in v && typeof v.uuid === "string" ? v.uuid : null;
       counts.rejected++; rejected.push({ uuid, reason });
     };
+    let derived!: Derivations;
     tx(() => {
+    const uuids = JSON.stringify([...envelope.upserts, ...envelope.deletions].flatMap((v) =>
+      v && typeof v === "object" && "uuid" in v && typeof v.uuid === "string" ? [v.uuid] : []));
+    const oldRows = new Map(all<RawRow>("SELECT * FROM hk_samples WHERE uuid IN (SELECT value FROM json_each(?))", uuids).map((r) => [r.uuid, r]));
+    const tombstones = new Map(all<{ uuid: string; type: string; deleted_at: number }>(
+      "SELECT uuid,type,deleted_at FROM hk_tombstones WHERE uuid IN (SELECT value FROM json_each(?))", uuids).map((r) => [r.uuid, r]));
+    const dailyRows = new Map(all<{ type: string; day: string; payload_id: number }>(
+      "SELECT type,day,payload_id FROM hk_daily_stats WHERE type IN (SELECT json_extract(value,'$.type') FROM json_each(?))", JSON.stringify(envelope.daily_stats)).map((r) => [JSON.stringify([r.type, r.day]), r]));
+    derived = new Derivations(id, uuids);
       for (const object of envelope.upserts) {
         const p = sampleSchema.safeParse(object);
         if (!p.success) { reject(object, p.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")); continue; }
-        const s = p.data, old = one<RawRow>("SELECT * FROM hk_samples WHERE uuid=?", s.uuid);
+        const s = p.data, old = oldRows.get(s.uuid);
         // Replaying old history must not undo a later replacement. --all still repairs the latest version.
         if (replay && old && old.payload_id > id) { counts.unchanged++; continue; }
         const contentHash = hash(canonical(s));
         if (old?.content_hash === contentHash && !replay) { counts.unchanged++; continue; }
         if (old) derived.touch(old);
-        const tombstone = one<{ type: string; deleted_at: number }>("SELECT type,deleted_at FROM hk_tombstones WHERE uuid=?", s.uuid);
+        const tombstone = tombstones.get(s.uuid);
         if (tombstone && tombstone.type !== s.type) { reject(object, "Upsert type does not match tombstone"); continue; }
         const deletedAt = tombstone?.deleted_at ?? old?.deleted_at ?? null;
         if (old) counter(old.type, old.deleted_at === null ? -1 : 0, old.deleted_at !== null ? -1 : 0);
@@ -90,20 +97,27 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
           ON CONFLICT(source) DO UPDATE SET duration_ms=MAX(duration_ms,excluded.duration_ms)`, s.source.name, Date.parse(s.end) - Date.parse(s.start));
         if (deletedAt === null) children(s); else clearContent(s.uuid);
         derived.project(s, deletedAt === null);
-        derived.touch(one<RawRow>("SELECT * FROM hk_samples WHERE uuid=?", s.uuid)!);
+        const fresh: RawRow = { uuid: s.uuid, type: s.type, kind: deletedAt === null ? s.kind : "other", start_ms: deletedAt === null ? Date.parse(s.start) : 0,
+          end_ms: deletedAt === null ? Date.parse(s.end) : 0, start_iso: deletedAt === null ? s.start : "", end_iso: deletedAt === null ? s.end : "",
+          tz: s.tz ?? null, source_name: deletedAt === null ? s.source.name : "", source_bundle: deletedAt === null ? s.source.bundle_id : "",
+          category_value: deletedAt === null && s.kind === "category" ? s.value : null, extra_json: deletedAt === null ? JSON.stringify(extra) : "{}",
+          content_hash: contentHash, payload_id: id, deleted_at: deletedAt };
+        oldRows.set(s.uuid, fresh); derived.touch(fresh);
         if (!old) counts.inserted++; else if (old.content_hash === contentHash) counts.unchanged++; else counts.updated++;
       }
       for (const object of envelope.deletions) {
         const p = deletionSchema.safeParse(object);
         if (!p.success) { reject(object, p.error.message); continue; }
-        const { uuid, type } = p.data, old = one<RawRow>("SELECT * FROM hk_samples WHERE uuid=?", uuid);
+        const { uuid, type } = p.data, old = oldRows.get(uuid);
         if (old && old.type !== type) { reject(object, "Deletion type does not match stored sample"); continue; }
         if (old) derived.touch(old);
         const marker = run("INSERT INTO hk_tombstones(uuid,type,deleted_at,payload_id) VALUES(?,?,?,?) ON CONFLICT(uuid) DO NOTHING", uuid, type, now(), id);
-        const tombstone = one<{ deleted_at: number }>("SELECT deleted_at FROM hk_tombstones WHERE uuid=?", uuid)!;
+        const tombstone = tombstones.get(uuid) ?? { uuid, type, deleted_at: now() };
+        tombstones.set(uuid, tombstone);
         run("UPDATE hk_samples SET deleted_at=?,updated_at=? WHERE uuid=? AND deleted_at IS NULL", tombstone.deleted_at, now(), uuid);
         run("DELETE FROM hk_sample_values WHERE uuid=?", uuid);
         clearContent(uuid);
+        if (old) oldRows.set(uuid, { ...old, deleted_at: tombstone.deleted_at });
         if (marker.changes) counter(type, old?.deleted_at === null ? -1 : 0, old?.deleted_at !== null && old ? 0 : 1);
         counts.deleted += Number(marker.changes);
       }
@@ -114,15 +128,20 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         if (m && (m.cumulative ? s.sum == null : [s.min, s.avg, s.max].every((v) => v == null))) {
           reject(object, m.cumulative ? "Cumulative daily statistic requires sum" : "Discrete daily statistic requires min, avg or max"); continue;
         }
-        const old = one<{ payload_id: number }>("SELECT payload_id FROM hk_daily_stats WHERE type=? AND day=?", s.type, s.day);
+        const old = dailyRows.get(JSON.stringify([s.type, s.day]));
         if (replay && old && old.payload_id > id) continue;
         run(`INSERT INTO hk_daily_stats(type,day,content_json,payload_id,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(type,day)
           DO UPDATE SET content_json=excluded.content_json,payload_id=excluded.payload_id,updated_at=excluded.updated_at`, s.type, s.day, JSON.stringify(s), id, now());
+        dailyRows.set(JSON.stringify([s.type, s.day]), { type: s.type, day: s.day, payload_id: id });
         derived.daily(s); counts.daily_stats++;
       }
       derived.finish();
-      for (const type of touchedTypes) run(`UPDATE hk_type_status SET newest_end=(SELECT end_iso FROM hk_samples
-        WHERE type=? AND deleted_at IS NULL ORDER BY end_ms DESC,uuid LIMIT 1) WHERE type=?`, type, type);
+      for (const [type, delta] of touchedTypes) {
+        run(`INSERT INTO hk_type_status(type,live,deleted) VALUES(?,?,?) ON CONFLICT(type)
+          DO UPDATE SET live=live+excluded.live,deleted=deleted+excluded.deleted`, type, delta.live, delta.deleted);
+        run(`UPDATE hk_type_status SET newest_end=(SELECT end_iso FROM hk_samples
+          WHERE type=? AND deleted_at IS NULL ORDER BY end_ms DESC,uuid LIMIT 1) WHERE type=?`, type, type);
+      }
       const received = one<{ received_at: number }>("SELECT received_at FROM payloads WHERE id=?", id)!.received_at;
       run(`INSERT INTO hk_batches(batch_id,payload_id,received_at,counts_json,rejected_json) VALUES(?,?,?,?,?) ON CONFLICT(batch_id)
         DO UPDATE SET counts_json=excluded.counts_json,rejected_json=excluded.rejected_json`, envelope.batch_id, id, received, JSON.stringify(counts), JSON.stringify(rejected));
