@@ -117,7 +117,8 @@ final class AppModel: ObservableObject {
     private var deliveryStatuses: [String: String] = [:]
     private func registerObservers() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        for type in registry.samples {
+        // HealthKit refuses observer queries for prescriptions (it raises); those still sync on each anchored pass.
+        for type in registry.samples where !(type is HKPrescriptionType) {
             let id = type.identifier
             let observer = HKObserverQuery(sampleType: type, predicate: nil) { _, completion, error in
                 // The completion box has exactly one owner and is invoked in defer on every path.

@@ -25,10 +25,7 @@ struct VitalisApp: App {
     init() { VFont.register() }
     var body: some Scene {
         WindowGroup {
-            TabView {
-                SyncView(model: model).tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
-                SettingsView(model: model).tabItem { Label("Settings", systemImage: "gear") }
-            }
+            RootView(model: model)
         }
     }
 }
