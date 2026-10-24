@@ -191,14 +191,9 @@ The following choices resolve details not fixed by the original contract:
   duplicate attempts do not count as syncs. `reparse --all` reports malformed stored envelopes and
   continues to later payloads, exiting nonzero if any payload failed.
 
-## Training (phase 2)
+## Training
 
-These are HTTP routes over the same functions as the MCP training tools (`app/src/training.ts`).
-
-- `GET /v2/exercises?since=<ISO>`: the full catalog, or what changed since, for the Watch's offline picker.
-- `POST /v2/exercises`: create a custom exercise (same input as `create_exercise`).
-- `POST /v2/workouts`: one Watch workout, with
-  `{ session: { client_id, title, started_at, ended_at, tz_offset_min, hk_workout_uuid }, sets: [SetIn] }`.
-  The session client id is idempotent and the set ids are too, as with `log_sets`. Sets join this session
-  explicitly, not by the 3-hour rule.
-- `GET /v2/workouts?from&to` and `GET /v2/workouts/:id`: the same shapes as `list_workouts` and `get_workout`.
+Training moved out of this contract. The app logs a session with `POST /v2/workouts` (one idempotent upsert per
+session, sets joined explicitly by the session's client id, deletions as `{ "id": …, "deleted": true }`), reads the
+catalog with `GET /v2/exercises?since=`, and creates custom exercises with `POST /v2/exercises`. Schemas, rules and
+errors are in `docs/api.md` (and `spec/10-server-api.md` §6).
