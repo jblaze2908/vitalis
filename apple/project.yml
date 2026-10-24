@@ -1,0 +1,78 @@
+name: Vitalis
+options:
+  minimumXcodeGenVersion: 2.46.0
+  deploymentTarget:
+    iOS: '18.0'
+    watchOS: '11.0'
+packages:
+  VitalisKit:
+    path: VitalisKit
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    CODE_SIGN_STYLE: Automatic
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+targets:
+  Vitalis:
+    type: application
+    platform: iOS
+    sources: [Vitalis]
+    dependencies:
+      - package: VitalisKit
+      - target: VitalisWatch
+        embed: true
+        # Modern single-target watch apps are Foundation extensions in Xcode 26.
+        copyPhase:
+          destination: plugins
+          subpath: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis
+        TARGETED_DEVICE_FAMILY: '1'
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: Vitalis/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Vitalis/Vitalis.entitlements
+        SUPPORTS_MACCATALYST: false
+  VitalisWatch:
+    type: application
+    platform: watchOS
+    sources: [VitalisWatch]
+    dependencies:
+      - package: VitalisKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.watchkitapp
+        TARGETED_DEVICE_FAMILY: '4'
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: VitalisWatch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: VitalisWatch/VitalisWatch.entitlements
+        SKIP_INSTALL: true
+        WATCHOS_DEPLOYMENT_TARGET: '11.0'
+  VitalisTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [VitalisTests]
+    dependencies:
+      - target: Vitalis
+      - package: VitalisKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.tests
+        GENERATE_INFOPLIST_FILE: true
+schemes:
+  Vitalis:
+    build:
+      targets:
+        Vitalis: all
+    test:
+      targets: [VitalisTests]
+  VitalisWatch:
+    build:
+      targets:
+        VitalisWatch: all

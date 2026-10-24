@@ -1,0 +1,32 @@
+import SwiftUI
+import UIKit
+
+@MainActor
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        AppModel.shared.start()
+        return true
+    }
+    func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
+        Task { await AppModel.shared.syncNow() }
+    }
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        AppModel.shared.scheduleCatchUp()
+    }
+}
+
+@main
+@MainActor
+struct VitalisApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @StateObject private var model = AppModel.shared
+    var body: some Scene {
+        WindowGroup {
+            TabView {
+                SyncView(model: model).tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+                SettingsView(model: model).tabItem { Label("Settings", systemImage: "gear") }
+            }
+        }
+    }
+}
