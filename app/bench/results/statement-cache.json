@@ -10,146 +10,146 @@
     "heart_rate": {
       "batches": 115,
       "objects": 575000,
-      "samples_per_second": 8036.26796714451,
-      "p50_ms": 616.2560890000004,
-      "p95_ms": 687.7738949999984,
-      "max_ms": 788.2977230000033
+      "samples_per_second": 4538.05002432983,
+      "p50_ms": 1138.441433,
+      "p95_ms": 1280.5486269999965,
+      "max_ms": 1599.69043100001
     },
     "cumulative": {
       "batches": 75,
       "objects": 375000,
-      "samples_per_second": 7763.957092586037,
-      "p50_ms": 636.7804230000038,
-      "p95_ms": 697.954933999994,
-      "max_ms": 729.7466149999964
+      "samples_per_second": 3866.1161681008693,
+      "p50_ms": 1289.2826780000178,
+      "p95_ms": 1365.8672590000206,
+      "max_ms": 1500.7794359999825
     },
     "sleep": {
       "batches": 8,
       "objects": 40000,
-      "samples_per_second": 4253.311541093256,
-      "p50_ms": 1055.692703000008,
-      "p95_ms": 1848.5705359999993,
-      "max_ms": 1848.5705359999993
+      "samples_per_second": 2799.9026814865806,
+      "p50_ms": 1683.0486369999999,
+      "p95_ms": 2174.0790519999864,
+      "max_ms": 2174.0790519999864
     },
     "strength": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 6768.587745064375,
-      "p50_ms": 738.7065350000048,
-      "p95_ms": 738.7065350000048,
-      "max_ms": 738.7065350000048
+      "samples_per_second": 3627.528230739662,
+      "p50_ms": 1378.3490250000032,
+      "p95_ms": 1378.3490250000032,
+      "max_ms": 1378.3490250000032
     },
     "routes": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 5135.946511409851,
-      "p50_ms": 973.5303879999847,
-      "p95_ms": 973.5303879999847,
-      "max_ms": 973.5303879999847
+      "samples_per_second": 2956.24684837851,
+      "p50_ms": 1691.3337269999902,
+      "p95_ms": 1691.3337269999902,
+      "max_ms": 1691.3337269999902
     },
     "cardiac": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 5547.028238475083,
-      "p50_ms": 901.3835490000201,
-      "p95_ms": 901.3835490000201,
-      "max_ms": 901.3835490000201
+      "samples_per_second": 3133.7219315660095,
+      "p50_ms": 1595.546800000011,
+      "p95_ms": 1595.546800000011,
+      "max_ms": 1595.546800000011
     },
     "deletions": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 15828.554819261712,
-      "p50_ms": 315.8848080000025,
-      "p95_ms": 315.8848080000025,
-      "max_ms": 315.8848080000025
+      "samples_per_second": 6481.0580727572415,
+      "p50_ms": 771.478969000018,
+      "p95_ms": 771.478969000018,
+      "max_ms": 771.478969000018
     },
     "reupserts": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 25225.889134265075,
-      "p50_ms": 198.2090690000041,
-      "p95_ms": 198.2090690000041,
-      "max_ms": 198.2090690000041
+      "samples_per_second": 18787.761404222852,
+      "p50_ms": 266.13069499999983,
+      "p95_ms": 266.13069499999983,
+      "max_ms": 266.13069499999983
     },
     "steady_state": {
       "batches": 20,
       "objects": 2000,
-      "samples_per_second": 7197.68180807081,
-      "p50_ms": 13.585270999989007,
-      "p95_ms": 15.66155499999877,
-      "max_ms": 15.66155499999877
+      "samples_per_second": 2490.8396600440374,
+      "p50_ms": 28.65617200001725,
+      "p95_ms": 85.55872500000987,
+      "max_ms": 85.55872500000987
     },
     "concurrent_cumulative": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 7339.546504100506,
-      "p50_ms": 681.2410000000091,
-      "p95_ms": 681.2410000000091,
-      "max_ms": 681.2410000000091
+      "samples_per_second": 3507.6568001897735,
+      "p50_ms": 1425.4530260000029,
+      "p95_ms": 1425.4530260000029,
+      "max_ms": 1425.4530260000029
     }
   },
   "batch_wall": {
-    "p50_ms": 627.503011000008,
-    "p95_ms": 788.2977230000033,
-    "max_ms": 1848.5705359999993
+    "p50_ms": 1230.522655000008,
+    "p95_ms": 1595.546800000011,
+    "max_ms": 2174.0790519999864
   },
-  "longest_event_loop_block_ms": 1848.6165029999975,
-  "read_during_ingest_ms": 692.5348010000016,
+  "longest_event_loop_block_ms": 2174.11920299998,
+  "read_during_ingest_ms": 1440.7478220000048,
   "reads": {
     "status": {
-      "p50_ms": 0.5411350000067614,
-      "p95_ms": 0.6628710000077263,
-      "max_ms": 0.6628710000077263
+      "p50_ms": 0.43005900000571273,
+      "p95_ms": 1.385930999997072,
+      "max_ms": 1.385930999997072
     },
     "freshness": {
-      "p50_ms": 43.3166360000032,
-      "p95_ms": 47.2187570000242,
-      "max_ms": 47.2187570000242
+      "p50_ms": 65.67781700001797,
+      "p95_ms": 73.62700400000904,
+      "max_ms": 73.62700400000904
     },
     "metrics_90d": {
-      "p50_ms": 12.855849999992643,
-      "p95_ms": 29.49285000000964,
-      "max_ms": 29.49285000000964
+      "p50_ms": 15.621752000006381,
+      "p95_ms": 30.915834999992512,
+      "max_ms": 30.915834999992512
     },
     "sleep_30n": {
-      "p50_ms": 7.056786000001011,
-      "p95_ms": 13.998623999999836,
-      "max_ms": 13.998623999999836
+      "p50_ms": 7.77090600001975,
+      "p95_ms": 10.814056000002893,
+      "max_ms": 10.814056000002893
     },
     "list_workouts": {
-      "p50_ms": 6.949259000015445,
-      "p95_ms": 9.827779999992345,
-      "max_ms": 9.827779999992345
+      "p50_ms": 5.97198999999091,
+      "p95_ms": 10.269821999972919,
+      "max_ms": 10.269821999972919
     }
   },
   "cold_start": {
     "empty": {
-      "p50_ms": 268.77356100000907,
-      "p95_ms": 272.9533640000154,
-      "max_ms": 272.9533640000154
+      "p50_ms": 295.77502100000856,
+      "p95_ms": 321.03630100004375,
+      "max_ms": 321.03630100004375
     },
     "million": {
-      "p50_ms": 232.34159600001294,
-      "p95_ms": 235.31867300000158,
-      "max_ms": 235.31867300000158
+      "p50_ms": 253.97629100002814,
+      "p95_ms": 260.5233180000214,
+      "max_ms": 260.5233180000214
     }
   },
   "storage": {
-    "checkpoint_bytes": 1237667840,
-    "sample_bytes": 1195933696,
-    "bytes_per_sample": 1181.7526640316205,
-    "point_bytes": 19243008,
+    "checkpoint_bytes": 1253036032,
+    "sample_bytes": 1193455616,
+    "bytes_per_sample": 1179.3039683794466,
+    "point_bytes": 19464192,
     "generated_points": 126000,
-    "bytes_per_point": 152.7222857142857,
-    "retained_payload_bytes": 13990478,
-    "retained_payload_share": 0.011303903638637003,
+    "bytes_per_point": 154.47771428571428,
+    "retained_payload_bytes": 30202488,
+    "retained_payload_share": 0.02410344733007646,
     "tables": {
       "calls": 49152,
       "calls_at": 4096,
       "exercises": 106496,
       "hk_batches": 32768,
       "hk_batches_received": 4096,
-      "hk_daily_stats": 4096,
+      "hk_daily_stats": 741376,
       "hk_heartbeat_beats": 1695744,
       "hk_quantity_points": 7880704,
       "hk_route_points": 2924544,
@@ -170,9 +170,9 @@
       "hk_workouts_source_window": 4096,
       "hk_workouts_start": 4096,
       "hook_events": 4096,
-      "metric_days": 573440,
-      "metric_days_day": 163840,
-      "payloads": 14135296,
+      "metric_days": 770048,
+      "metric_days_day": 245760,
+      "payloads": 30326784,
       "payloads_received": 4096,
       "sessions": 4096,
       "sessions_started": 4096,
@@ -182,19 +182,19 @@
       "sleep_nights": 196608,
       "sqlite_autoindex_exercises_1": 28672,
       "sqlite_autoindex_hk_batches_1": 4096,
-      "sqlite_autoindex_hk_daily_stats_1": 4096,
-      "sqlite_autoindex_hk_heartbeat_beats_1": 1613824,
-      "sqlite_autoindex_hk_quantity_points_1": 3670016,
-      "sqlite_autoindex_hk_route_points_1": 1458176,
-      "sqlite_autoindex_hk_sample_values_1": 54943744,
-      "sqlite_autoindex_hk_samples_1": 52490240,
+      "sqlite_autoindex_hk_daily_stats_1": 258048,
+      "sqlite_autoindex_hk_heartbeat_beats_1": 1654784,
+      "sqlite_autoindex_hk_quantity_points_1": 3862528,
+      "sqlite_autoindex_hk_route_points_1": 1445888,
+      "sqlite_autoindex_hk_sample_values_1": 53813248,
+      "sqlite_autoindex_hk_samples_1": 51146752,
       "sqlite_autoindex_hk_sleep_bounds_1": 4096,
-      "sqlite_autoindex_hk_sleep_members_1": 2039808,
-      "sqlite_autoindex_hk_tombstones_1": 253952,
+      "sqlite_autoindex_hk_sleep_members_1": 1990656,
+      "sqlite_autoindex_hk_tombstones_1": 249856,
       "sqlite_autoindex_hk_type_status_1": 4096,
       "sqlite_autoindex_hk_workouts_1": 12288,
       "sqlite_autoindex_hook_events_1": 4096,
-      "sqlite_autoindex_metric_days_1": 425984,
+      "sqlite_autoindex_metric_days_1": 557056,
       "sqlite_autoindex_payloads_1": 24576,
       "sqlite_autoindex_sessions_1": 4096,
       "sqlite_autoindex_sets_1": 4096,
@@ -208,19 +208,19 @@
   },
   "compression": {
     "gzip": {
-      "input_bytes": 2402109,
-      "bytes": 52522,
-      "p50_ms": 10.275995999982115,
-      "p95_ms": 11.933405999996467,
-      "max_ms": 11.933405999996467
+      "input_bytes": 2405034,
+      "bytes": 131185,
+      "p50_ms": 14.89800099999411,
+      "p95_ms": 18.3412079999689,
+      "max_ms": 18.3412079999689
     },
     "zstd": {
-      "input_bytes": 2402109,
-      "bytes": 48785,
-      "p50_ms": 1.9569090000004508,
-      "p95_ms": 3.46281799999997,
-      "max_ms": 3.46281799999997
+      "input_bytes": 2405034,
+      "bytes": 132030,
+      "p50_ms": 4.016187000030186,
+      "p95_ms": 7.014179999998305,
+      "max_ms": 7.014179999998305
     }
   },
-  "db_path": "/tmp/vitalis-bench-T39DIK/bench.db"
+  "db_path": "/home/jblaze2908/projects/vitalis/.data/cache-src/app/.data/bench/vitalis-bench-ntK1KY/bench.db"
 }

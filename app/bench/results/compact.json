@@ -1,0 +1,253 @@
+{
+  "label": "compact",
+  "commit": "c27bb19d381fa3edc122ea49e991ee56581c04e3",
+  "node": "v22.23.1",
+  "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+  "generated_samples": 1005000,
+  "sample_count": 1012000,
+  "batch_size": 5000,
+  "batches": {
+    "heart_rate": {
+      "batches": 115,
+      "objects": 575000,
+      "samples_per_second": 8308.08782355933,
+      "p50_ms": 625.4769879999985,
+      "p95_ms": 711.0283110000018,
+      "max_ms": 780.332402
+    },
+    "cumulative": {
+      "batches": 75,
+      "objects": 375000,
+      "samples_per_second": 6765.77459683837,
+      "p50_ms": 734.239236999987,
+      "p95_ms": 788.288452000008,
+      "max_ms": 799.1682609999989
+    },
+    "sleep": {
+      "batches": 8,
+      "objects": 40000,
+      "samples_per_second": 2918.7572704341833,
+      "p50_ms": 1750.6710820000153,
+      "p95_ms": 1792.1829840000137,
+      "max_ms": 1792.1829840000137
+    },
+    "strength": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 6154.107019815195,
+      "p50_ms": 812.4655590000039,
+      "p95_ms": 812.4655590000039,
+      "max_ms": 812.4655590000039
+    },
+    "routes": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 4845.918389017985,
+      "p50_ms": 1031.796163000021,
+      "p95_ms": 1031.796163000021,
+      "max_ms": 1031.796163000021
+    },
+    "cardiac": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 5873.933121051479,
+      "p50_ms": 851.2184080000152,
+      "p95_ms": 851.2184080000152,
+      "max_ms": 851.2184080000152
+    },
+    "deletions": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 11100.065805630426,
+      "p50_ms": 450.4477799999877,
+      "p95_ms": 450.4477799999877,
+      "max_ms": 450.4477799999877
+    },
+    "reupserts": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 17054.981302966127,
+      "p50_ms": 293.1694799999823,
+      "p95_ms": 293.1694799999823,
+      "max_ms": 293.1694799999823
+    },
+    "steady_state": {
+      "batches": 20,
+      "objects": 2000,
+      "samples_per_second": 4412.580192881059,
+      "p50_ms": 15.131721000012476,
+      "p95_ms": 67.29519800000708,
+      "max_ms": 67.29519800000708
+    },
+    "concurrent_cumulative": {
+      "batches": 1,
+      "objects": 5000,
+      "samples_per_second": 6481.9667743301525,
+      "p50_ms": 771.3708160000097,
+      "p95_ms": 771.3708160000097,
+      "max_ms": 771.3708160000097
+    }
+  },
+  "batch_wall": {
+    "p50_ms": 689.7985219999973,
+    "p95_ms": 812.4655590000039,
+    "max_ms": 1792.1829840000137
+  },
+  "longest_event_loop_block_ms": 1792.2726079999993,
+  "read_during_ingest_ms": 785.1762220000091,
+  "reads": {
+    "status": {
+      "p50_ms": 0.33680700001423247,
+      "p95_ms": 0.41394700002274476,
+      "max_ms": 0.41394700002274476
+    },
+    "freshness": {
+      "p50_ms": 64.56601000000956,
+      "p95_ms": 66.64352899999358,
+      "max_ms": 66.64352899999358
+    },
+    "metrics_90d": {
+      "p50_ms": 15.856075999996392,
+      "p95_ms": 32.45841200000723,
+      "max_ms": 32.45841200000723
+    },
+    "sleep_30n": {
+      "p50_ms": 7.761878000019351,
+      "p95_ms": 10.350225000001956,
+      "max_ms": 10.350225000001956
+    },
+    "list_workouts": {
+      "p50_ms": 6.0975409999955446,
+      "p95_ms": 11.873665000020992,
+      "max_ms": 11.873665000020992
+    }
+  },
+  "cold_start": {
+    "empty": {
+      "p50_ms": 295.6303060000064,
+      "p95_ms": 317.1865300000063,
+      "max_ms": 317.1865300000063
+    },
+    "million": {
+      "p50_ms": 250.51239600000554,
+      "p95_ms": 256.8127159999858,
+      "max_ms": 256.8127159999858
+    }
+  },
+  "storage": {
+    "checkpoint_bytes": 304623616,
+    "sample_bytes": 260325376,
+    "bytes_per_sample": 257.2385138339921,
+    "point_bytes": 4603904,
+    "generated_points": 141000,
+    "bytes_per_point": 32.65180141843972,
+    "retained_payload_bytes": 30202488,
+    "point_kinds": {
+      "layout": "packed-v1",
+      "kinds": {
+        "quantity": {
+          "points": 69000,
+          "encoded_bytes": 2221800,
+          "allocated_bytes": 2299399.8710585875,
+          "allocated_bytes_per_point": 33.3246358124433,
+          "encoded_bytes_per_point": 32.2
+        },
+        "route": {
+          "points": 27000,
+          "encoded_bytes": 1836120,
+          "allocated_bytes": 1900249.3884454467,
+          "allocated_bytes_per_point": 70.37960697946099,
+          "encoded_bytes_per_point": 68.00444444444445
+        },
+        "heartbeat": {
+          "points": 30000,
+          "encoded_bytes": 270600,
+          "allocated_bytes": 280051.1320138868,
+          "allocated_bytes_per_point": 9.335037733796227,
+          "encoded_bytes_per_point": 9.02
+        },
+        "ecg": {
+          "points": 15000,
+          "encoded_bytes": 120012,
+          "allocated_bytes": 124203.60848207903,
+          "allocated_bytes_per_point": 8.280240565471935,
+          "encoded_bytes_per_point": 8.0008
+        }
+      },
+      "allocation_note": "BLOB table/index page bytes apportioned by encoded bytes; includes page overhead."
+    },
+    "retained_payload_share": 0.09914690264854581,
+    "tables": {
+      "calls": 49152,
+      "calls_at": 4096,
+      "exercises": 106496,
+      "hk_batches": 36864,
+      "hk_batches_received": 12288,
+      "hk_blobs": 4603904,
+      "hk_daily_stats": 823296,
+      "hk_devices": 4096,
+      "hk_samples": 156581888,
+      "hk_samples_day": 23883776,
+      "hk_samples_sleep": 1060864,
+      "hk_samples_time": 27066368,
+      "hk_sleep_bounds": 4096,
+      "hk_sleep_day": 3100672,
+      "hk_sleep_members": 3084288,
+      "hk_sources": 4096,
+      "hk_sources_name": 4096,
+      "hk_tombstones": 487424,
+      "hk_type_status": 4096,
+      "hk_types": 4096,
+      "hk_value_days": 40960,
+      "hk_value_days_day": 28672,
+      "hk_workouts": 28672,
+      "hk_workouts_source_window": 4096,
+      "hk_workouts_start": 4096,
+      "hook_events": 4096,
+      "metric_days": 774144,
+      "metric_days_day": 245760,
+      "payloads": 30326784,
+      "payloads_received": 4096,
+      "sessions": 4096,
+      "sessions_started": 4096,
+      "sets": 4096,
+      "sets_exercise": 4096,
+      "sets_session": 4096,
+      "sleep_nights": 196608,
+      "sqlite_autoindex_exercises_1": 28672,
+      "sqlite_autoindex_hk_devices_1": 4096,
+      "sqlite_autoindex_hk_samples_1": 51146752,
+      "sqlite_autoindex_hk_sources_1": 4096,
+      "sqlite_autoindex_hk_types_1": 4096,
+      "sqlite_autoindex_hk_workouts_1": 12288,
+      "sqlite_autoindex_hook_events_1": 4096,
+      "sqlite_autoindex_metric_days_1": 557056,
+      "sqlite_autoindex_payloads_1": 24576,
+      "sqlite_autoindex_sessions_1": 4096,
+      "sqlite_autoindex_sets_1": 4096,
+      "sqlite_autoindex_sleep_nights_1": 65536,
+      "sqlite_autoindex_tokens_1": 4096,
+      "sqlite_autoindex_tokens_2": 4096,
+      "sqlite_schema": 16384,
+      "sqlite_sequence": 4096,
+      "tokens": 4096
+    }
+  },
+  "compression": {
+    "gzip": {
+      "input_bytes": 2405034,
+      "bytes": 131185,
+      "p50_ms": 14.720295999984955,
+      "p95_ms": 19.155128999991575,
+      "max_ms": 19.155128999991575
+    },
+    "zstd": {
+      "input_bytes": 2405034,
+      "bytes": 132030,
+      "p50_ms": 5.641212999995332,
+      "p95_ms": 5.958844999986468,
+      "max_ms": 5.958844999986468
+    }
+  },
+  "db_path": "/home/jblaze2908/projects/vitalis/.data/compact-src/app/.data/bench/vitalis-bench-faEaOY/bench.db"
+}

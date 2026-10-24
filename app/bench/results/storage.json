@@ -1,0 +1,58 @@
+[
+  {
+    "name": "integer-text-4k",
+    "n": 1000000,
+    "insert_ms": 52217.391663,
+    "samples_per_second": 19150.7076120115,
+    "lookup_10k_ms": 163.69235900000058,
+    "bytes_per_sample": 225.21856
+  },
+  {
+    "name": "blob-without-rowid-4k",
+    "n": 1000000,
+    "insert_ms": 66817.924909,
+    "samples_per_second": 14966.043937489978,
+    "lookup_10k_ms": 150.72889200001373,
+    "bytes_per_sample": 190.431232
+  },
+  {
+    "name": "integer-text-8k",
+    "n": 1000000,
+    "insert_ms": 55897.116456,
+    "samples_per_second": 17890.010494318798,
+    "lookup_10k_ms": 195.97072500002105,
+    "bytes_per_sample": 222.150656
+  },
+  {
+    "name": "integer-text-16k",
+    "n": 1000000,
+    "insert_ms": 58344.00326200001,
+    "samples_per_second": 17139.72206379793,
+    "lookup_10k_ms": 234.7534030000097,
+    "bytes_per_sample": 220.85632
+  },
+  {
+    "name": "integer-text-64m",
+    "n": 1000000,
+    "insert_ms": 48718.135188000015,
+    "samples_per_second": 20526.237224414832,
+    "lookup_10k_ms": 148.27298900001915,
+    "bytes_per_sample": 225.21856
+  },
+  {
+    "name": "integer-text-mmap",
+    "n": 1000000,
+    "insert_ms": 52013.18292699999,
+    "samples_per_second": 19225.895123616843,
+    "lookup_10k_ms": 129.20681200001854,
+    "bytes_per_sample": 225.21856
+  },
+  {
+    "name": "integer-text-checkpoint",
+    "n": 1000000,
+    "insert_ms": 42449.15574199997,
+    "samples_per_second": 23557.59455094608,
+    "lookup_10k_ms": 138.19647000002442,
+    "bytes_per_sample": 225.21856
+  }
+]

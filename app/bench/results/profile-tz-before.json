@@ -1,0 +1,19 @@
+{
+  "batches": 8,
+  "warmup_batches": 3,
+  "average": {
+    "bytes": 2426089,
+    "wall_ms": 887.3200704000003,
+    "parse_ms": 16.860940399999983,
+    "validate_ms": 455.19573859999116,
+    "sqlite_ms": 115.78471079998398,
+    "derive_ms": 4.985371800000121,
+    "compress_ms": 13.119328200000108,
+    "hash_ms": 109.71243020000584,
+    "other_ms": 171.66155040001894,
+    "scalar_samples_per_second": 5634.945232046898
+  },
+  "phases_path": ".data/profiles/ingest-3i05oo/phases.jsonl",
+  "db_path": ".data/profiles/ingest-3i05oo/profile.db",
+  "instrumentation_note": "Diagnostic before transaction-clock correction: COMMIT/checkpoint time is in other_ms, not sqlite_ms. The named-zone validation measurement is unaffected. Final profile includes transaction time in SQLite."
+}

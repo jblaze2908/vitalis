@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import * as zlib from 'node:zlib';
+import { pointStorage } from './point-storage.mjs';
 
 const benchRoot = process.env.BENCH_ROOT ?? new URL('../.data/bench/', import.meta.url).pathname;
 mkdirSync(benchRoot, { recursive: true });
@@ -160,6 +161,7 @@ try { tables = Object.fromEntries(all('SELECT name,SUM(pgsize) bytes FROM dbstat
   }
   clone.close();
 }
+const pointsByKind = pointStorage(all, one, tables);
 const rawBodies = one("SELECT SUM(length(body_gz)) n FROM payloads WHERE origin='v2'").n;
 const sampleCount = one('SELECT COUNT(*) n FROM hk_samples').n;
 const sampleBytes = tables.samples ?? Object.entries(tables).filter(([k]) => /^hk_(samples|tombstones|sample_values|values|types|sources|devices|contributions|value_days)|^sqlite_autoindex_hk_(samples|tombstones|sample_values|types|sources|devices|contributions|value_days)/.test(k)).reduce((n, [, v]) => n + v, 0);
@@ -199,9 +201,9 @@ const report = { label: process.env.BENCH_LABEL ?? 'current', commit: execFileSy
   batches: Object.fromEntries(Object.entries(timings).map(([kind, times]) => [kind, { batches: times.length, objects: counts[kind], samples_per_second: counts[kind] / (times.reduce((a, b) => a + b, 0) / 1000), ...summary(times) }])),
   batch_wall: summary(Object.entries(timings).filter(([k]) => k !== 'steady_state').flatMap(([, v]) => v)), longest_event_loop_block_ms: longestBlock,
   read_during_ingest_ms: readDuring, reads, cold_start: cold,
-  storage: { checkpoint_bytes: statSync(process.env.VITALIS_DB).size, sample_bytes: sampleBytes, bytes_per_sample: sampleBytes / sampleCount,
-    point_bytes: pointBytes, generated_points: pointCount, bytes_per_point: pointBytes / pointCount, retained_payload_bytes: rawBodies,
-    retained_payload_share: rawBodies / statSync(process.env.VITALIS_DB).size, tables }, compression, db_path: process.env.VITALIS_DB };
+  storage: { checkpoint_bytes: statSync(process.env.VITALIS_DB).size, checkpoint_bytes_per_sample: statSync(process.env.VITALIS_DB).size / sampleCount, sample_bytes: sampleBytes, bytes_per_sample: sampleBytes / sampleCount,
+    point_bytes: pointBytes, generated_points: pointCount, bytes_per_point: pointBytes / pointCount, retained_payload_bytes: rawBodies, point_kinds: pointsByKind,
+    retained_payload_share: rawBodies / statSync(process.env.VITALIS_DB).size, retained_payload_allocated_bytes: Object.entries(tables).filter(([k]) => k.includes('payloads')).reduce((n,[,v])=>n+v,0), tables }, compression, db_path: process.env.VITALIS_DB };
 const path = process.env.BENCH_OUTPUT ?? `bench/results/${report.label}.json`;
 writeFileSync(path, JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report, null, 2));

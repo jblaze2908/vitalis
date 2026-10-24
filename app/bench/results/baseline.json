@@ -1,6 +1,6 @@
 {
   "label": "baseline",
-  "commit": "e28a7520a41c8625a234e24a8dedf872c7bb0502",
+  "commit": "dcfe6d3530351ca3b6dc69530426970980399a18",
   "node": "v22.23.1",
   "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
   "generated_samples": 1005000,
@@ -10,146 +10,146 @@
     "heart_rate": {
       "batches": 115,
       "objects": 575000,
-      "samples_per_second": 3492.8026755415303,
-      "p50_ms": 1421.628045999998,
-      "p95_ms": 1496.273545,
-      "max_ms": 1740.1707780000002
+      "samples_per_second": 2627.3438251516295,
+      "p50_ms": 1925.2714010000054,
+      "p95_ms": 2052.726766000007,
+      "max_ms": 2661.1835030000075
     },
     "cumulative": {
       "batches": 75,
       "objects": 375000,
-      "samples_per_second": 3486.123157259522,
-      "p50_ms": 1427.5904140000057,
-      "p95_ms": 1487.948693000013,
-      "max_ms": 1521.3571149999916
+      "samples_per_second": 2402.1187463707765,
+      "p50_ms": 2076.8149120000016,
+      "p95_ms": 2137.719192999997,
+      "max_ms": 2160.6183999999776
     },
     "sleep": {
       "batches": 8,
       "objects": 40000,
-      "samples_per_second": 1846.5078388932786,
-      "p50_ms": 2636.7074150000117,
-      "p95_ms": 3164.3688810000313,
-      "max_ms": 3164.3688810000313
+      "samples_per_second": 1553.5702300335977,
+      "p50_ms": 3129.7570310000447,
+      "p95_ms": 3577.6159970000153,
+      "max_ms": 3577.6159970000153
     },
     "strength": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 3149.664169703582,
-      "p50_ms": 1587.470832000021,
-      "p95_ms": 1587.470832000021,
-      "max_ms": 1587.470832000021
+      "samples_per_second": 2245.867660213368,
+      "p50_ms": 2226.3110549999983,
+      "p95_ms": 2226.3110549999983,
+      "max_ms": 2226.3110549999983
     },
     "routes": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 2842.225651818512,
-      "p50_ms": 1759.184741999954,
-      "p95_ms": 1759.184741999954,
-      "max_ms": 1759.184741999954
+      "samples_per_second": 2016.6482459966087,
+      "p50_ms": 2479.361489999981,
+      "p95_ms": 2479.361489999981,
+      "max_ms": 2479.361489999981
     },
     "cardiac": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 3012.7764334679,
-      "p50_ms": 1659.598748999997,
-      "p95_ms": 1659.598748999997,
-      "max_ms": 1659.598748999997
+      "samples_per_second": 1999.9119774741496,
+      "p50_ms": 2500.1100330000045,
+      "p95_ms": 2500.1100330000045,
+      "max_ms": 2500.1100330000045
     },
     "deletions": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 8496.53432567341,
-      "p50_ms": 588.4752309999894,
-      "p95_ms": 588.4752309999894,
-      "max_ms": 588.4752309999894
+      "samples_per_second": 5211.304259892854,
+      "p50_ms": 959.4527109999908,
+      "p95_ms": 959.4527109999908,
+      "max_ms": 959.4527109999908
     },
     "reupserts": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 13467.937829898505,
-      "p50_ms": 371.2520849999855,
-      "p95_ms": 371.2520849999855,
-      "max_ms": 371.2520849999855
+      "samples_per_second": 12248.547516405028,
+      "p50_ms": 408.21166699996684,
+      "p95_ms": 408.21166699996684,
+      "max_ms": 408.21166699996684
     },
     "steady_state": {
       "batches": 20,
       "objects": 2000,
-      "samples_per_second": 3549.953211882078,
-      "p50_ms": 27.72627199999988,
-      "p95_ms": 30.698150000011083,
-      "max_ms": 30.698150000011083
+      "samples_per_second": 1917.619994268073,
+      "p50_ms": 37.66296099999454,
+      "p95_ms": 89.65921700000763,
+      "max_ms": 89.65921700000763
     },
     "concurrent_cumulative": {
       "batches": 1,
       "objects": 5000,
-      "samples_per_second": 3473.8595173475705,
-      "p50_ms": 1439.3213010000181,
-      "p95_ms": 1439.3213010000181,
-      "max_ms": 1439.3213010000181
+      "samples_per_second": 2117.067661539216,
+      "p50_ms": 2361.7572979999823,
+      "p95_ms": 2361.7572979999823,
+      "max_ms": 2361.7572979999823
     }
   },
   "batch_wall": {
-    "p50_ms": 1425.2208409999948,
-    "p95_ms": 1659.598748999997,
-    "max_ms": 3164.3688810000313
+    "p50_ms": 2020.5340280000237,
+    "p95_ms": 2479.361489999981,
+    "max_ms": 3577.6159970000153
   },
-  "longest_event_loop_block_ms": 3164.4101419999497,
-  "read_during_ingest_ms": 1460.7539589999942,
+  "longest_event_loop_block_ms": 3577.657093000016,
+  "read_during_ingest_ms": 2373.5833270000294,
   "reads": {
     "status": {
-      "p50_ms": 837.1529689999879,
-      "p95_ms": 864.240914999973,
-      "max_ms": 864.240914999973
+      "p50_ms": 857.0421130000032,
+      "p95_ms": 884.0403749999823,
+      "max_ms": 884.0403749999823
     },
     "freshness": {
-      "p50_ms": 41.9341420000419,
-      "p95_ms": 55.38215400004992,
-      "max_ms": 55.38215400004992
+      "p50_ms": 57.31543399998918,
+      "p95_ms": 69.14807600004133,
+      "max_ms": 69.14807600004133
     },
     "metrics_90d": {
-      "p50_ms": 13.449903000000006,
-      "p95_ms": 18.130348000000026,
-      "max_ms": 18.130348000000026
+      "p50_ms": 15.727891999995336,
+      "p95_ms": 32.055676999967545,
+      "max_ms": 32.055676999967545
     },
     "sleep_30n": {
-      "p50_ms": 7.591822999995202,
-      "p95_ms": 11.24623900000006,
-      "max_ms": 11.24623900000006
+      "p50_ms": 8.205934999976307,
+      "p95_ms": 11.1430780000519,
+      "max_ms": 11.1430780000519
     },
     "list_workouts": {
-      "p50_ms": 7.010316999978386,
-      "p95_ms": 10.778825999994297,
-      "max_ms": 10.778825999994297
+      "p50_ms": 6.0044460000353865,
+      "p95_ms": 9.49747900001239,
+      "max_ms": 9.49747900001239
     }
   },
   "cold_start": {
     "empty": {
-      "p50_ms": 237.68704499996966,
-      "p95_ms": 267.21174300002167,
-      "max_ms": 267.21174300002167
+      "p50_ms": 290.069868999999,
+      "p95_ms": 290.8997199999867,
+      "max_ms": 290.8997199999867
     },
     "million": {
-      "p50_ms": 232.69491300004302,
-      "p95_ms": 249.7581989999744,
-      "max_ms": 249.7581989999744
+      "p50_ms": 257.8733099999954,
+      "p95_ms": 271.1329690000275,
+      "max_ms": 271.1329690000275
     }
   },
   "storage": {
-    "checkpoint_bytes": 1199579136,
-    "sample_bytes": 1157767168,
-    "bytes_per_sample": 1144.0387035573121,
-    "point_bytes": 19337216,
+    "checkpoint_bytes": 1214935040,
+    "sample_bytes": 1155289088,
+    "bytes_per_sample": 1141.5900079051382,
+    "point_bytes": 19546112,
     "generated_points": 126600,
-    "bytes_per_point": 152.7426224328594,
-    "retained_payload_bytes": 13990478,
-    "retained_payload_share": 0.01166282205161661,
+    "bytes_per_point": 154.39266982622433,
+    "retained_payload_bytes": 30202488,
+    "retained_payload_share": 0.024859343920149015,
     "tables": {
       "calls": 49152,
       "calls_at": 4096,
       "exercises": 106496,
       "hk_batches": 32768,
       "hk_batches_received": 4096,
-      "hk_daily_stats": 4096,
+      "hk_daily_stats": 741376,
       "hk_heartbeat_beats": 1695744,
       "hk_quantity_points": 7946240,
       "hk_route_points": 2924544,
@@ -167,9 +167,9 @@
       "hk_workouts_source_window": 4096,
       "hk_workouts_start": 4096,
       "hook_events": 4096,
-      "metric_days": 573440,
-      "metric_days_day": 163840,
-      "payloads": 14135296,
+      "metric_days": 770048,
+      "metric_days_day": 245760,
+      "payloads": 30326784,
       "payloads_received": 4096,
       "sessions": 4096,
       "sessions_started": 4096,
@@ -179,17 +179,17 @@
       "sleep_nights": 196608,
       "sqlite_autoindex_exercises_1": 28672,
       "sqlite_autoindex_hk_batches_1": 4096,
-      "sqlite_autoindex_hk_daily_stats_1": 4096,
-      "sqlite_autoindex_hk_heartbeat_beats_1": 1613824,
-      "sqlite_autoindex_hk_quantity_points_1": 3698688,
-      "sqlite_autoindex_hk_route_points_1": 1458176,
-      "sqlite_autoindex_hk_sample_values_1": 54943744,
-      "sqlite_autoindex_hk_samples_1": 52490240,
-      "sqlite_autoindex_hk_sleep_members_1": 2039808,
-      "sqlite_autoindex_hk_tombstones_1": 253952,
+      "sqlite_autoindex_hk_daily_stats_1": 258048,
+      "sqlite_autoindex_hk_heartbeat_beats_1": 1654784,
+      "sqlite_autoindex_hk_quantity_points_1": 3878912,
+      "sqlite_autoindex_hk_route_points_1": 1445888,
+      "sqlite_autoindex_hk_sample_values_1": 53813248,
+      "sqlite_autoindex_hk_samples_1": 51146752,
+      "sqlite_autoindex_hk_sleep_members_1": 1990656,
+      "sqlite_autoindex_hk_tombstones_1": 249856,
       "sqlite_autoindex_hk_workouts_1": 12288,
       "sqlite_autoindex_hook_events_1": 4096,
-      "sqlite_autoindex_metric_days_1": 425984,
+      "sqlite_autoindex_metric_days_1": 557056,
       "sqlite_autoindex_payloads_1": 24576,
       "sqlite_autoindex_sessions_1": 4096,
       "sqlite_autoindex_sets_1": 4096,
@@ -203,23 +203,19 @@
   },
   "compression": {
     "gzip": {
-      "input_bytes": 2402109,
-      "bytes": 52522,
-      "p50_ms": 10.63726200000383,
-      "p95_ms": 12.33375500002876,
-      "max_ms": 12.33375500002876
+      "input_bytes": 2405034,
+      "bytes": 131185,
+      "p50_ms": 14.416003999998793,
+      "p95_ms": 16.531108999974094,
+      "max_ms": 16.531108999974094
     },
     "zstd": {
-      "input_bytes": 2402109,
-      "bytes": 48785,
-      "p50_ms": 3.451342999993358,
-      "p95_ms": 10.256496999994852,
-      "max_ms": 10.256496999994852
+      "input_bytes": 2405034,
+      "bytes": 132030,
+      "p50_ms": 4.650383000029251,
+      "p95_ms": 4.735798999958206,
+      "max_ms": 4.735798999958206
     }
   },
-  "db_path": "/tmp/vitalis-bench-sSUPYm/bench.db",
-  "notes": [
-    "Runtime sources unchanged from dcfe6d3. Harness-only commit e28a752.",
-    "metrics_90d re-probed with populated 2021-01-01..2021-03-31 range before changing runtime sources; sample storage includes projection indexes; point count counts stored child rows (ECG JSON remains in sample storage)."
-  ]
+  "db_path": "/home/jblaze2908/projects/vitalis/.data/baseline-src/app/.data/bench/vitalis-bench-MpnMsQ/bench.db"
 }

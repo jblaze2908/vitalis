@@ -1,0 +1,126 @@
+{
+  "profile": "/home/jblaze2908/projects/vitalis/.data/compact-src/app/.data/profiles/CPU.20261024.054834.9302.0.001.cpuprofile",
+  "duration_ms": 7742.32,
+  "top_self_ms": [
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-schema.js:5",
+      "self_ms": 3106.3450000000144
+    },
+    {
+      "frame": "run file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/db.js:124",
+      "self_ms": 727.0289999999999
+    },
+    {
+      "frame": "canonical file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2.js:14",
+      "self_ms": 606.1940000000004
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2.js:77",
+      "self_ms": 411.0670000000005
+    },
+    {
+      "frame": "tx file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/db.js:158",
+      "self_ms": 242.50199999999992
+    },
+    {
+      "frame": "all file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/db.js:146",
+      "self_ms": 193.68399999999988
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2.js:18",
+      "self_ms": 185.58299999999994
+    },
+    {
+      "frame": "update node:internal/crypto/hash:132",
+      "self_ms": 164.07599999999994
+    },
+    {
+      "frame": "dayAt file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-metrics.js:37",
+      "self_ms": 155.01700000000002
+    },
+    {
+      "frame": "inst._zod.parse file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:1695",
+      "self_ms": 147.573
+    },
+    {
+      "frame": "(garbage collector) :0",
+      "self_ms": 144.02800000000005
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/bench/profile-ingest.mjs:15",
+      "self_ms": 120.78099999999998
+    },
+    {
+      "frame": "processChunkSync node:zlib:408",
+      "self_ms": 106.74399999999996
+    },
+    {
+      "frame": "applyV2 file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2.js:39",
+      "self_ms": 103.88299999999995
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/bench/profile-ingest.mjs:1",
+      "self_ms": 103.37899999999993
+    },
+    {
+      "frame": "Hash node:internal/crypto/hash:88",
+      "self_ms": 78.42200000000001
+    },
+    {
+      "frame": "sourceId file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2.js:86",
+      "self_ms": 66.167
+    },
+    {
+      "frame": "projectSample file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-derived.js:243",
+      "self_ms": 65.371
+    },
+    {
+      "frame": "(anonymous) :3",
+      "self_ms": 65.33299999999997
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-schema.js:4",
+      "self_ms": 51.384000000000015
+    },
+    {
+      "frame": "digest node:internal/crypto/hash:150",
+      "self_ms": 46.969999999999985
+    },
+    {
+      "frame": "ordered file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-schema.js:14",
+      "self_ms": 46.068999999999996
+    },
+    {
+      "frame": "group file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-derived.js:60",
+      "self_ms": 43.318000000000005
+    },
+    {
+      "frame": "(idle) :0",
+      "self_ms": 42.315
+    },
+    {
+      "frame": "stampParts file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/v2-time.js:2",
+      "self_ms": 40.23299999999999
+    },
+    {
+      "frame": "runChecks file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:34",
+      "self_ms": 40.21699999999999
+    },
+    {
+      "frame": "inst._zod.run file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:97",
+      "self_ms": 36.98500000000001
+    },
+    {
+      "frame": "inst._zod.parse file:///home/jblaze2908/projects/vitalis/app/node_modules/zod/v4/core/schemas.js:1171",
+      "self_ms": 29.452000000000005
+    },
+    {
+      "frame": "(anonymous) file:///home/jblaze2908/projects/vitalis/.data/compact-src/app/dist/src/db.js:1",
+      "self_ms": 29.094000000000005
+    },
+    {
+      "frame": "compileSourceTextModule node:internal/modules/esm/utils:344",
+      "self_ms": 26.252000000000002
+    }
+  ]
+}
