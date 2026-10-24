@@ -1,8 +1,9 @@
 import { Worker } from 'node:worker_threads';
 import { HttpError } from './config.js';
 import { flushAudits } from './db.js';
+import type { IngestMeta, IngestResult } from './ingest.js';
 import type { SyncResult } from './v2.js';
-type Result = SyncResult & { new_nights?: string[] };
+type Result = (SyncResult | IngestResult) & { new_nights?: string[] };
 let worker: Worker | undefined, seq = 0, queuedBytes = 0;
 const pending = new Map<number, { bytes: number; resolve: (r: Result) => void; reject: (e: Error) => void }>();
 function getWorker() {
@@ -27,7 +28,10 @@ function getWorker() {
   current.unref();
   return current;
 }
-export function ingestV2Async(body: Buffer, encoding?: string): Promise<Result> {
+export const ingestV2Async = (body: Buffer, encoding?: string) => submit(body, encoding) as Promise<SyncResult & { new_nights?: string[] }>;
+/** Health Auto Export push on the same writer queue as native batches. */
+export const ingestAsync = (body: Buffer, hae: IngestMeta) => submit(body, undefined, hae) as Promise<IngestResult>;
+function submit(body: Buffer, encoding?: string, hae?: IngestMeta): Promise<Result> {
   if (pending.size >= 32 || queuedBytes + body.length > 128 * 1048576) return Promise.reject(new HttpError(503, 'Native ingest queue is full; retry this batch'));
   const current = getWorker(), id = ++seq;
   // Large HTTP bodies already own a dedicated Buffer.concat allocation. Transfer it without another copy.
@@ -36,6 +40,6 @@ export function ingestV2Async(body: Buffer, encoding?: string): Promise<Result> 
     ? new Uint8Array(body.buffer) : Uint8Array.from(body);
   return new Promise((resolve, reject) => {
     pending.set(id, { bytes: body.length, resolve, reject }); queuedBytes += body.length; current.ref();
-    current.postMessage({ id, body: transferable, encoding }, [transferable.buffer]);
+    current.postMessage({ id, body: transferable, encoding, hae }, [transferable.buffer]);
   });
 }

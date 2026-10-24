@@ -5,10 +5,9 @@ import { fileURLToPath } from "node:url";
 import { BIND, HttpError, MAX_INGEST_BYTES, PORT } from "./config.js";
 import { seedExercises } from "./exercises.js";
 import { afterIngest } from "./hooks.js";
-import { ingest } from "./ingest.js";
 import { mcpRoute } from "./mcp.js";
 import { authenticate, logCall } from "./tokens.js";
-import { ingestV2Async } from "./v2-client.js";
+import { ingestAsync, ingestV2Async } from "./v2-client.js";
 import { syncStatus } from "./v2.js";
 
 seedExercises();
@@ -25,11 +24,12 @@ app.post("/ingest", async (c) => {
   if (Number(c.req.header("content-length") ?? 0) > MAX_INGEST_BYTES) return c.json({ error: `Body over ${MAX_INGEST_BYTES >> 20} MB; turn on Batch Requests` }, 413);
   const body = Buffer.from(await c.req.arrayBuffer());
   if (body.length > MAX_INGEST_BYTES) return c.json({ error: `Body over ${MAX_INGEST_BYTES >> 20} MB; turn on Batch Requests` }, 413);
+  const bodyBytes = body.length; // the body is transferred to the writer and detached
   try {
-    const r = ingest(body, { origin: `rest:${token.name}`, automation: c.req.header("automation-name") ?? c.req.header("automation-id") ?? null,
+    const r = await ingestAsync(body, { origin: `rest:${token.name}`, automation: c.req.header("automation-name") ?? c.req.header("automation-id") ?? null,
       aggregation: c.req.header("automation-aggregation") ?? null, period: c.req.header("automation-period") ?? null });
-    logCall(token.id, "ingest", true, Date.now() - t0, `${body.length} bytes, ${JSON.stringify(r.counts)}${r.duplicate ? ", duplicate" : ""}${r.warnings.length ? `, ${r.warnings.length} warnings` : ""}`);
-    void afterIngest(r.new_nights);
+    logCall(token.id, "ingest", true, Date.now() - t0, `${bodyBytes} bytes, ${JSON.stringify(r.counts)}${r.duplicate ? ", duplicate" : ""}${r.warnings.length ? `, ${r.warnings.length} warnings` : ""}`);
+    void afterIngest(r.new_nights).catch((e) => console.error("ingest hook failed:", (e as Error).message));
     const { new_nights: _n, ...out } = r;
     return c.json(out);
   } catch (e) {

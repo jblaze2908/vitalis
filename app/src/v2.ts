@@ -1,7 +1,7 @@
 // Native sync: durable raw body first, then one atomic ledger + projection + batch commit.
 import { createHash } from "node:crypto";
 import { compressNative } from "./v2-payload.js";
-import { httpErr, now } from "./config.js";
+import { HttpError, httpErr, MAX_BATCH_DAILY, MAX_BATCH_OBJECTS, now } from "./config.js";
 import { all, one, run, tx } from "./db.js";
 import { Derivations, projectSample, type RawRow } from "./v2-derived.js";
 import { KINDS, pack } from "./v2-storage.js";
@@ -27,12 +27,18 @@ export function ingestV2(body: Buffer): SyncResult & { new_nights?: string[] } {
   beginProfile();
   const sha = hash(body);
   let p = one<{ id: number }>("SELECT id FROM payloads WHERE sha256=?", sha);
+  const existed = !!p;
   if (!p) {
     const t = profile ? performance.now() : 0, compressed = compressNative(body);
     if (profile) profile.compress += performance.now() - t;
     p = { id: Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz,codec) VALUES(?,'v2',?,?,?,?)", now(), sha, body.length, compressed.body, compressed.codec).lastInsertRowid) };
   }
-  try { return applyV2(p.id, body); } finally { endProfile(body.length); }
+  try { return applyV2(p.id, body); }
+  catch (e) {
+    // An over-cap batch was never applied; don't keep its body where `reparse --all` would apply it.
+    if (!existed && e instanceof HttpError && e.status === 413) run("DELETE FROM payloads WHERE id=?", p.id);
+    throw e;
+  } finally { endProfile(body.length); }
 }
 
 export function applyV2(id: number, body: Buffer, replay = false): SyncResult & { new_nights?: string[] } {
@@ -56,6 +62,11 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
       recordPayload(id, JSON.parse(previous.counts_json), JSON.parse(previous.rejected_json));
       return result(previous, true);
     }
+    // Checked before anything is applied. Replays of already-accepted history are exempt.
+    if (!replay && envelope.upserts.length + envelope.deletions.length > MAX_BATCH_OBJECTS)
+      throw httpErr(413, `Batch has ${envelope.upserts.length + envelope.deletions.length} upserts + deletions; the limit is ${MAX_BATCH_OBJECTS}. Send smaller batches.`);
+    if (!replay && envelope.daily_stats.length > MAX_BATCH_DAILY)
+      throw httpErr(413, `Batch has ${envelope.daily_stats.length} daily_stats; the limit is ${MAX_BATCH_DAILY}. Send smaller batches.`);
     const counts: Counts = { inserted: 0, updated: 0, unchanged: 0, deleted: 0, daily_stats: 0, rejected: 0 }, rejected: Rejection[] = [];
     const reject = (v: unknown, reason: string) => {
       const uuid = v && typeof v === "object" && "uuid" in v && typeof v.uuid === "string" ? v.uuid : null;
