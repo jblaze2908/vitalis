@@ -10,6 +10,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "VitalisKit"),
-        .target(name: "VitalisUI", resources: [.process("Fonts")]),
+        .target(name: "VitalisUI", resources: [.process("Fonts"), .copy("MuscleMap/LICENSE-react-native-body-highlighter.txt")]),
     ]
 )
