@@ -6,6 +6,9 @@ import { BIND, HttpError, MAX_INGEST_BYTES, PORT } from "./config.js";
 import { seedExercises } from "./exercises.js";
 import { afterIngest } from "./hooks.js";
 import { mcpRoute } from "./mcp.js";
+import { foodRoutes } from "./routes/food.js";
+import { readRoutes } from "./routes/read.js";
+import { writeRoutes } from "./routes/write.js";
 import { authenticate, logCall } from "./tokens.js";
 import { ingestAsync, ingestV2Async } from "./v2-client.js";
 import { syncStatus } from "./v2.js";
@@ -79,8 +82,12 @@ app.post("/v2/samples", async (c) => {
 app.get("/v2/sync/status", (c) => {
   const token = authenticate(c.req.header("authorization") ?? c.req.header("x-api-key"));
   if (!token) return c.json({ error: "Missing or invalid token" }, 401);
-  return c.json(syncStatus());
+  return c.json(syncStatus(token));
 });
+
+app.route("/", readRoutes);
+app.route("/", writeRoutes);
+app.route("/", foodRoutes);
 
 app.all("/mcp", mcpRoute);
 

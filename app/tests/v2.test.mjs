@@ -384,7 +384,9 @@ test("additive schema starts against an existing production-format database and 
   const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr); const result = JSON.parse(r.stdout.trim());
   assert.equal(result.health, 200); assert.equal(result.qty, 123); assert.equal(result.tables, 13);
-  assert.deepEqual(result.status, { last_batch_at: null, types: [], batches: [] });
+  // /v2/sync/status gained token and server blocks (S-08); the legacy fields are unchanged.
+  const { token: _t, server: _s, ...legacy } = result.status;
+  assert.deepEqual(legacy, { last_batch_at: null, types: [], batches: [] });
 });
 
 test("a UUID changing kind replaces bulky children and removes its old derived workout", async () => {

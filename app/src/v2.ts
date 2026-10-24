@@ -8,6 +8,12 @@ import { KINDS, pack } from "./v2-storage.js";
 import { stampParts } from "./v2-time.js";
 import { beginProfile, endProfile, profile } from "./v2-profile.js";
 import { HK_METRICS } from "./v2-metrics.js";
+import { readFileSync } from "node:fs";
+import { TZ } from "./config.js";
+import { isoAt, ownerOffsetMin } from "./time.js";
+import type { Token } from "./tokens.js";
+
+const VERSION = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
 import { dailySchema, deletionSchema, envelopeSchema, sampleSchema, type Sample } from "./v2-schema.js";
 
 export type Counts = { inserted: number; updated: number; unchanged: number; deleted: number; daily_stats: number; rejected: number };
@@ -245,11 +251,14 @@ function clearContent(uuid: string) {
     tz=NULL,value=NULL,unit=NULL,category_value=NULL,source_id=NULL,device_id=NULL,json=NULL,day=NULL,native_value=NULL WHERE uuid=?`, uuid);
 }
 
-export function syncStatus() {
+export function syncStatus(token?: Token) {
   const batches = all<Batch>("SELECT * FROM hk_batches ORDER BY received_at DESC,payload_id DESC LIMIT 20");
   const types = all<{ type: string; live: number; deleted: number; newest_end: string | null }>(
     "SELECT type,live,deleted,newest_end FROM hk_type_status WHERE live+deleted>0 ORDER BY type");
-  return { last_batch_at: batches.length ? new Date(batches[0].received_at).toISOString() : null, types,
+  const t = Date.now();
+  return { ...(token && { token: { name: token.name, scope: token.scope, can_push: token.scope !== "read", can_read: token.scope !== "ingest", can_write: token.scope === "write" } }),
+    server: { version: VERSION, time: isoAt(t, ownerOffsetMin(t)), tz: TZ },
+    last_batch_at: batches.length ? new Date(batches[0].received_at).toISOString() : null, types,
     batches: batches.map((b) => ({ batch_id: b.batch_id, payload_id: b.payload_id, received_at: new Date(b.received_at).toISOString(),
       counts: JSON.parse(b.counts_json) as Counts, rejected: JSON.parse(b.rejected_json) as Rejection[] })) };
 }

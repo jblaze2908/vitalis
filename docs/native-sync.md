@@ -103,13 +103,16 @@ keeps working:
 
 ## GET /v2/sync/status
 
-Auth: any token. For the app's sync screen. Returns the last batch time, totals per `type` (live and
-deleted), the newest sample `end` per type, and the last 20 batches with counts and rejections.
+Auth: any token. For the app's sync and setup screens. Returns what the calling token can do, the server's
+version, clock and time zone, the last batch time, totals per `type` (live and deleted), the newest sample
+`end` per type, and the last 20 batches with counts and rejections.
 
 Response `200` (times are ISO 8601; empty storage returns null and empty arrays):
 
 ```json
 {
+  "token": { "name": "iphone", "scope": "write", "can_push": true, "can_read": true, "can_write": true },
+  "server": { "version": "0.1.0", "time": "2026-10-23T17:30:02+05:30", "tz": "Asia/Kolkata" },
   "last_batch_at": "2026-10-23T12:00:00.000Z",
   "types": [
     { "type": "HKQuantityTypeIdentifierStepCount", "live": 100, "deleted": 2,
@@ -123,7 +126,9 @@ Response `200` (times are ISO 8601; empty storage returns null and empty arrays)
 }
 ```
 
-Types are sorted by identifier. `newest_end` is the original `end` of the newest **live** sample
+`can_push` is true for `ingest` and `write` tokens, `can_read` for `read` and `write`, `can_write` for `write` only;
+setup shows "connected" only when `can_write` is true, since logging food and workouts needs it. `server.version`
+is `app/package.json`'s version. Types are sorted by identifier. `newest_end` is the original `end` of the newest **live** sample
 (by instant), or null when none are live. Deleted totals include unknown-UUID tombstones once,
 even after a late upsert. Batches are newest first, with payload id breaking timestamp ties;
 duplicate attempts do not create batches or advance `last_batch_at` or MCP `last_sync`.
