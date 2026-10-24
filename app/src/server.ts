@@ -6,6 +6,7 @@ import { BIND, HttpError, MAX_INGEST_BYTES, PORT } from "./config.js";
 import { seedExercises } from "./exercises.js";
 import { afterIngest } from "./hooks.js";
 import { mcpRoute } from "./mcp.js";
+import { userAgent } from "./off.js";
 import { foodRoutes } from "./routes/food.js";
 import { readRoutes } from "./routes/read.js";
 import { writeRoutes } from "./routes/write.js";
@@ -92,5 +93,6 @@ app.route("/", foodRoutes);
 app.all("/mcp", mcpRoute);
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  userAgent(); // warns once at startup when VITALIS_CONTACT_EMAIL is unset (50 Q3)
   serve({ fetch: app.fetch, port: PORT, hostname: BIND }, (i) => console.log(`vitalis listening on ${BIND}:${i.port}`));
 }
