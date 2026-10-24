@@ -6,6 +6,8 @@ import { all, one } from "./db.js";
 import { BASELINE_DAYS, baseline, compare, daily, decimals, heartRateBand, hm, nights, round, type Compared } from "./stats.js";
 import { addDays, clock, daysBetween, eveningMinutes, fromEveningMinutes, isoAt, ownerOffsetMin, today } from "./time.js";
 import { lastHook } from "./hooks.js";
+import { scoresFor } from "./derived.js";
+import { verdictCall } from "./scoring.js";
 import { daysSinceTrained, lastTraining } from "./training.js";
 
 export const NO_ROW = "A day with no value means nothing reached Vitalis for it (phone locked, sync not run yet), not zero.";
@@ -106,16 +108,14 @@ function judge(sleep: { flag?: string; reading?: string; usual: unknown; delta?:
   const have = parts.filter(([, c]) => c);
   const worse = have.filter(([, c]) => c!.reading === "worse").map(([n]) => n);
   const better = have.filter(([, c]) => c!.reading === "better").map(([n]) => n);
-  const rule = "Rule: compare last night's sleep, resting heart rate and HRV with the 60-day usual range (10th–90th percentile). Two or more worse: easy. One worse: as planned, no records. Two or more better: good. Otherwise: normal.";
+  const rule = "Rule: the call follows the day's recovery band, the same score the app shows (sleep score, HRV and resting heart rate against the 60 days before): ready → good, steady → normal, ease → as_planned_no_records, rest → easy; no score yet (under 14 nights of history, or no sleep or heart data) → unknown.";
   if (!have.length) return { call: "unknown", reason: "No sleep, resting heart rate or HRV for this day yet.", worse, better, rule };
-  // Judge only once some signal present today has a usual range to be judged against.
-  const keyOf: Record<string, string> = { sleep: "sleep_h", "resting heart rate": "resting_hr", HRV: "hrv" };
-  const nb = Math.max(...have.map(([n]) => baseline(keyOf[n], day).days));
-  if (nb < 7) return { call: "unknown", reason: `Only ${nb} days of history before ${day}; a usual range needs 7.`, worse, better, rule };
-  if (worse.length >= 2) return { call: "easy", reason: `${worse.join(" and ")} are outside your usual range on the bad side.`, worse, better, rule };
-  if (worse.length === 1) return { call: "as_planned_no_records", reason: `${worse[0]} is off your usual; the rest is normal.`, worse, better, rule };
-  if (better.length >= 2) return { call: "good", reason: `${better.join(" and ")} are better than usual.`, worse, better, rule };
-  return { call: "normal", reason: "Within your usual range.", worse, better, rule };
+  const rec = scoresFor(day).recovery;
+  const call = verdictCall(rec.band as Parameters<typeof verdictCall>[0]);
+  if (call === "unknown") return { call, reason: `${rec.reason ?? "No recovery score yet"}.`, worse, better, rule };
+  const why = worse.length ? `${worse.join(" and ")} ${worse.length > 1 ? "are" : "is"} outside your usual range on the bad side.`
+    : better.length ? `${better.join(" and ")} ${better.length > 1 ? "are" : "is"} better than usual.` : "Within your usual range.";
+  return { call, reason: `Recovery ${rec.score} (${rec.label}). ${why}`, worse, better, rule };
 }
 
 function weight(day: string) {
@@ -159,6 +159,7 @@ export function getSleep(from: string, to: string) {
   const flag = (v: number, b: typeof bSleep) => (b.usual === null || !("raw" in b) || !b.raw ? undefined : v < b.raw.low ? "low" : v > b.raw.high ? "high" : undefined);
   const list = ns.map((n) => ({ night_ending: n.day, asleep: hm(n.asleep_h), asleep_h: round(n.asleep_h, 2), fell_asleep: clock(n.sleep_start), woke: clock(n.sleep_end),
     deep: n.deep_h != null ? hm(n.deep_h) : null, rem: n.rem_h != null ? hm(n.rem_h) : null, awake: n.awake_h != null ? hm(n.awake_h) : null,
+    score: scoresFor(n.day).sleep?.score ?? null, wakeups: n.wakeups,
     ...(flag(n.asleep_h, bSleep) && { asleep_flag: flag(n.asleep_h, bSleep) }),
     ...(n.sleep_start && flag(eveningMinutes(n.sleep_start), bBed) && { bedtime_flag: flag(eveningMinutes(n.sleep_start), bBed) === "high" ? "later than usual" : "earlier than usual" }) }));
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);

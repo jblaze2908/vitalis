@@ -18,9 +18,11 @@ test("a fresh install answers honestly: no data, no verdict, no sync", async () 
 
 test("tool lists follow the token's scope; ingest tokens and foreign origins can't use /mcp", async () => {
   const names = async (t) => (await mcp(t, "tools/list")).msg.result.tools.map((x) => x.name).sort();
-  const reads = ["find_exercises", "get_brief", "get_exercise_history", "get_freshness", "get_metrics", "get_sleep", "get_training_summary", "get_workout", "list_workouts"];
+  // S-19 added get_today, get_scores, get_food_day, get_targets (read) and log_food (write).
+  const reads = ["find_exercises", "get_brief", "get_exercise_history", "get_food_day", "get_freshness", "get_metrics", "get_scores", "get_sleep", "get_targets",
+    "get_today", "get_training_summary", "get_workout", "list_workouts"];
   assert.deepEqual(await names(readTok), reads);
-  assert.deepEqual(await names(writeTok), [...reads, "create_exercise", "edit_set", "edit_workout", "log_sets"].sort());
+  assert.deepEqual(await names(writeTok), [...reads, "create_exercise", "edit_set", "edit_workout", "log_food", "log_sets"].sort());
   const tools = (await mcp(readTok, "tools/list")).msg.result.tools;
   assert.ok(tools.every((t) => t.annotations?.readOnlyHint === true && t.outputSchema));
   const bad = await mcp(ingestTok, "tools/list");
@@ -146,4 +148,34 @@ test("edits, deletes and the training summary", async () => {
   assert.ok(f.data.syncs_last_7_days >= 1);
   assert.match(f.data.note, /not zero/);
   assert.ok(all("SELECT tool FROM calls").some((c) => c.tool === "log_sets"));
+});
+
+test("app parity: get_today is the GET /v2/today body; get_brief adds scores and plan; verdict.call follows the band", async () => {
+  const day = (await http("GET", "/v2/today", { token: readTok })).json.day;
+  const [viaHttp, viaMcp] = [await http("GET", "/v2/today", { token: readTok }), await call(readTok, "get_today", {})];
+  const strip = (b) => { const { generated_at: _g, pulse, ...rest } = b; return { ...rest, pulse: { ...pulse, now: null } }; };
+  assert.deepEqual(strip(viaMcp.data), strip(viaHttp.json));
+  assert.equal(viaMcp.data.day, day);
+  const b = (await call(readTok, "get_brief", { day: DAY })).data;
+  assert.equal(b.scores.recovery.band, "rest"); assert.equal(b.verdict.call, "easy");
+  assert.match(b.verdict.rule, /recovery band/);
+  assert.ok(b.plan.headline && b.plan.action.kind);
+  const s = await call(readTok, "get_scores", { from: addDays(DAY, -2), to: DAY });
+  assert.equal(s.data.days.length, 3); assert.equal(s.data.days[2].recovery.band, "rest");
+  assert.equal((await call(readTok, "get_scores", { from: "2026-01-01", to: "2026-06-01" })).isError, true);
+  const sl = await call(readTok, "get_sleep", { from: DAY, to: DAY });
+  assert.equal(typeof sl.data.nights[0].score, "number"); assert.ok("wakeups" in sl.data.nights[0]);
+});
+
+test("food and targets over MCP; training summary carries heat, due and weekly sets", async () => {
+  const entry = { id: "mcp-f1", meal_id: "mcp-m1", slot: "lunch", eaten_at: `${DAY}T13:00:00+05:30`, name: "Dal", kcal: 220, protein_g: 12, source: "describe", estimate: true };
+  const r = await call(writeTok, "log_food", { entries: [entry] });
+  assert.equal(r.isError, false, r.text); assert.equal(r.data.accepted.inserted, 1);
+  assert.equal((await call(writeTok, "log_food", { entries: [entry] })).data.accepted.unchanged, 1);
+  const f = await call(readTok, "get_food_day", { day: DAY });
+  assert.equal(f.data.kcal_eaten, 220);
+  const t = await call(readTok, "get_targets");
+  assert.ok(t.data.effective.kcal > 0);
+  const sum = await call(readTok, "get_training_summary", { from: "2026-10-01", to: "2026-10-07" });
+  assert.equal(Object.keys(sum.data.heat).length, 17); assert.ok("due" in sum.data); assert.equal(Object.keys(sum.data.weekly_sets.status).length, 17);
 });

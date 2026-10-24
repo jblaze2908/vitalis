@@ -9,6 +9,12 @@ import { brief, freshness, getMetrics, getSleep } from "./health.js";
 import { addDays, DAY_RE, today } from "./time.js";
 import { authenticate, logCall, type Token } from "./tokens.js";
 import { KINDS, editSet, editWorkout, exerciseHistory, getWorkout, listWorkouts, logSets, trainingSummary } from "./training.js";
+import { scoresFor, trainingSets, trainingState } from "./derived.js";
+import { entriesSchema, foodDay, postEntries } from "./food.js";
+import { getTargets, effectiveTargets } from "./targets.js";
+import { todayBody } from "./today.js";
+import { weekStartOf, weeklySets } from "./training-analytics.js";
+import { daysBetween, ownerOffsetMin } from "./time.js";
 
 export const INSTRUCTIONS = `Vitalis holds one person's health record: Apple Health data synced from their iPhone (sleep, heart, activity, weight, Watch workouts) and a strength-training log.
 - Days are the person's local days. A night of sleep belongs to the day they woke up.
@@ -16,8 +22,9 @@ export const INSTRUCTIONS = `Vitalis holds one person's health record: Apple Hea
 - "flag" low/high means outside the usual range; "reading" better/worse says which way is good for that metric.
 - A missing day is not zero. Check "freshness" (last_sync, latest_day) before saying they didn't sleep, walk or train.
 - Watch energy, VO2 max and estimated 1RM are estimates; say so when you use them.
-- Start with get_brief for "how am I today". Use find_exercises when an exercise name might be ambiguous.
-- log_sets is safe to retry when you pass your own set ids.`;
+- Start with get_brief for "how am I today"; get_today is exactly what the app's Home screen shows. Use find_exercises when an exercise name might be ambiguous.
+- Scores (sleep, recovery) are computed by Vitalis; quote them and their parts, never compute your own.
+- log_sets and log_food are safe to retry when you pass your own ids.`;
 
 const day = z.string().regex(DAY_RE, "a date like 2026-10-09");
 const when = z.string().min(10).max(40).describe("ISO 8601 time with offset, e.g. 2026-10-09T19:05:00+05:30");
@@ -69,7 +76,10 @@ export function buildServer(token: Token) {
   s.registerTool("get_brief", { title: "Today's check", annotations: READ, outputSchema: Out,
     description: "Today's check: last night's sleep, resting heart rate, HRV and breathing against the person's usual; yesterday's activity; weight trend; last training and muscles not trained for 7+ days; a rule-based call (easy, as_planned_no_records, normal, good, or unknown when there is no data or under 7 days of history) and a summary paragraph to quote. Start here for 'how did I sleep', 'should I train hard today', 'how am I doing'.",
     inputSchema: z.object({ day: day.optional().describe("the day to check; default today in the person's time zone") }) },
-  wrap(ctx, "get_brief", (a: { day?: string }) => brief(a.day)));
+  wrap(ctx, "get_brief", (a: { day?: string }) => {
+    const b = brief(a.day), t = todayBody(b.day);
+    return { ...b, scores: scoresView(b.day), plan: { headline: t.verdict.headline, action: t.verdict.action } };
+  }));
 
   s.registerTool("get_sleep", { title: "Sleep by night", annotations: READ, outputSchema: Out,
     description: "Nights of sleep between two dates, keyed by the day they woke up: time asleep, when they fell asleep and woke, deep, REM and awake time, nights outside the usual flagged, and the range's average against the usual before it. For sleep trends, bedtime drift, 'how did I sleep this week'.",
@@ -100,7 +110,39 @@ export function buildServer(token: Token) {
   s.registerTool("get_training_summary", { title: "Training summary", annotations: READ, outputSchema: Out,
     description: "Training between two dates: strength sessions and Watch workouts, working sets per muscle (warm-ups excluded), volume, new records, and days since each major muscle was last trained. For 'how was my training week', 'am I skipping legs'.",
     inputSchema: z.object({ from: day.optional().describe("default 6 days before to"), to: day.optional().describe("default today") }) },
-  wrap(ctx, "get_training_summary", (a: { from?: string; to?: string }) => trainingSummary(...span(a, 7))));
+  wrap(ctx, "get_training_summary", (a: { from?: string; to?: string }) => {
+    const [from, to] = span(a, 7), state = trainingState(), week = weekStartOf(to), off = ownerOffsetMin();
+    const tg = effectiveTargets(), at = (d: string) => Date.parse(`${d}T00:00:00Z`) - off * 60_000;
+    const ws = weeklySets(trainingSets(at(week) - 14 * 3_600_000, at(addDays(week, 7)) + 14 * 3_600_000), week, { min: tg.weekly_sets_min, max: tg.weekly_sets_max });
+    return { ...trainingSummary(from, to), heat: state.heat, due: state.due, weekly_sets: { week_start: week, min: ws.min, max: ws.max, by_muscle: ws.by_muscle, status: ws.status } };
+  }));
+
+  s.registerTool("get_today", { title: "Today, as the app shows it", annotations: READ, outputSchema: Out,
+    description: "The app's Home screen for a day: the verdict (headline and one action), recovery score with its parts against the 60-day usual, fuel (calories left, protein), activity pace against the usual by now, muscle heat and the training due, and freshness. Quote these numbers; they are what the person sees.",
+    inputSchema: z.object({ day: day.optional().describe("default today") }) },
+  wrap(ctx, "get_today", (a: { day?: string }) => todayBody(a.day ?? today())));
+
+  s.registerTool("get_scores", { title: "Sleep and recovery scores", annotations: READ, outputSchema: Out,
+    description: "Per day between two dates (at most 90): the sleep score (0–100, band and its four parts: duration, bedtime consistency, efficiency, wake-ups) and the recovery score (0–100, band, status and its parts: sleep, HRV, resting heart rate). Scores need 14 nights of history; before that status is calibrating.",
+    inputSchema: z.object({ from: day.optional().describe("default 6 days before to"), to: day.optional().describe("default today") }) },
+  wrap(ctx, "get_scores", (a: { from?: string; to?: string }) => {
+    const [from, to] = span(a, 7);
+    if (from > to) throw new HttpError(400, "from is after to");
+    if (daysBetween(from, to) >= 90) throw new HttpError(400, "Ask for at most 90 days at a time");
+    const days: unknown[] = [];
+    for (let d = from; d <= to; d = addDays(d, 1)) days.push({ day: d, ...scoresView(d) });
+    return { range: `${from}..${to}`, days };
+  }));
+
+  s.registerTool("get_food_day", { title: "Food logged on a day", annotations: READ, outputSchema: Out,
+    description: "What was eaten on a day, by meal slot, with calories and protein against the day's target (the target adapts weekly to the weight trend unless fixed), calories left and the usual for the next slot.",
+    inputSchema: z.object({ day: day.optional().describe("default today") }) },
+  wrap(ctx, "get_food_day", (a: { day?: string }) => foodDay(a.day ?? today())));
+
+  s.registerTool("get_targets", { title: "Targets", annotations: READ, outputSchema: Out,
+    description: "The person's targets: what they set, what scoring uses now (steps, calories, protein, sleep need, wake time, bed-by) and the suggested defaults with their basis.",
+    inputSchema: z.object({}) },
+  wrap(ctx, "get_targets", () => getTargets()));
 
   s.registerTool("find_exercises", { title: "Find exercises", annotations: READ, outputSchema: Out,
     description: "Search the exercise catalogue (about 750 public-domain exercises plus custom ones) by name or gym shorthand ('bench', 'rdl', 'ohp', 'lat pulldown'). Returns ids, equipment and muscles; pass an id to log_sets when a name is ambiguous.",
@@ -137,7 +179,22 @@ export function buildServer(token: Token) {
       secondary: z.array(z.enum(MUSCLES as [string, ...string[]])).max(6).optional(), equipment: z.string().max(40).optional(), aliases: z.array(z.string().max(60)).max(10).optional() }) },
   wrap(ctx, "create_exercise", (a: Parameters<typeof createExercise>[0]) => createExercise(a)));
 
+  s.registerTool("log_food", { title: "Log food", annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, outputSchema: Out,
+    description: "Log food entries, exactly as the app does. Give every entry your own id (a UUID) and group items eaten together under one meal_id, so a retry can't double-log. Calories and macros are your estimate unless the person gave them; set estimate: true then. Returns the updated day.",
+    inputSchema: entriesSchema },
+  wrap(ctx, "log_food", (a: Parameters<typeof postEntries>[0]) => { const r = postEntries(a); return { accepted: r.accepted, day: foodDay(r.day) }; },
+    (r) => JSON.stringify((r as { accepted: unknown }).accepted)));
+
   return s;
+}
+
+/** Sleep and recovery score objects for one day, as get_brief and get_scores show them. */
+function scoresView(d: string) {
+  const s = scoresFor(d);
+  return {
+    sleep: { score: s.sleep?.score ?? null, band: s.sleep?.band ?? null, parts: s.sleep?.parts.map((p) => ({ key: p.key, score: p.score, detail: p.detail })) ?? null },
+    recovery: { score: s.recovery.score, band: s.recovery.band, status: s.recovery.status, parts: s.recovery.parts },
+  };
 }
 
 const handler = createMcpHandler((c) => buildServer(c.authInfo!.extra!.token as Token), { maxRequestBodySize: 1 << 20, onerror: (e) => console.error("mcp:", e.message) });

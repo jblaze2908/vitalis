@@ -2,6 +2,8 @@
 import { writeFileSync } from 'node:fs';
 if(!process.env.VITALIS_DB)throw Error('VITALIS_DB must identify a synthetic benchmark DB');
 const {app}=await import('../dist/src/server.js');const{createToken}=await import('../dist/src/tokens.js');
+// READ_APP=1: time the app's read routes on one synthetic year instead (seeded here when the DB is empty).
+if(process.env.READ_APP){await (await import('./app-reads.mjs')).run(app,createToken);process.exit(0);}
 const token=createToken('concurrent synthetic read probe','write').token, headers={authorization:`Bearer ${token}`,'content-type':'application/json'};
 const envelope=upserts=>({schema:1,batch_id:`read-${Date.now()}-${Math.random()}`,client:{install_id:'synthetic',app_version:'1',os:'iOS 26.1',model:'iPhone'},upserts,deletions:[],daily_stats:[]});
 const send=raw=>app.request('/v2/samples',{method:'POST',headers,body:raw});

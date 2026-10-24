@@ -51,6 +51,7 @@ Additional tools:
 node bench/storage-bench.mjs                # seven 1M-row layout/PRAGMA trials
 node bench/compression-bench.mjs            # gzip/zstd size + time on five contract shapes
 VITALIS_DB=<synthetic.db> node bench/read-latency.mjs
+VITALIS_ROOT=.data/bench VITALIS_DB=.data/bench/app-reads.db VITALIS_TZ=Asia/Kolkata READ_APP=1 node bench/read-latency.mjs
 mkdir -p .data/profiles
 node --cpu-prof --cpu-prof-dir=.data/profiles bench/profile-ingest.mjs
 node bench/summarize-profile.mjs <file.cpuprofile> <summary.json>
@@ -63,3 +64,15 @@ separate parse/envelope, object validation, canonical hashing, compression, SQLi
 and remaining JS. Derivations include their SQL; it is subtracted from the separate SQLite total.
 CPU profiling is run separately from the published end-to-end timings. `BENCH_BATCHES` is a quick
 iteration option; runs below 1M parents must not be presented as full backfill results.
+
+## App read routes
+
+`READ_APP=1` times the app's read routes (`bench/app-reads.mjs`) instead of the concurrent ingest probe. On an empty DB it
+first seeds one synthetic year: a Health Auto Export year of daily values and nights, native step/energy samples
+(30-minute intervals, 07:00–22:00) and overnight HRV samples for every day, three meals a day, and a strength session
+every other day. Each route is then requested 101 times without `If-None-Match`, so every request computes its body;
+`first_ms` is the first request (it fills the per-day cache), percentiles are over the other 100.
+
+Target (spec 12 §3): p95 under 50 ms. Measured 24 Oct 2026 on the dev Mac (Apple Silicon, Node 22.16.0),
+`results/read-latency-app.json`: `/v2/today` p95 6.6 ms (first 83.2 ms), `/v2/training` 8.4 ms, `/v2/food/day` 1.3 ms,
+`/v2/sleep` 1.0 ms, `/v2/body` 4.3 ms. Not yet measured on the production host.
