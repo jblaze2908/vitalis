@@ -114,9 +114,20 @@ CREATE TABLE IF NOT EXISTS calls (
 CREATE INDEX IF NOT EXISTS calls_at ON calls(at);
 `);
 
-export const run = (sql: string, ...p: SQLInputValue[]) => db.prepare(sql).run(...p);
-export const one = <T>(sql: string, ...p: SQLInputValue[]) => db.prepare(sql).get(...p) as T | undefined;
-export const all = <T>(sql: string, ...p: SQLInputValue[]) => db.prepare(sql).all(...p) as T[];
+// Bound dynamic-query growth while reusing the hot statements on this connection.
+const statements = new Map<string, ReturnType<typeof db.prepare>>();
+export function statement(sql: string) {
+  let s = statements.get(sql);
+  if (!s) {
+    s = db.prepare(sql);
+    if (statements.size >= 512) statements.delete(statements.keys().next().value!);
+    statements.set(sql, s);
+  }
+  return s;
+}
+export const run = (sql: string, ...p: SQLInputValue[]) => statement(sql).run(...p);
+export const one = <T>(sql: string, ...p: SQLInputValue[]) => statement(sql).get(...p) as T | undefined;
+export const all = <T>(sql: string, ...p: SQLInputValue[]) => statement(sql).all(...p) as T[];
 export const marks = (n: number) => Array(n).fill("?").join(",");
 
 export function tx<T>(fn: () => T): T {
