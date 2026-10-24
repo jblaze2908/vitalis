@@ -175,6 +175,21 @@ test("deleting all sleep removes the derived night; overlapping unspecified and 
   assert.equal(one("SELECT * FROM sleep_nights WHERE day='2026-10-11'"), undefined);
 });
 
+test("wake-ups count awake spells of a minute or more between first sleep and final wake", async () => {
+  const d = "2026-11-02", n = (day) => ({ ...one("SELECT wakeups,awake_h FROM sleep_nights WHERE day=? AND source='Native Watch'", day) });
+  await post(batch([
+    sleep(2, "2026-11-01", "22:30", "23:00"), sleep(3, "2026-11-01", "23:00", "23:00", { end: at(d, "01:00") }),
+    sleep(2, d, "01:00", "01:10"), sleep(3, d, "01:10", "03:00"), sleep(2, d, "03:00", "03:00", { end: `${d}T03:00:30.123+05:30` }),
+    sleep(4, d, "03:00", "03:00", { start: `${d}T03:00:30.123+05:30`, end: at(d, "04:00") }),
+    sleep(2, d, "04:00", "04:20"), sleep(5, d, "04:20", "06:00"), sleep(2, d, "06:00", "06:30"),
+  ]));
+  assert.equal(n(d).wakeups, 2);
+  await post(batch([sleep(3, "2026-11-03", "01:00", "04:00"), sleep(4, "2026-11-03", "04:00", "06:00")]));
+  assert.deepEqual(n("2026-11-03"), { wakeups: 0, awake_h: null });
+  await post(batch([sleep(1, "2026-11-04", "01:00", "07:00")]));
+  assert.deepEqual(n("2026-11-04"), { wakeups: null, awake_h: null });
+});
+
 test("daily_stats produce merged totals and fixed discrete units independently of raw source rows", async () => {
   const s = sample({ start: at("2026-10-12", "10:00"), end: at("2026-10-12", "11:00"), value: 200 });
   const b = batch([s], { daily_stats: [

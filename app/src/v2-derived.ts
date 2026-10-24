@@ -174,16 +174,19 @@ export class Derivations {
         .map((r) => ({ source, start: r.start_ms, end: r.end_ms }))).reduce((n, r) => n + (r.end - r.start) / HOUR, 0);
       const edge = (xs: RawRow[], end: boolean) => xs.length ? xs.reduce((a, b) => end ? (a.end_ms >= b.end_ms ? a : b) : (a.start_ms <= b.start_ms ? a : b))[end ? "end_iso" : "start_iso"] : null;
       const bed = rs.filter((r) => r.category_value === 0);
+      const staged = rs.some((r) => [3, 4, 5].includes(r.category_value!)), hasAwake = rs.some((r) => r.category_value === 2);
+      // Wake-ups: merged awake spells of ≥ 1 min inside the sleep span; unknown (null) when the source records neither stages nor awake.
+      const first = Math.min(...asleep.map((r) => r.start_ms)), last = Math.max(...asleep.map((r) => r.end_ms));
+      const wakeups = staged || hasAwake ? this.merge(rs.filter((r) => r.category_value === 2).map((r) => ({ source, start: r.start_ms, end: r.end_ms })))
+        .filter((w) => w.end - w.start >= 60_000 && w.start >= first && w.end <= last).length : null;
       if (!one("SELECT 1 FROM sleep_nights WHERE day=?", day)) this.newNights.push(day);
-      run(`INSERT INTO sleep_nights(day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,payload_id,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
+      run(`INSERT INTO sleep_nights(day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,wakeups,payload_id,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
         in_bed_start=excluded.in_bed_start,in_bed_end=excluded.in_bed_end,asleep_h=excluded.asleep_h,core_h=excluded.core_h,deep_h=excluded.deep_h,
-        rem_h=excluded.rem_h,awake_h=excluded.awake_h,payload_id=excluded.payload_id,updated_at=excluded.updated_at`, day, source, edge(asleep, false), edge(asleep, true),
+        rem_h=excluded.rem_h,awake_h=excluded.awake_h,wakeups=excluded.wakeups,payload_id=excluded.payload_id,updated_at=excluded.updated_at`, day, source, edge(asleep, false), edge(asleep, true),
         edge(bed, false), edge(bed, true), hours([1, 3, 4, 5]),
-        rs.some((r) => [3, 4, 5].includes(r.category_value!)) ? hours([3]) : null,
-        rs.some((r) => [3, 4, 5].includes(r.category_value!)) ? hours([4]) : null,
-        rs.some((r) => [3, 4, 5].includes(r.category_value!)) ? hours([5]) : null,
-        rs.some((r) => r.category_value === 2) ? hours([2]) : null, this.payloadId, now());
+        staged ? hours([3]) : null, staged ? hours([4]) : null, staged ? hours([5]) : null,
+        hasAwake ? hours([2]) : null, wakeups, this.payloadId, now());
     }
   }
 
