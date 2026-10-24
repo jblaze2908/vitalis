@@ -75,3 +75,25 @@ export const TONIGHT = {
   WAKE_HISTORY_NIGHTS: 14,
   WAKE_ROUND_MIN: 5,
 } as const;
+
+/** §7 Training. Muscles in templates are API slugs (hyphens). */
+export const TRAINING = {
+  tauH: 36,
+  loadWindowDays: 14,
+  noDataWindowDays: 30,
+  weight: { primary: 1, secondary: 0.5 },
+  // Heat bands by load L: < fresh → 1, < recovering → 2, < partly → 3, else 4.
+  heat: { fresh: 0.5, recovering: 2, partly: 4 },
+  // Session heat by weighted sets: ≥ loaded → 4, ≥ partly → 3, > 0 → 2.
+  sessionHeat: { partly: 2, loaded: 4 },
+  weeklySets: { min: 10, max: 20 },
+  e1rmTrend: { windowDays: 84, changeDays: 56 },
+  templates: [
+    { template: "legs", name: "Legs", muscles: ["quadriceps", "hamstrings", "glutes", "calves"],
+      exercises: ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
+    { template: "push", name: "Push", muscles: ["chest", "shoulders", "triceps"],
+      exercises: ["barbell-bench-press-medium-grip", "standing-military-press", "incline-dumbbell-press", "side-lateral-raise", "triceps-pushdown"] },
+    { template: "pull", name: "Pull", muscles: ["lats", "middle-back", "biceps"],
+      exercises: ["wide-grip-lat-pulldown", "bent-over-barbell-row", "seated-cable-rows", "face-pull", "barbell-curl"] },
+  ],
+} as const;
