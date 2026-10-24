@@ -62,7 +62,7 @@ struct SetupChrome<Content: View, Action: View>: View {
                 .padding(.horizontal, VSpace.gutter)
                 .padding(.bottom, 44)
         }
-        .ignoresSafeArea(.container, edges: [.top, .bottom])
+        .ignoresSafeArea(.container, edges: .bottom)
         .vScreen()
     }
 }
