@@ -14,7 +14,7 @@ export const MIN_SCORE_DAYS = 14;
 
 type MetricRow = { day: string; source: string; qty: number | null; min: number | null; avg: number | null; max: number | null };
 export type Night = { day: string; source: string; sleep_start: string | null; sleep_end: string | null; in_bed_start: string | null;
-  in_bed_end: string | null; asleep_h: number; core_h: number | null; deep_h: number | null; rem_h: number | null; awake_h: number | null };
+  in_bed_end: string | null; asleep_h: number; core_h: number | null; deep_h: number | null; rem_h: number | null; awake_h: number | null; wakeups: number | null };
 
 // Explicit Apple-merged rows always win. Cumulative fallback uses the largest total; discrete ties use source name.
 const rank = (s: string) => (s === "" ? 0 : /watch/i.test(s) ? 1 : 2);
@@ -31,7 +31,7 @@ function pickPerDay<T extends { day: string; source: string; qty?: number | null
 }
 
 export function nights(from: string, to: string): Night[] {
-  const rows = all<Night>("SELECT day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h FROM sleep_nights WHERE day BETWEEN ? AND ? ORDER BY day", from, to);
+  const rows = all<Night>("SELECT day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,wakeups FROM sleep_nights WHERE day BETWEEN ? AND ? ORDER BY day", from, to);
   return [...pickPerDay(rows).values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 

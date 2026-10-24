@@ -8,6 +8,7 @@ import { KINDS, pack } from "./v2-storage.js";
 import { stampParts } from "./v2-time.js";
 import { beginProfile, endProfile, profile } from "./v2-profile.js";
 import { HK_METRICS } from "./v2-metrics.js";
+import { markDirty } from "./derived.js";
 import { readFileSync } from "node:fs";
 import { TZ } from "./config.js";
 import { isoAt, ownerOffsetMin } from "./time.js";
@@ -220,6 +221,7 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
       for (const t of types.values()) run("UPDATE hk_types SET duration_ms=MAX(duration_ms,?) WHERE id=?", t.duration_ms, t.id);
       const deriveStarted = profile ? performance.now() : 0, deriveSql = profile?.sqlite ?? 0;
       derived.finish();
+      markDirty([...derived.touchedDays]);
       if (profile) { profile.derive += performance.now() - deriveStarted; profile.derive_sql += profile.sqlite - deriveSql; }
       for (const [type, delta] of touchedTypes) {
         run(`INSERT INTO hk_type_status(type,live,deleted) VALUES(?,?,?) ON CONFLICT(type)

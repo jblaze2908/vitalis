@@ -7,6 +7,7 @@ import { BY_HAE, convert } from "./catalog.js";
 import { httpErr, now } from "./config.js";
 import { all, one, run, tx } from "./db.js";
 import { localDay, parseStamp } from "./time.js";
+import { markDirty } from "./derived.js";
 import { decodePayload } from "./v2-payload.js";
 import { applyV2 } from "./v2.js";
 
@@ -48,19 +49,20 @@ export const payloadIds = () => all<{ id: number }>("SELECT id FROM payloads ORD
 const zero = (): Counts => ({ metric_days: 0, sleep_nights: 0, workouts: 0, skipped_metrics: 0 });
 
 function apply(id: number, data: Row): IngestResult {
-  const counts = zero(), warnings: string[] = [], newNights: string[] = [];
+  const counts = zero(), warnings: string[] = [], newNights: string[] = [], days = new Set<string>();
   try {
     tx(() => {
       for (const m of Array.isArray(data.metrics) ? (data.metrics as Row[]) : []) {
         const name = str(m.name);
         try {
-          if (name === "sleep_analysis") counts.sleep_nights += sleep(id, m, warnings, newNights);
-          else { const n = metric(id, m, warnings); if (n < 0) counts.skipped_metrics++; else counts.metric_days += n; }
+          if (name === "sleep_analysis") counts.sleep_nights += sleep(id, m, warnings, newNights, days);
+          else { const n = metric(id, m, warnings, days); if (n < 0) counts.skipped_metrics++; else counts.metric_days += n; }
         } catch (e) { counts.skipped_metrics++; warnings.push(`${name || "unnamed metric"}: ${(e as Error).message}`); }
       }
       for (const w of Array.isArray(data.workouts) ? (data.workouts as Row[]) : []) {
         try { if (workout(id, w)) counts.workouts++; } catch (e) { warnings.push(`workout ${str(w.id) || "?"}: ${(e as Error).message}`); }
       }
+      markDirty([...days]);
     });
     run("UPDATE payloads SET parsed_at=?,counts=?,warnings=?,error=NULL WHERE id=?", now(), JSON.stringify(counts), JSON.stringify(warnings), id);
   } catch (e) {
@@ -72,7 +74,7 @@ function apply(id: number, data: Row): IngestResult {
 }
 
 /** Rows written, or -1 when the metric was skipped. */
-function metric(id: number, m: Row, warnings: string[]): number {
+function metric(id: number, m: Row, warnings: string[], days: Set<string>): number {
   const name = str(m.name), units = str(m.units), def = BY_HAE.get(name);
   const rows = Array.isArray(m.data) ? (m.data as Row[]) : [];
   const parsed: { day: string; source: string; qty: number | null; min: number | null; avg: number | null; max: number | null }[] = [];
@@ -99,6 +101,7 @@ function metric(id: number, m: Row, warnings: string[]): number {
   }
   const key = def?.key ?? name, unit = def?.unit ?? units;
   for (const r of parsed) {
+    days.add(r.day);
     run(`INSERT INTO metric_days(metric,day,source,qty,min,avg,max,unit,payload_id,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(metric,day,source) DO UPDATE SET qty=excluded.qty,min=excluded.min,avg=excluded.avg,max=excluded.max,unit=excluded.unit,
          payload_id=excluded.payload_id,updated_at=excluded.updated_at`, key, r.day, r.source, r.qty, r.min, r.avg, r.max, unit, id, now());
@@ -106,7 +109,7 @@ function metric(id: number, m: Row, warnings: string[]): number {
   return parsed.length;
 }
 
-function sleep(id: number, m: Row, warnings: string[], newNights: string[]): number {
+function sleep(id: number, m: Row, warnings: string[], newNights: string[], days: Set<string>): number {
   let n = 0;
   for (const r of Array.isArray(m.data) ? (m.data as Row[]) : []) {
     if (r.startDate !== undefined && r.date === undefined) {
@@ -122,6 +125,7 @@ function sleep(id: number, m: Row, warnings: string[], newNights: string[]): num
     if (asleep <= 0) continue;
     const at = (k: string) => parseStamp(r[k])?.iso ?? null;
     if (!one("SELECT 1 FROM sleep_nights WHERE day=?", t.day)) newNights.push(t.day);
+    days.add(t.day);
     run(`INSERT INTO sleep_nights(day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,payload_id,updated_at)
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
          in_bed_start=excluded.in_bed_start,in_bed_end=excluded.in_bed_end,asleep_h=excluded.asleep_h,core_h=excluded.core_h,deep_h=excluded.deep_h,

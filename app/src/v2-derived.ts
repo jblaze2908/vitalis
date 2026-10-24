@@ -37,6 +37,8 @@ export class Derivations {
   private workouts = new Set<string>();
   private hrWindows: Window[] = [];
   readonly newNights: string[] = [];
+  /** Local days whose daily values or night this batch may have changed; the caller marks them dirty. */
+  readonly touchedDays = new Set<string>();
   private priorGroups = new Map<string, MetricGroup[]>();
   private priorNights = new Map<string, { day: string; source: string }>();
   constructor(private payloadId: number, uuids: string) {
@@ -58,7 +60,7 @@ export class Derivations {
     if (row.type === HR_TYPE && row.deleted_at === null) this.hrWindows.push({ source: row.source_name,
       start: Math.min(row.start_ms, row.series_start ?? row.start_ms), end: Math.max(row.end_ms, row.series_end ?? row.end_ms) });
   }
-  private group(g: MetricGroup) { this.metrics.set(JSON.stringify([g.metric, g.day, g.source]), g); }
+  private group(g: MetricGroup) { this.metrics.set(JSON.stringify([g.metric, g.day, g.source]), g); this.touchedDays.add(g.day); }
 
   project(s: Sample, id: number, projection: Projection) {
     const m = HK_METRICS.get(s.type);
@@ -73,6 +75,7 @@ export class Derivations {
   daily(s: DailyStat) {
     const m = HK_METRICS.get(s.type);
     if (!m) return;
+    this.touchedDays.add(s.day);
     const cv = (v: number | null | undefined) => v == null ? null : s.type === STAND_TYPE && s.unit === "count" ? v : nativeValue(m.def.key, v, s.unit);
     const qty = m.cumulative ? cv(s.sum) : null, min = m.cumulative ? null : cv(s.min), avg = m.cumulative ? null : cv(s.avg), max = m.cumulative ? null : cv(s.max);
     if ([qty, min, avg, max].every((v) => v === null)) {
@@ -160,6 +163,7 @@ export class Derivations {
       for (const r of members) run("INSERT INTO hk_sleep_members(uuid,day,source) VALUES(?,?,?)", r.uuid, day, g.source);
     }
     for (const [key, { day, source }] of affected) {
+      this.touchedDays.add(day);
       const rs = nights.get(key) ?? [];
       // Another disconnected session on the same wake day (e.g. a nap) must remain included.
       for (const r of all<RawRow>(`SELECT s.* FROM hk_sleep_members m JOIN hk_raw s USING(uuid) WHERE m.day=? AND m.source=? AND s.deleted_at IS NULL`, day, source)) {
