@@ -1,0 +1,126 @@
+{
+  "day": "2026-10-24",
+  "date_label": "TODAY · SAT 24 OCT",
+  "prev_day": "2026-10-23",
+  "next_day": null,
+  "kcal_target": 2300,
+  "kcal_eaten": 2190,
+  "kcal_left": 110,
+  "over": false,
+  "macros": {
+    "protein": {
+      "g": 105,
+      "target_g": 150
+    },
+    "carbs": {
+      "g": 0,
+      "target_g": null
+    },
+    "fat": {
+      "g": 0,
+      "target_g": null
+    }
+  },
+  "target_note": "TARGET 2,300 KCAL ADJUSTS WEEKLY FROM YOUR WEIGHT TREND",
+  "meals": [
+    {
+      "slot": "breakfast",
+      "label": "BREAKFAST",
+      "time": "08:10",
+      "kcal": 530,
+      "just_added": false,
+      "entries": [
+        {
+          "id": "f-2026-10-24-0",
+          "meal_id": "m-2026-10-24-0",
+          "name": "Meal 0",
+          "portion_text": null,
+          "grams": null,
+          "kcal": 530,
+          "protein_g": 35,
+          "carbs_g": null,
+          "fat_g": null,
+          "estimate": false,
+          "source": "manual"
+        }
+      ]
+    },
+    {
+      "slot": "lunch",
+      "label": "LUNCH",
+      "time": "13:05",
+      "kcal": 780,
+      "just_added": false,
+      "entries": [
+        {
+          "id": "f-2026-10-24-1",
+          "meal_id": "m-2026-10-24-1",
+          "name": "Meal 1",
+          "portion_text": null,
+          "grams": null,
+          "kcal": 780,
+          "protein_g": 35,
+          "carbs_g": null,
+          "fat_g": null,
+          "estimate": false,
+          "source": "manual"
+        }
+      ]
+    },
+    {
+      "slot": "dinner",
+      "label": "DINNER",
+      "time": "20:30",
+      "kcal": 880,
+      "just_added": false,
+      "entries": [
+        {
+          "id": "f-2026-10-24-2",
+          "meal_id": "m-2026-10-24-2",
+          "name": "Meal 2",
+          "portion_text": null,
+          "grams": null,
+          "kcal": 880,
+          "protein_g": 35,
+          "carbs_g": null,
+          "fat_g": null,
+          "estimate": false,
+          "source": "manual"
+        }
+      ]
+    }
+  ],
+  "next_slot": "breakfast",
+  "usual_next": {
+    "name": "Meal 0",
+    "kcal": 530,
+    "protein_g": 35,
+    "carbs_g": 0,
+    "fat_g": 0,
+    "items": [
+      {
+        "name": "Meal 0",
+        "portion_text": null,
+        "grams": null,
+        "kcal": 530,
+        "protein_g": 35,
+        "carbs_g": null,
+        "fat_g": null
+      }
+    ],
+    "meal_signature": "meal 0"
+  },
+  "empty": false,
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}

@@ -11,10 +11,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if setupCompleted { shell } else { SetupPlaceholder(model: model) { setupCompleted = true } }
+            if setupCompleted { shell } else { SetupFlow(model: model) { setupCompleted = true } }
         }
         .vScreen()
         .environment(router)
+        .environment(Services.shared)
         .onOpenURL { router.open($0) }
         #if DEBUG
         // Simulator screenshots without taps: launch with `-VitalisRoute vitalis://train`.
@@ -26,33 +27,25 @@ struct RootView: View {
         VStack(spacing: 0) {
             ZStack {
                 switch router.tab {
-                case .today: TabPlaceholder(tab: .today) { router.open(.settings) }
-                case .sleep: TabPlaceholder(tab: .sleep)
-                case .body: TabPlaceholder(tab: .body)
-                case .train: TabPlaceholder(tab: .train)
-                case .eat: TabPlaceholder(tab: .eat)
+                case .today: TodayScreen()
+                case .sleep: SleepScreen()
+                case .body: BodyScreen()
+                case .train: TrainScreen()
+                case .eat: EatScreen()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             TabBar(selection: $router.tab)
         }
         .ignoresSafeArea(.container, edges: .bottom)
-        .sheet(isPresented: $router.showsSettings) {
-            NavigationStack(path: $router.settingsPath) {
-                SettingsView(model: model)
-                    .navigationDestination(for: SettingsPage.self) { page in
-                        switch page { case .sync: SyncView(model: model) }
-                    }
-                    .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink("Sync", value: SettingsPage.sync) } }
-            }
-            .preferredColorScheme(.dark)
-        }
+        .sheet(isPresented: $router.showsSettings) { SettingsScreen(model: model).preferredColorScheme(.dark) }
         .sheet(item: $router.sheet) { sheet in
-            SheetChrome { Text(sheet.id).vReading().padding(VSpace.gutter) }.presentationDetents([.medium])
+            switch sheet {
+            case .quickAdd(let slot): QuickAddSheet(slot: slot)
+            case .workoutStart: WorkoutStartSheet()
+            }
         }
-        .fullScreenCover(isPresented: $router.showsDigest) {
-            VStack { Text("Morning digest").vHeadline(44); SecondaryButton("Start my day", size: .full) { router.showsDigest = false } }
-                .padding(VSpace.gutter).vScreen()
-        }
+        .fullScreenCover(isPresented: $router.showsDigest) { DigestScreen() }
+        .fullScreenCover(isPresented: $router.showsLiveWorkout) { LiveWorkoutScreen() }
     }
 }

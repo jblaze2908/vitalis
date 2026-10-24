@@ -1,0 +1,237 @@
+{
+  "week_start": "2026-10-19",
+  "week_end": "2026-10-25",
+  "label": "THIS WEEK · 19 TO 25 OCT",
+  "heat": {
+    "abdominals": 0,
+    "abductors": 0,
+    "adductors": 0,
+    "biceps": 4,
+    "calves": 1,
+    "chest": 2,
+    "forearms": 3,
+    "glutes": 1,
+    "hamstrings": 2,
+    "lats": 4,
+    "lower-back": 1,
+    "middle-back": 4,
+    "neck": 0,
+    "quadriceps": 2,
+    "shoulders": 4,
+    "traps": 0,
+    "triceps": 3
+  },
+  "muscles": [
+    {
+      "slug": "abdominals",
+      "heat": 0,
+      "load": 0,
+      "days_since": null,
+      "week_sets": 0,
+      "status": "under"
+    },
+    {
+      "slug": "abductors",
+      "heat": 0,
+      "load": 0,
+      "days_since": null,
+      "week_sets": 0,
+      "status": "under"
+    },
+    {
+      "slug": "adductors",
+      "heat": 0,
+      "load": 0,
+      "days_since": null,
+      "week_sets": 0,
+      "status": "under"
+    },
+    {
+      "slug": "biceps",
+      "heat": 4,
+      "load": 9.1,
+      "days_since": 0,
+      "week_sets": 8,
+      "status": "under"
+    },
+    {
+      "slug": "calves",
+      "heat": 1,
+      "load": 0.47,
+      "days_since": null,
+      "week_sets": 6,
+      "status": "under"
+    },
+    {
+      "slug": "chest",
+      "heat": 2,
+      "load": 1.19,
+      "days_since": 2,
+      "week_sets": 4,
+      "status": "under"
+    },
+    {
+      "slug": "forearms",
+      "heat": 3,
+      "load": 2.28,
+      "days_since": null,
+      "week_sets": 2,
+      "status": "under"
+    },
+    {
+      "slug": "glutes",
+      "heat": 1,
+      "load": 0.47,
+      "days_since": null,
+      "week_sets": 6,
+      "status": "under"
+    },
+    {
+      "slug": "hamstrings",
+      "heat": 2,
+      "load": 0.63,
+      "days_since": 4,
+      "week_sets": 8,
+      "status": "under"
+    },
+    {
+      "slug": "lats",
+      "heat": 4,
+      "load": 6.79,
+      "days_since": 0,
+      "week_sets": 6,
+      "status": "under"
+    },
+    {
+      "slug": "lower-back",
+      "heat": 1,
+      "load": 0.31,
+      "days_since": null,
+      "week_sets": 4,
+      "status": "under"
+    },
+    {
+      "slug": "middle-back",
+      "heat": 4,
+      "load": 6.8,
+      "days_since": 0,
+      "week_sets": 6,
+      "status": "under"
+    },
+    {
+      "slug": "neck",
+      "heat": 0,
+      "load": 0,
+      "days_since": null,
+      "week_sets": 0,
+      "status": "under"
+    },
+    {
+      "slug": "quadriceps",
+      "heat": 2,
+      "load": 0.63,
+      "days_since": 4,
+      "week_sets": 8,
+      "status": "under"
+    },
+    {
+      "slug": "shoulders",
+      "heat": 4,
+      "load": 6.32,
+      "days_since": 2,
+      "week_sets": 10,
+      "status": "in_range"
+    },
+    {
+      "slug": "traps",
+      "heat": 0,
+      "load": 0,
+      "days_since": null,
+      "week_sets": 0,
+      "status": "under"
+    },
+    {
+      "slug": "triceps",
+      "heat": 3,
+      "load": 2.4,
+      "days_since": 2,
+      "week_sets": 8,
+      "status": "under"
+    }
+  ],
+  "due": null,
+  "stats": {
+    "sessions": 3,
+    "working_sets": 36,
+    "muscles_hit": 12,
+    "muscles_total": 17
+  },
+  "weekly_sets": {
+    "min": 10,
+    "max": 20,
+    "by_muscle": {
+      "abdominals": 0,
+      "abductors": 0,
+      "adductors": 0,
+      "biceps": 8,
+      "calves": 6,
+      "chest": 4,
+      "forearms": 2,
+      "glutes": 6,
+      "hamstrings": 8,
+      "lats": 6,
+      "lower-back": 4,
+      "middle-back": 6,
+      "neck": 0,
+      "quadriceps": 8,
+      "shoulders": 10,
+      "traps": 0,
+      "triceps": 8
+    }
+  },
+  "sessions": [
+    {
+      "id": "7ad4a98b-290a-4d12-b99a-c3ab21b20d1d",
+      "kind": "strength",
+      "title": "pull",
+      "day": "2026-10-24",
+      "start": "2026-10-24T18:00:00+05:30",
+      "duration_min": 30,
+      "working_sets": 12,
+      "tag": null
+    },
+    {
+      "id": "ef7647ca-7072-4dfa-bdd5-48bd91c05e24",
+      "kind": "strength",
+      "title": "push",
+      "day": "2026-10-22",
+      "start": "2026-10-22T18:00:00+05:30",
+      "duration_min": 30,
+      "working_sets": 12,
+      "tag": null
+    },
+    {
+      "id": "5b995e50-20bc-4aa2-9145-b9b49fb7f76f",
+      "kind": "strength",
+      "title": "legs",
+      "day": "2026-10-20",
+      "start": "2026-10-20T18:00:00+05:30",
+      "duration_min": 30,
+      "working_sets": 12,
+      "tag": null
+    }
+  ],
+  "empty": false,
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}

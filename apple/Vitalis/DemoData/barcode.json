@@ -1,0 +1,4 @@
+{ "code": "8901063010031", "found": true, "source": "openfoodfacts",
+  "item": { "name": "Lassi", "brand": "Example Dairy", "quantity_label": "200 ML BOTTLE", "per_100g": { "kcal": 72, "protein_g": 3, "carbs_g": 11, "fat_g": 2 },
+            "serving": { "label": "200 ML BOTTLE", "grams": 200, "kcal": 144, "protein_g": 6, "carbs_g": 22, "fat_g": 4 } },
+  "label": "200 ML BOTTLE · OPEN FOOD FACTS" }

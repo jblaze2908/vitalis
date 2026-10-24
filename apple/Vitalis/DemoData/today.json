@@ -1,0 +1,143 @@
+{
+  "day": "2026-10-24",
+  "generated_at": "2026-10-24T22:14:23+05:30",
+  "verdict": {
+    "band": "ready",
+    "label": "READY",
+    "headline": "Done for today",
+    "reason": "pull, 12 sets.",
+    "action": {
+      "kind": "bed_reminder",
+      "label": "Remind me"
+    }
+  },
+  "recovery": {
+    "score": 78,
+    "band": "ready",
+    "status": "ok",
+    "reason": null,
+    "nights_of_history": 60,
+    "nights_needed": 0,
+    "parts": {
+      "sleep": {
+        "score": 93,
+        "band": "good"
+      },
+      "hrv": {
+        "value": 47.5,
+        "unit": "ms",
+        "basis": "overnight",
+        "usual": 47.5,
+        "usual_range": [
+          47.5,
+          47.5
+        ],
+        "z": 0,
+        "score": 75,
+        "arrow": null,
+        "tint": null
+      },
+      "resting_hr": {
+        "value": 62,
+        "unit": "bpm",
+        "usual": 60,
+        "usual_range": [
+          58,
+          62
+        ],
+        "z": -1,
+        "score": 60,
+        "arrow": "up",
+        "tint": "watch"
+      }
+    }
+  },
+  "fuel": {
+    "kcal_target": 2300,
+    "kcal_eaten": 2190,
+    "kcal_left": 110,
+    "protein_target_g": 150,
+    "protein_g": 105,
+    "next_slot": "breakfast",
+    "next_label": "LOG BREAKFAST"
+  },
+  "activity": {
+    "steps": 8000,
+    "steps_target": 8000,
+    "steps_expected_now": 8000,
+    "steps_pace": "on_pace",
+    "active_kcal": 400,
+    "active_kcal_expected_now": 490,
+    "active_kcal_pace": "behind"
+  },
+  "training": {
+    "heat": {
+      "abdominals": 0,
+      "abductors": 0,
+      "adductors": 0,
+      "biceps": 4,
+      "calves": 1,
+      "chest": 2,
+      "forearms": 3,
+      "glutes": 1,
+      "hamstrings": 2,
+      "lats": 4,
+      "lower-back": 1,
+      "middle-back": 4,
+      "neck": 0,
+      "quadriceps": 2,
+      "shoulders": 4,
+      "traps": 0,
+      "triceps": 3
+    },
+    "fresh_label": null,
+    "loaded_label": "Biceps loaded",
+    "due": null,
+    "trained_today": true
+  },
+  "pulse": {
+    "window": {
+      "start": "2026-10-24T06:50:00+05:30",
+      "end": "2026-10-24T23:50:00+05:30"
+    },
+    "now": "2026-10-24T22:14:23+05:30",
+    "events": [
+      {
+        "at": "2026-10-24T06:50:00+05:30",
+        "kind": "wake"
+      },
+      {
+        "at": "2026-10-24T08:10:00+05:30",
+        "kind": "meal"
+      },
+      {
+        "at": "2026-10-24T13:05:00+05:30",
+        "kind": "meal"
+      },
+      {
+        "at": "2026-10-24T18:00:00+05:30",
+        "kind": "workout"
+      },
+      {
+        "at": "2026-10-24T20:30:00+05:30",
+        "kind": "meal"
+      }
+    ]
+  },
+  "digest": {
+    "available": true,
+    "night_ended_at": "2026-10-24T06:50:00+05:30"
+  },
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}

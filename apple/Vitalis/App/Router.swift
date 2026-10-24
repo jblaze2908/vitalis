@@ -18,6 +18,8 @@ final class Router {
     var sheet: AppSheet?
     var showsDigest = false
     var showsSettings = false
+    /// The full-screen iPhone logger (I-12); the tab bar hides while it shows.
+    var showsLiveWorkout = false
     var settingsPath: [SettingsPage] = []
 
     func open(_ route: Route) {
@@ -32,6 +34,9 @@ final class Router {
     }
 
     func open(_ url: URL) { if let r = DeepLinks.parse(url) { open(r) } }
+
+    /// Leave the start-choice sheet for the iPhone logger.
+    func startLoggingOnPhone() { sheet = nil; showsLiveWorkout = true }
 
     private func dismissAll() { sheet = nil; showsDigest = false; showsSettings = false }
 }

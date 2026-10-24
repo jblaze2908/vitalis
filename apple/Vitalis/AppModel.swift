@@ -102,6 +102,7 @@ final class AppModel: ObservableObject {
         try TokenStore.save(token)
         try await prepareEngine()?.configure(settings)
         SettingsStore.baseURL = settings.baseURL.absoluteString
+        await Services.shared.resumeAfterNewToken()
     }
     func resetExport() async throws {
         guard let engine = prepareEngine() else { throw SyncEngine.EngineError.protectedDataUnavailable }

@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         AppModel.shared.start()
+        Services.shared.start()
         return true
     }
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {

@@ -1,0 +1,55 @@
+{
+  "end": "2026-10-24",
+  "nights": [
+    {
+      "day": "2026-10-18",
+      "score": 93,
+      "asleep_h": 7
+    },
+    {
+      "day": "2026-10-19",
+      "score": 93,
+      "asleep_h": 7
+    },
+    {
+      "day": "2026-10-20",
+      "score": 93,
+      "asleep_h": 7
+    },
+    {
+      "day": "2026-10-21",
+      "score": 93,
+      "asleep_h": 7
+    },
+    {
+      "day": "2026-10-22",
+      "score": 93,
+      "asleep_h": 7
+    },
+    {
+      "day": "2026-10-23",
+      "score": 93,
+      "asleep_h": 7
+    },
+    {
+      "day": "2026-10-24",
+      "score": 93,
+      "asleep_h": 7
+    }
+  ],
+  "avg_score": 93,
+  "bedtime_spread_min": 0,
+  "label": "AVG 93 · BED ± 0M",
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}

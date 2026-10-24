@@ -1,0 +1,55 @@
+{
+  "slot": "lunch",
+  "usual": {
+    "name": "Meal 1",
+    "kcal": 780,
+    "protein_g": 35,
+    "carbs_g": 0,
+    "fat_g": 0,
+    "items": [
+      {
+        "name": "Meal 1",
+        "portion_text": null,
+        "grams": null,
+        "kcal": 780,
+        "protein_g": 35,
+        "carbs_g": null,
+        "fat_g": null
+      }
+    ],
+    "meal_signature": "meal 1"
+  },
+  "recent": [
+    {
+      "name": "Meal 2",
+      "portion_text": null,
+      "grams": null,
+      "kcal": 880,
+      "protein_g": 35,
+      "carbs_g": null,
+      "fat_g": null,
+      "last_day": "2026-10-24"
+    },
+    {
+      "name": "Meal 1",
+      "portion_text": null,
+      "grams": null,
+      "kcal": 780,
+      "protein_g": 35,
+      "carbs_g": null,
+      "fat_g": null,
+      "last_day": "2026-10-24"
+    },
+    {
+      "name": "Meal 0",
+      "portion_text": null,
+      "grams": null,
+      "kcal": 530,
+      "protein_g": 35,
+      "carbs_g": null,
+      "fat_g": null,
+      "last_day": "2026-10-24"
+    }
+  ],
+  "saved": []
+}

@@ -1,0 +1,264 @@
+{
+  "day": "2026-10-24",
+  "weight": {
+    "trend_kg": 76.2,
+    "month_change_kg": -0.1,
+    "goal_kg": null,
+    "toward_goal": null,
+    "latest": {
+      "kg": 76.2,
+      "at": null,
+      "source": "SYNTHETIC",
+      "manual": false
+    },
+    "series": [
+      {
+        "day": "2026-09-25",
+        "raw_kg": 76.3,
+        "trend_kg": 76.37
+      },
+      {
+        "day": "2026-09-26",
+        "raw_kg": 76.3,
+        "trend_kg": 76.36
+      },
+      {
+        "day": "2026-09-27",
+        "raw_kg": 76.3,
+        "trend_kg": 76.36
+      },
+      {
+        "day": "2026-09-28",
+        "raw_kg": 76.3,
+        "trend_kg": 76.35
+      },
+      {
+        "day": "2026-09-29",
+        "raw_kg": 76.3,
+        "trend_kg": 76.35
+      },
+      {
+        "day": "2026-09-30",
+        "raw_kg": 76.3,
+        "trend_kg": 76.34
+      },
+      {
+        "day": "2026-10-01",
+        "raw_kg": 76.3,
+        "trend_kg": 76.34
+      },
+      {
+        "day": "2026-10-02",
+        "raw_kg": 76.3,
+        "trend_kg": 76.33
+      },
+      {
+        "day": "2026-10-03",
+        "raw_kg": 76.3,
+        "trend_kg": 76.33
+      },
+      {
+        "day": "2026-10-04",
+        "raw_kg": 76.3,
+        "trend_kg": 76.32
+      },
+      {
+        "day": "2026-10-05",
+        "raw_kg": 76.3,
+        "trend_kg": 76.32
+      },
+      {
+        "day": "2026-10-06",
+        "raw_kg": 76.3,
+        "trend_kg": 76.31
+      },
+      {
+        "day": "2026-10-07",
+        "raw_kg": 76.3,
+        "trend_kg": 76.31
+      },
+      {
+        "day": "2026-10-08",
+        "raw_kg": 76.3,
+        "trend_kg": 76.3
+      },
+      {
+        "day": "2026-10-09",
+        "raw_kg": 76.3,
+        "trend_kg": 76.3
+      },
+      {
+        "day": "2026-10-10",
+        "raw_kg": 76.3,
+        "trend_kg": 76.29
+      },
+      {
+        "day": "2026-10-11",
+        "raw_kg": 76.2,
+        "trend_kg": 76.29
+      },
+      {
+        "day": "2026-10-12",
+        "raw_kg": 76.2,
+        "trend_kg": 76.28
+      },
+      {
+        "day": "2026-10-13",
+        "raw_kg": 76.2,
+        "trend_kg": 76.28
+      },
+      {
+        "day": "2026-10-14",
+        "raw_kg": 76.2,
+        "trend_kg": 76.27
+      },
+      {
+        "day": "2026-10-15",
+        "raw_kg": 76.2,
+        "trend_kg": 76.27
+      },
+      {
+        "day": "2026-10-16",
+        "raw_kg": 76.2,
+        "trend_kg": 76.26
+      },
+      {
+        "day": "2026-10-17",
+        "raw_kg": 76.2,
+        "trend_kg": 76.26
+      },
+      {
+        "day": "2026-10-18",
+        "raw_kg": 76.2,
+        "trend_kg": 76.25
+      },
+      {
+        "day": "2026-10-19",
+        "raw_kg": 76.2,
+        "trend_kg": 76.25
+      },
+      {
+        "day": "2026-10-20",
+        "raw_kg": 76.2,
+        "trend_kg": 76.24
+      },
+      {
+        "day": "2026-10-21",
+        "raw_kg": 76.2,
+        "trend_kg": 76.24
+      },
+      {
+        "day": "2026-10-22",
+        "raw_kg": 76.2,
+        "trend_kg": 76.23
+      },
+      {
+        "day": "2026-10-23",
+        "raw_kg": 76.2,
+        "trend_kg": 76.23
+      },
+      {
+        "day": "2026-10-24",
+        "raw_kg": 76.2,
+        "trend_kg": 76.22
+      }
+    ]
+  },
+  "activity": {
+    "steps": 8000,
+    "steps_target": 8000,
+    "active_kcal": 400,
+    "exercise_min": null,
+    "exercise_target_min": 30,
+    "week": [
+      {
+        "day": "2026-10-18",
+        "steps": 9500
+      },
+      {
+        "day": "2026-10-19",
+        "steps": 10000
+      },
+      {
+        "day": "2026-10-20",
+        "steps": 6000
+      },
+      {
+        "day": "2026-10-21",
+        "steps": 6500
+      },
+      {
+        "day": "2026-10-22",
+        "steps": 7000
+      },
+      {
+        "day": "2026-10-23",
+        "steps": 7500
+      },
+      {
+        "day": "2026-10-24",
+        "steps": 8000
+      }
+    ]
+  },
+  "vitals": [
+    {
+      "key": "hrv",
+      "label": "HRV",
+      "value": 47.5,
+      "unit": "ms",
+      "usual": 47.5,
+      "usual_range": [
+        47.5,
+        47.5
+      ],
+      "flag": null,
+      "reading": null
+    },
+    {
+      "key": "resting_hr",
+      "label": "RESTING HR",
+      "value": 62,
+      "unit": "bpm",
+      "usual": 60,
+      "usual_range": [
+        58,
+        62
+      ],
+      "flag": null,
+      "reading": null
+    },
+    {
+      "key": "spo2",
+      "label": "SPO2",
+      "value": null,
+      "unit": "%",
+      "usual": null,
+      "usual_range": null,
+      "flag": null,
+      "reading": null
+    },
+    {
+      "key": "respiratory_rate",
+      "label": "BREATHING",
+      "value": null,
+      "unit": "/min",
+      "usual": null,
+      "usual_range": null,
+      "flag": null,
+      "reading": null
+    }
+  ],
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}
