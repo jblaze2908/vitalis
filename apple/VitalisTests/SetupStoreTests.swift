@@ -247,3 +247,12 @@ import VitalisKit
         #expect(SetupStep.resume(hasServer: true, hasToken: true, saved: 4) == .targets)
     }
 }
+
+@Suite struct HistoryProgressFallbackTests {
+    @Test func countsTypesDoneWhenTheCurrentTypeHasNoSamples() {
+        let snap = SyncSnapshot(phase: "Backfilling", currentType: "C", page: 1)
+        let p = HistoryProgress.make(snapshot: snap, oldestSeen: nil, startedAt: Date(), now: Date(), typeOrder: ["A", "B", "C", "D"])
+        #expect(p.percent == 50)
+        #expect(HistoryProgress.make(snapshot: snap, oldestSeen: nil, startedAt: Date(), now: Date()).percent == nil)
+    }
+}

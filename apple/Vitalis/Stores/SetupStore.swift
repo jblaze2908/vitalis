@@ -78,7 +78,7 @@ struct HistoryProgress: Equatable, Sendable {
     /// Percent = the current page's newest sample date between the oldest date seen and now. `TypeHistory` keeps only
     /// `newestEnd`, so "oldest seen" is the earliest page date observed since this step began.
     static func make(snapshot: SyncSnapshot, oldestSeen: Date?, startedAt: Date?, now: Date,
-                     calendar: Calendar = .current) -> HistoryProgress {
+                     typeOrder: [String] = [], calendar: Calendar = .current) -> HistoryProgress {
         let history = snapshot.history
         let sent = history.types.values.reduce(0) { $0 + $1.objectsSent }
         let pageDate = snapshot.currentType.flatMap { history.types[$0]?.newestEnd }.flatMap(APIDate.parse)
@@ -92,6 +92,9 @@ struct HistoryProgress: Equatable, Sendable {
             let oldest = min(oldestSeen ?? pageDate, pageDate)
             let span = now.timeIntervalSince(oldest)
             percent = span > 0 ? min(99, max(0, Int(pageDate.timeIntervalSince(oldest) / span * 100))) : 0
+        } else if let current = snapshot.currentType, let i = typeOrder.firstIndex(of: current), !typeOrder.isEmpty {
+            // Most Health types hold no samples, so there's usually no page date: fall back to types done in read order.
+            percent = min(99, i * 100 / typeOrder.count)
         }
 
         var timeLeft: String?
@@ -350,10 +353,14 @@ final class SetupStore {
     }
 
     func progress() -> HistoryProgress {
-        HistoryProgress.make(snapshot: snapshot, oldestSeen: oldestSeen, startedAt: historyStartedAt, now: deps.now())
+        HistoryProgress.make(snapshot: snapshot, oldestSeen: oldestSeen, startedAt: historyStartedAt, now: deps.now(),
+                             typeOrder: Self.typeOrder)
     }
 
     func goToTargets() { step = .targets }
+
+    /// The exporter reads types in registry order, which is what the progress fallback counts against.
+    static let typeOrder: [String] = HealthTypes().samples.map(\.identifier)
 
     func loadTargets() async {
         guard !targetsLoaded, let settings = settings ?? (try? ServerSettings(serverText)) else { return }
