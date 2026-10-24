@@ -77,7 +77,8 @@ final class AppModel: ObservableObject {
         isAuthorizing = true
         defer { isAuthorizing = false }
         do {
-            try await healthStore.requestAuthorization(toShare: HealthShareTypes.all, read: registry.readTypes)
+            // Prescriptions need per-object authorization; listing them here makes HealthKit raise and crash.
+            try await healthStore.requestAuthorization(toShare: HealthShareTypes.all, read: registry.readTypes.filter { !($0 is HKPrescriptionType) })
             try await prepareEngine()?.requestHistoryBackfill()
             // Permission success doesn't disclose which read types the user allowed.
             // Reinstall observers that may have failed before permission was requested.
