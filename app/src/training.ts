@@ -15,11 +15,11 @@ export const SESSION_GAP_H = 3;
 export type SetInput = { id?: string; exercise: string; kind?: Kind; weight_kg?: number | null; reps?: number | null; duration_s?: number | null;
   distance_m?: number | null; rpe?: number | null; rir?: number | null; target_weight_kg?: number | null; target_reps?: number | null;
   performed_at?: string; note?: string | null };
-type SetRow = { id: string; session_id: string; exercise_id: string; ord: number; kind: Kind; weight_kg: number | null; reps: number | null;
+export type SetRow = { id: string; session_id: string; exercise_id: string; ord: number; kind: Kind; weight_kg: number | null; reps: number | null;
   duration_s: number | null; distance_m: number | null; rpe: number | null; rir: number | null; target_weight_kg: number | null;
   target_reps: number | null; performed_at: number; note: string | null; deleted_at: number | null };
-type SessionRow = { id: string; title: string | null; started_at: number; ended_at: number | null; tz_offset_min: number; notes: string | null;
-  source: string; deleted_at: number | null };
+export type SessionRow = { id: string; title: string | null; started_at: number; ended_at: number | null; tz_offset_min: number; notes: string | null;
+  source: string; deleted_at: number | null; hk_workout_uuid?: string | null; template?: string | null; client_source?: string | null };
 
 export const e1rm = (w: number | null, r: number | null) => (w && r && r >= 1 && r <= 12 ? round(r === 1 ? w : w * (1 + r / 30), 1) : null);
 const working = (s: { kind: Kind }) => s.kind !== "warmup";
@@ -134,11 +134,11 @@ const setView = (s: SetRow, off: number) => ({
   at: isoAt(s.performed_at, off), ...(s.note && { note: s.note }),
 });
 
-const liveSets = (sessionIds: string[]) => sessionIds.length
+export const liveSets = (sessionIds: string[]) => sessionIds.length
   ? all<SetRow>(`SELECT * FROM sets WHERE session_id IN (${marks(sessionIds.length)}) AND deleted_at IS NULL ORDER BY session_id, ord`, ...sessionIds) : [];
 
 /** Session ids, exercises and sets in one shape for every read. */
-function sessionView(s: SessionRow, sets: SetRow[], detail: boolean) {
+export function sessionView(s: SessionRow, sets: SetRow[], detail: boolean) {
   const end = s.ended_at ?? (sets.length ? Math.max(...sets.map((x) => x.performed_at)) : s.started_at);
   const byEx = new Map<string, SetRow[]>();
   for (const x of sets) byEx.set(x.exercise_id, [...(byEx.get(x.exercise_id) ?? []), x]);
@@ -154,8 +154,10 @@ function sessionView(s: SessionRow, sets: SetRow[], detail: boolean) {
       ...(best && { best_set: `${best.weight_kg ?? 0} kg × ${best.reps}`, e1rm_kg_estimate: e1rm(best.weight_kg, best.reps) }),
       ...(detail ? { sets: xs.map((x) => setView(x, s.tz_offset_min)) } : { sets: xs.map((x) => `${x.kind === "warmup" ? "w " : ""}${x.weight_kg ?? 0}×${x.reps ?? "-"}`).join(", ") }) };
   });
-  const hr = all<{ id: string; name: string; hr_avg: number | null; hr_max: number | null; active_kcal: number | null }>(
-    "SELECT id,name,hr_avg,hr_max,active_kcal FROM hk_workouts WHERE start_ms < ? AND end_ms > ?", end + 60_000, s.started_at - 60_000);
+  type Hr = { id: string; name: string; hr_avg: number | null; hr_max: number | null; active_kcal: number | null };
+  // The workout the Watch or phone saved for this session wins; otherwise any overlapping Watch workout.
+  const linked = s.hk_workout_uuid ? all<Hr>("SELECT id,name,hr_avg,hr_max,active_kcal FROM hk_workouts WHERE id=?", s.hk_workout_uuid) : [];
+  const hr = linked.length ? linked : all<Hr>("SELECT id,name,hr_avg,hr_max,active_kcal FROM hk_workouts WHERE start_ms < ? AND end_ms > ?", end + 60_000, s.started_at - 60_000);
   return { id: s.id, type: "strength", title: s.title, day: localDay(s.started_at, s.tz_offset_min), start: isoAt(s.started_at, s.tz_offset_min),
     end: isoAt(end, s.tz_offset_min), duration_min: Math.round((end - s.started_at) / 60_000), open: s.ended_at === null,
     working_sets: workingSets, volume_kg: Math.round(volume), working_sets_by_muscle: muscles, exercises,
@@ -177,6 +179,8 @@ export function listWorkouts(from: string, to: string) {
     // A session whose sets were all deleted isn't a workout.
     .filter((v) => v.day >= from && v.day <= to && v.exercises.length > 0);
   const attached = new Set(strength.map((s) => (typeof s.watch === "object" ? s.watch.workout_id : "")));
+  // A workout a session links explicitly belongs to that session even when the session falls outside this range.
+  for (const r of all<{ id: string }>("SELECT hk_workout_uuid id FROM sessions WHERE deleted_at IS NULL AND hk_workout_uuid IS NOT NULL")) attached.add(r.id);
   const watch = all<{ id: string; name: string; start: string; end: string; day: string; duration_s: number; active_kcal: number | null;
     hr_avg: number | null; hr_max: number | null; distance_km: number | null }>(
     "SELECT id,name,start,end,day,duration_s,active_kcal,hr_avg,hr_max,distance_km FROM hk_workouts WHERE day BETWEEN ? AND ? ORDER BY start_ms DESC", from, to)
