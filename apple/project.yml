@@ -29,6 +29,7 @@ targets:
         product: VitalisUI
       - target: VitalisWatch
         embed: true  # XcodeGen embeds a watchOS app dependency in "Embed Watch Content" (…/Watch)
+      - target: VitalisWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis
@@ -45,6 +46,7 @@ targets:
       - package: VitalisKit
       - package: VitalisKit
         product: VitalisUI
+      - target: VitalisWatchWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.watchkitapp
@@ -52,6 +54,44 @@ targets:
         GENERATE_INFOPLIST_FILE: false
         INFOPLIST_FILE: VitalisWatch/Info.plist
         CODE_SIGN_ENTITLEMENTS: VitalisWatch/VitalisWatch.entitlements
+        SKIP_INSTALL: true
+        WATCHOS_DEPLOYMENT_TARGET: '11.0'
+  VitalisWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [VitalisWidgets]
+    dependencies:
+      - package: VitalisKit
+      - package: VitalisKit
+        product: VitalisUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.widgets
+        TARGETED_DEVICE_FAMILY: '1'
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: VitalisWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: VitalisWidgets/VitalisWidgets.entitlements
+        SKIP_INSTALL: true
+  VitalisWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    # The timeline provider and preview data are shared with the iOS widgets.
+    sources:
+      - VitalisWatchWidgets
+      - VitalisWidgets/TodayProvider.swift
+      - VitalisWidgets/WidgetFormat.swift
+      - VitalisWidgets/WidgetPreviewData.swift
+    dependencies:
+      - package: VitalisKit
+      - package: VitalisKit
+        product: VitalisUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).vitalis.watchkitapp.widgets
+        TARGETED_DEVICE_FAMILY: '4'
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: VitalisWatchWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: VitalisWatchWidgets/VitalisWatchWidgets.entitlements
         SKIP_INSTALL: true
         WATCHOS_DEPLOYMENT_TARGET: '11.0'
   VitalisTests:
