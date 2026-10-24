@@ -95,7 +95,11 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         if (replay && old && old.payload_id > id) { counts.unchanged++; continue; }
         const hashStarted = profile ? performance.now() : 0, contentHash = hash(canonical(s));
         if (profile) profile.hash += performance.now() - hashStarted;
-        if (old?.content_hash === contentHash && !replay) { counts.unchanged++; continue; }
+        if (old?.content_hash === contentHash && !replay) {
+          // A later unchanged acceptance still protects this UUID from replaying an older rejected replacement.
+          run("UPDATE hk_samples SET payload_id=MAX(payload_id,?) WHERE id=?", id, old.id);
+          old.payload_id = Math.max(old.payload_id, id); counts.unchanged++; continue;
+        }
         if (old) derived.touch(old);
         const tombstone = tombstones.get(s.uuid);
         if (tombstone && tombstone.type !== s.type) { reject(object, "Upsert type does not match tombstone"); continue; }

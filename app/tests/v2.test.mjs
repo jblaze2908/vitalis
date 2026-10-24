@@ -597,3 +597,13 @@ test("compact timestamps preserve explicit negative-zero offsets", async () => {
   assert.equal((await post(batch([s]))).status, 200);
   assert.equal(row(s).start_iso, s.start); assert.equal(row(s).end_iso, s.end); assert.deepEqual(points(s), s.series);
 });
+
+test("a later unchanged acceptance prevents replay of an older rejected replacement", async () => {
+  const s = sample({ start: at('2027-04-04', '10:00'), end: at('2027-04-04', '10:01') });
+  await post(batch([s]));
+  const rejectedBody = body(batch([{ ...s, value: 999 }])), time = Date.now();
+  const id = Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz) VALUES(?,'v2',?,?,?)",
+    time, createHash('sha256').update(rejectedBody).digest('hex'), rejectedBody.length, gzipSync(rejectedBody)).lastInsertRowid);
+  assert.equal((await post(batch([s]))).json.counts.unchanged, 1);
+  reparse(id); assert.equal(row(s).value, s.value); assert.equal(metric('steps', '2027-04-04').qty, s.value);
+});
