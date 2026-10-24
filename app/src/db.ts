@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS hk_tombstones (
 CREATE TABLE IF NOT EXISTS hk_type_status (
   type TEXT PRIMARY KEY, live INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0, newest_end TEXT) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS hk_sleep_bounds (source TEXT PRIMARY KEY, duration_ms INTEGER NOT NULL) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS hk_blobs (sample_id INTEGER PRIMARY KEY REFERENCES hk_samples(id), data BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS hk_blobs (sample_id INTEGER PRIMARY KEY REFERENCES hk_samples(id), data BLOB NOT NULL, start_ms INTEGER, end_ms INTEGER);
+CREATE INDEX IF NOT EXISTS hk_blobs_window ON hk_blobs(end_ms,start_ms) WHERE end_ms IS NOT NULL;
 -- Exceptions only: series aggregate to one row per day, and cumulative intervals crossing midnight split by day.
 -- Ordinary scalar values use the indexed raw row directly, with no second per-sample projection.
 CREATE TABLE IF NOT EXISTS hk_value_days (
@@ -152,7 +153,7 @@ db.exec(`
 CREATE VIEW IF NOT EXISTS hk_raw AS SELECT s.id,s.uuid,t.identifier type,
   CASE s.kind WHEN 0 THEN 'quantity' WHEN 1 THEN 'category' WHEN 2 THEN 'workout' WHEN 3 THEN 'route'
     WHEN 4 THEN 'heartbeat' WHEN 5 THEN 'ecg' WHEN 6 THEN 'correlation' WHEN 7 THEN 'state_of_mind' ELSE 'other' END kind,
-  s.type_id,s.source_id,s.start_ms,s.end_ms,
+  s.type_id,s.source_id,s.start_ms,s.end_ms,b.start_ms series_start,b.end_ms series_end,
   hk_iso(s.start_ms,s.start_offset,s.start_format,json_extract(s.json,'$.times.start')) start_iso,
   hk_iso(s.end_ms,s.end_offset,s.end_format,json_extract(s.json,'$.times.end')) end_iso,
   s.tz,s.value,s.unit,s.category_value,COALESCE(src.name,'') source_name,COALESCE(src.bundle,'') source_bundle,
@@ -161,7 +162,7 @@ CREATE VIEW IF NOT EXISTS hk_raw AS SELECT s.id,s.uuid,t.identifier type,
     CASE s.kind WHEN 0 THEN 'quantity' WHEN 1 THEN 'category' WHEN 2 THEN 'workout' WHEN 3 THEN 'route'
       WHEN 4 THEN 'heartbeat' WHEN 5 THEN 'ecg' WHEN 6 THEN 'correlation' WHEN 7 THEN 'state_of_mind' ELSE 'other' END) END extra_json,
   lower(hex(s.content_hash)) content_hash,s.payload_id,s.created_at,s.updated_at,s.deleted_at
-FROM hk_samples s JOIN hk_types t ON t.id=s.type_id LEFT JOIN hk_sources src ON src.id=s.source_id LEFT JOIN hk_devices d ON d.id=s.device_id;
+FROM hk_samples s JOIN hk_types t ON t.id=s.type_id LEFT JOIN hk_sources src ON src.id=s.source_id LEFT JOIN hk_devices d ON d.id=s.device_id LEFT JOIN hk_blobs b ON b.sample_id=s.id;
 CREATE VIEW IF NOT EXISTS hk_values AS
 SELECT s.uuid,s.id sample_id,t.metric,s.day,src.name source,src.bundle source_bundle,s.native_value total,1 n,
   s.native_value min,s.native_value max,s.start_ms,s.end_ms

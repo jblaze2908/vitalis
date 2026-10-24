@@ -6,7 +6,7 @@ import { blobFor, unpack } from "./v2-storage.js";
 import type { DailyStat, Sample } from "./v2-schema.js";
 
 export type RawRow = { id: number; type_id: number; source_id: number | null; uuid: string; type: string; kind: Sample["kind"]; start_ms: number; end_ms: number; start_iso: string; end_iso: string;
-  tz: string | null; source_name: string; source_bundle: string; category_value: number | null; extra_json: string; content_hash: string; payload_id: number; deleted_at: number | null };
+  series_start?: number | null; series_end?: number | null; tz: string | null; source_name: string; source_bundle: string; category_value: number | null; extra_json: string; content_hash: string; payload_id: number; deleted_at: number | null };
 type MetricGroup = { metric: string; day: string; source: string };
 type Window = { source: string; start: number; end: number };
 const HOUR = 3_600_000;
@@ -37,7 +37,8 @@ export class Derivations {
       if (old) this.sleepAffected.set(JSON.stringify([old.day, old.source]), old);
     }
     if (row.kind === "workout") this.workouts.add(row.uuid);
-    if (row.type === HR_TYPE) this.hrWindows.push({ source: row.source_name, start: row.start_ms, end: row.end_ms });
+    if (row.type === HR_TYPE && row.deleted_at === null) this.hrWindows.push({ source: row.source_name,
+      start: Math.min(row.start_ms, row.series_start ?? row.start_ms), end: Math.max(row.end_ms, row.series_end ?? row.end_ms) });
   }
   private group(g: MetricGroup) { this.metrics.set(JSON.stringify([g.metric, g.day, g.source]), g); }
 
@@ -200,8 +201,10 @@ export class Derivations {
       const type = one<{ id: number; duration_ms: number }>("SELECT id,duration_ms FROM hk_types WHERE identifier=?", HR_TYPE);
       const readings: { source: string; bundle: string; value: number }[] = [];
       if (type) for (const h of all<RawRow & { value: number; unit: string }>(`SELECT * FROM hk_raw
-        WHERE type_id=? AND deleted_at IS NULL AND end_ms BETWEEN ? AND ? AND start_ms<=?`,
-        type.id, r.start_ms, r.end_ms + type.duration_ms, r.end_ms)) {
+        WHERE type_id=? AND kind='quantity' AND deleted_at IS NULL AND series_start IS NULL AND end_ms BETWEEN ? AND ? AND start_ms>=?
+        UNION ALL SELECT r.* FROM hk_blobs b JOIN hk_raw r ON r.id=b.sample_id
+        WHERE r.type_id=? AND r.kind='quantity' AND r.deleted_at IS NULL AND b.end_ms BETWEEN ? AND ? AND b.start_ms<=?`,
+        type.id, r.start_ms, r.end_ms, r.start_ms, type.id, r.start_ms, r.end_ms + type.duration_ms, r.end_ms)) {
         const blob = blobFor(h.uuid);
         const points = blob ? unpack(blob) as [string, string, number][] : [[h.start_iso, h.end_iso, h.value] as [string, string, number]];
         for (const [start, end, value] of points) if (Date.parse(start) >= r.start_ms && Date.parse(start) <= r.end_ms && Date.parse(end) <= r.end_ms) {

@@ -550,3 +550,16 @@ test("MCP reads and token-use auditing do not wait on another connection's write
   assert.equal(one("SELECT COUNT(*) n FROM calls WHERE token_id=?", token.id).n, before + 1);
   assert.ok(one("SELECT last_used_at FROM tokens WHERE id=?", token.id).last_used_at);
 });
+
+test("HR series windows use point bounds, including points outside the parent interval", async () => {
+  const w = workout({ start: at("2027-04-01", "10:00"), end: at("2027-04-01", "11:00") });
+  const h = sample({ type: type("HeartRate"), unit: "count/min", value: 500, start: at("2027-04-01", "08:00"), end: at("2027-04-01", "08:10"),
+    series: [[at("2027-04-01", "10:30"), at("2027-04-01", "10:30"), 100]] });
+  await post(batch([w])); await post(batch([h]));
+  const get = () => one("SELECT hr_avg FROM hk_workouts WHERE id=?", w.uuid).hr_avg;
+  assert.equal(get(), 100);
+  await post(batch([{ ...h, series: [[at("2027-04-01", "12:00"), at("2027-04-01", "12:00"), 130]] }]));
+  assert.equal(get(), null);
+  const wrongKind = sample({ type: type("HeartRate"), kind: "category", value: 1, value_label: "unmapped", start: at("2027-04-01", "10:30"), end: at("2027-04-01", "10:30") });
+  assert.equal((await post(batch([wrongKind]))).status, 200); assert.equal(get(), null);
+});

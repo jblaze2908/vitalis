@@ -145,12 +145,18 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
             src, dev, Object.keys(packed).length ? JSON.stringify(packed) : null, projection.day, projection.value, Buffer.from(contentHash, "hex"), id, now(), now());
           const sampleId = old?.id ?? Number(stored.lastInsertRowid);
           if (old) { run("DELETE FROM hk_blobs WHERE sample_id=?", sampleId); run("DELETE FROM hk_value_days WHERE sample_id=?", sampleId); }
-          const blob = pack(s); if (blob) run("INSERT INTO hk_blobs(sample_id,data) VALUES(?,?)", sampleId, blob);
+          let seriesStart: number | null = null, seriesEnd: number | null = null;
+          if (s.kind === "quantity" && s.series?.length) {
+            seriesStart = Infinity; seriesEnd = -Infinity;
+            for (const [a, z] of s.series) { seriesStart = Math.min(seriesStart, Date.parse(a)); seriesEnd = Math.max(seriesEnd, Date.parse(z)); }
+            type.duration_ms = Math.max(type.duration_ms, seriesEnd - seriesStart);
+          }
+          const blob = pack(s); if (blob) run("INSERT INTO hk_blobs(sample_id,data,start_ms,end_ms) VALUES(?,?,?,?)", sampleId, blob, seriesStart, seriesEnd);
           if (s.type === "HKCategoryTypeIdentifierSleepAnalysis") run(`INSERT INTO hk_sleep_bounds(source,duration_ms) VALUES(?,?)
             ON CONFLICT(source) DO UPDATE SET duration_ms=MAX(duration_ms,excluded.duration_ms)`, s.source.name, to - from);
           derived.project(s, sampleId, projection);
           fresh = { id: sampleId, uuid: s.uuid, type: s.type, type_id: type.id, source_id: src, kind: s.kind, start_ms: from, end_ms: to,
-            start_iso: s.start, end_iso: s.end, tz: s.tz ?? null, source_name: s.source.name, source_bundle: s.source.bundle_id,
+            series_start: seriesStart, series_end: seriesEnd, start_iso: s.start, end_iso: s.end, tz: s.tz ?? null, source_name: s.source.name, source_bundle: s.source.bundle_id,
             category_value: s.kind === "category" ? s.value : null, extra_json: JSON.stringify(extra), content_hash: contentHash, payload_id: id, deleted_at: null };
           derived.touch(fresh);
         }

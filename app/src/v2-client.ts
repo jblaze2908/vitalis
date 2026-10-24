@@ -19,7 +19,7 @@ function getWorker() {
     pending.delete(id); queuedBytes -= p.bytes;
     flushAudits();
     if (!pending.size) current.unref();
-    if (error) { const err = new HttpError(error.status, error.message); err.stack = error.stack; p.reject(err); }
+    if (error) { const err = error.status === 500 ? new Error(error.message) : new HttpError(error.status, error.message); err.stack = error.stack; p.reject(err); }
     else p.resolve(result);
   });
   current.on('error', fail);
