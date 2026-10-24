@@ -16,7 +16,9 @@ Ordinary scalar samples have an indexed local day and converted catalog value in
 There is no full `hk_sample_values` table. `hk_value_days` contains only series summaries and cumulative
 midnight splits: count, sum, min, max per sample/day. Arithmetic means use sum/count across samples.
 Raw series remain in their packed blob, with indexed point bounds, so partial workout windows still select individual points.
-`hk_raw` and `hk_values` are read views, not additional copies of the ledger.
+`hk_raw` and `hk_values` are read views, not additional copies of the ledger. They call the `hk_iso` SQL function,
+which the app registers on each of its connections, so another connection (the `sqlite3` CLI, a SQL editor) cannot
+query them: it fails with `no such function: hk_iso`. Read the base tables there, or go through the app.
 
 `hk_type_status` maintains live/deleted counters and newest live end in the same ingest transaction.
 `hk_sleep_bounds` and the per-type maximum duration bound interval seeks without excluding long
@@ -42,7 +44,25 @@ Format 255 refers to an exact original timestamp in the trailer. Trailer keys ar
 `<index>e` for quantity starts/ends, or `<index>` for route times. Array order is record order.
 Replacing a UUID replaces its whole blob; deleting it removes the blob and day summaries.
 
+## Upgrades and rollback
+
+- At startup `hk_types.metric` and `cumulative` are re-synced from `HK_METRICS` for every type (types no longer
+  mapped get `metric = NULL`). Rows already derived under the old mapping (`metric_days`, `sleep_nights`,
+  `hk_workouts`) are not rewritten by that: after a mapping change, run `vitalis reparse --all`.
+- A database that ran the first v2 layout (commit `dcfe6d3`: `hk_samples` without `type_id`) has its `hk_*` native
+  tables and views dropped at startup, with one log line. They are all derivable; `payloads`, `hk_workouts` and every non-`hk_*`
+  table are untouched. Run `vitalis reparse --all` to rebuild them.
+- Rolling back to the pre-v2 release is safe: the new tables and the `payloads.codec` column are additive, and the
+  old code ignores them (`codec` defaults to `gzip`). It cannot read native (`v2`) payloads, so
+  don't run its `reparse --all` over a database that holds them. Rolling back to `dcfe6d3` is
+  not safe: its startup `CREATE INDEX ... ON hk_samples(type, ...)` fails against this layout's `hk_samples`.
+
 ## Execution and retention
+
+Every ingest write is serialised in this one worker: native batches and Health Auto Export `/ingest` pushes share its
+queue (the `afterIngest` hook runs on the main thread after the worker replies). MCP write tools and hooks stay on the
+main thread with `busy_timeout=3000`; they are small, and a native batch is capped at 5,000 upserts + deletions and
+5,000 `daily_stats` (413 above), so a writer lock is held for a bounded time.
 
 HTTP native ingestion, gzip decoding, JSON parsing, validation, hashing, compression, SQLite writes,
 and projection updates run in a `worker_threads` worker with a separate connection. The HTTP/MCP

@@ -19,6 +19,8 @@ All work is committed on `feat/native-sync`. Nothing was pushed or merged; main 
 | 7. Sleep interval scan | Maintain a conservative maximum duration and bound both start-time sides. The category/source/start index range-seeks while retaining long enclosing intervals. | sleep range is bounded on both sides and preserves long enclosing segments |
 | 8. Tombstones | Delete blobs and day-summary children; clear scalar/metadata/extra content. Late upserts persist identity/deleted/audit state and content hash only. Raw payload retention remains intact. | tombstones clear every child and ECG content, including deletion-before-upsert and re-upsert |
 
+Deliberate `pickPerDay` change: with two non-merged sources for a cumulative metric, the largest total now wins; before, it picked by source-name order.
+
 The source-selection regressions are in `app/tests/stats.test.mjs`. Additional regressions cover exact binary round trips, UUID kind replacement, weighted series means, malformed primitive daily stats, worker read responsiveness under a write lock, negative-zero ISO offsets, series points outside parent intervals, and newer unchanged acceptances protecting against older replay. `v2-query-plan.test.mjs` checks the actual touched-day aggregate plan.
 
 ## Final schema

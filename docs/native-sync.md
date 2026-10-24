@@ -10,8 +10,9 @@ The app uses one `write` token, kept in the iOS Keychain.
 ## POST /v2/samples
 
 Auth: `ingest` or `write`. Body: JSON, optionally `Content-Encoding: gzip`. The same size limit as
-`/ingest` (`VITALIS_MAX_INGEST_MB`). The phone keeps a batch to about 5,000 objects (a client choice,
-not a server rule).
+`/ingest` (`VITALIS_MAX_INGEST_MB`). Hard caps per batch: at most 5,000 `upserts` + `deletions` combined, and
+separately at most 5,000 `daily_stats`. A larger batch gets `413` with the counts and the limit, before anything is
+applied or the body is kept; split it into more batches.
 
 ```json
 {
