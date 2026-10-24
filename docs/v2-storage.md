@@ -56,3 +56,9 @@ retains its existing format. Native payloads use builtin zstd on supported Node 
 the fallback and can be selected with `VITALIS_PAYLOAD_CODEC=gzip`. `body_gz` keeps its legacy column
 name; replay dispatches by codec. The SHA-256 always covers the decoded JSON bytes, independent of
 HTTP or retention compression. No retained raw bodies are discarded.
+
+SQLite keeps WAL and `synchronous=NORMAL`. Fresh files use 4 KiB pages; existing files retain their
+page size. Each connection has a 64 MiB page cache, a 256 MiB mmap ceiling, memory temporary storage,
+and an 8,192-page automatic checkpoint threshold. The schema/PRAGMA sweep and end-to-end results
+are recorded in `app/bench/results` and the performance report. These are measured choices for this
+machine, not a universal SQLite tuning prescription.

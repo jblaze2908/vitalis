@@ -6,7 +6,10 @@ import { rebuildISO } from "./v2-time.js";
 import { ROOT } from "./config.js";
 
 export const db = new DatabaseSync(process.env.VITALIS_DB ?? join(ROOT, "vitalis.db"));
-db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=3000; PRAGMA foreign_keys=ON;");
+// Keep existing files' page size; choose the measured 4K layout only before a fresh file gets pages.
+if (db.prepare("PRAGMA page_count").get()!.page_count === 0) db.exec("PRAGMA page_size=4096");
+db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=3000; PRAGMA foreign_keys=ON;
+  PRAGMA cache_size=-65536; PRAGMA mmap_size=268435456; PRAGMA temp_store=MEMORY; PRAGMA wal_autocheckpoint=8192;`);
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS tokens (
