@@ -1,13 +1,15 @@
 // Deterministic synthetic data only. Full run: BENCH_LABEL=baseline npm run bench.
 // BENCH_BATCHES lowers iteration count for development; published results always use >= 1M.
-import { mkdtempSync, writeFileSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { tmpdir, cpus } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import * as zlib from 'node:zlib';
 
-const dir = mkdtempSync(join(tmpdir(), 'vitalis-bench-'));
+const benchRoot = process.env.BENCH_ROOT ?? new URL('../.data/bench/', import.meta.url).pathname;
+mkdirSync(benchRoot, { recursive: true });
+const dir = mkdtempSync(join(benchRoot, 'vitalis-bench-'));
 process.env.VITALIS_ROOT = dir;
 process.env.VITALIS_DB = join(dir, 'bench.db');
 process.env.VITALIS_TZ = 'UTC';
@@ -23,7 +25,10 @@ const source = [
 ];
 const device = { name: 'Synthetic device', manufacturer: 'Apple', model: 'Watch', hardware_version: '7', software_version: '26.1' };
 let seq = 0, batchSeq = 0;
-const uuid = () => `00000000-0000-4000-8000-${(++seq).toString(16).padStart(12, '0')}`;
+const mix = x => { x = Math.imul(x ^ (x >>> 16), 0x7feb352d); x = Math.imul(x ^ (x >>> 15), 0x846ca68b); return (x ^ (x >>> 16)) >>> 0; };
+// Deterministic UUIDs with random index locality, matching HealthKit's v4 UUID distribution.
+const uuid = () => { const i = ++seq, a = mix(i).toString(16).padStart(8, '0'), b = mix(i + 17).toString(16).padStart(8, '0');
+  return `${a}-${b.slice(0,4)}-4${b.slice(4,7)}-8${mix(i + 31).toString(16).padStart(8,'0').slice(0,3)}-${i.toString(16).padStart(12,'0')}`; };
 const iso = ms => new Date(ms).toISOString();
 const type = t => `HKQuantityTypeIdentifier${t}`;
 const base = (t, i, ms, duration = 0) => ({ uuid: uuid(), type: t, start: iso(ms), end: iso(ms + duration),
@@ -68,7 +73,15 @@ function generate(kind, n = N) {
   }
   return out;
 }
-const envelope = (upserts = [], deletions = []) => ({ schema: 1, batch_id: `bench-${++batchSeq}`, client: { install_id: 'synthetic', app_version: '1', os: 'iOS 26.1', model: 'iPhone17,1' }, upserts, deletions, daily_stats: [] });
+const envelope = (upserts = [], deletions = []) => {
+  const stats = new Map();
+  for (const s of upserts) if (s.kind === 'quantity') for (const day of new Set([s.start.slice(0,10),s.end.slice(0,10)])) {
+    const discrete = s.type === type('HeartRate');
+    stats.set(s.type + day, { type: s.type, day, tz: 'UTC', unit: s.unit,
+      ...(discrete ? { min: 50, avg: 75, max: 160 } : { sum: s.unit === 'count' ? 9000 : 600 }) });
+  }
+  return { schema: 1, batch_id: `bench-${++batchSeq}`, client: { install_id: 'synthetic', app_version: '1', os: 'iOS 26.1', model: 'iPhone17,1' }, upserts, deletions, daily_stats: [...stats.values()] };
+};
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const summary = xs => { const s = [...xs].sort((a, b) => a - b); return { p50_ms: s[Math.floor((s.length - 1) * .50)], p95_ms: s[Math.ceil((s.length - 1) * .95)], max_ms: s.at(-1) }; };
 const timings = {}, counts = {}, profiles = [];
@@ -149,10 +162,12 @@ try { tables = Object.fromEntries(all('SELECT name,SUM(pgsize) bytes FROM dbstat
 }
 const rawBodies = one("SELECT SUM(length(body_gz)) n FROM payloads WHERE origin='v2'").n;
 const sampleCount = one('SELECT COUNT(*) n FROM hk_samples').n;
-const sampleBytes = tables.samples ?? Object.entries(tables).filter(([k]) => /^hk_(samples|tombstones|sample_values|values|types|sources|devices|contributions)|^sqlite_autoindex_hk_(samples|tombstones|sample_values|types|sources|devices|contributions)/.test(k)).reduce((n, [, v]) => n + v, 0);
+const sampleBytes = tables.samples ?? Object.entries(tables).filter(([k]) => /^hk_(samples|tombstones|sample_values|values|types|sources|devices|contributions|value_days)|^sqlite_autoindex_hk_(samples|tombstones|sample_values|types|sources|devices|contributions|value_days)/.test(k)).reduce((n, [, v]) => n + v, 0);
 const pointBytes = tables.points ?? Object.entries(tables).filter(([k]) => /hk_(quantity_points|route_points|heartbeat_beats|blobs)/.test(k)).reduce((n, [, v]) => n + v, 0);
 // Generator counts: 60 points per 500th HR object, ten 2700-point routes, 50 x 600 beats, one 15K ECG.
-const pointCount = ['hk_quantity_points', 'hk_route_points', 'hk_heartbeat_beats'].reduce((n, table) => n + one(`SELECT COUNT(*) n FROM ${table}`).n, 0);
+const packed = one("SELECT 1 FROM sqlite_master WHERE name='hk_blobs'");
+const pointCount = packed ? all('SELECT data FROM hk_blobs').reduce((n,r) => n + Buffer.from(r.data).readUInt32LE(4),0)
+  : ['hk_quantity_points', 'hk_route_points', 'hk_heartbeat_beats'].reduce((n, table) => n + one(`SELECT COUNT(*) n FROM ${table}`).n, 0);
 const compressionBody = Buffer.from(JSON.stringify(envelope(generate('cumulative'))));
 const compression = {};
 for (const [name, compress] of [['gzip', b => zlib.gzipSync(b)], ...(zlib.zstdCompressSync ? [['zstd', b => zlib.zstdCompressSync(b)]] : [])]) {

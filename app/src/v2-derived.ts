@@ -1,10 +1,11 @@
 import { BY_KEY } from "./catalog.js";
 import { now } from "./config.js";
-import { all, db, one, run } from "./db.js";
+import { all, one, run } from "./db.js";
 import { dayAt, HK_METRICS, HR_TYPE, nativeValue, SLEEP_TYPE, splitDays, STAND_TYPE } from "./v2-metrics.js";
+import { blobFor, unpack } from "./v2-storage.js";
 import type { DailyStat, Sample } from "./v2-schema.js";
 
-export type RawRow = { uuid: string; type: string; kind: Sample["kind"]; start_ms: number; end_ms: number; start_iso: string; end_iso: string;
+export type RawRow = { id: number; type_id: number; source_id: number | null; uuid: string; type: string; kind: Sample["kind"]; start_ms: number; end_ms: number; start_iso: string; end_iso: string;
   tz: string | null; source_name: string; source_bundle: string; category_value: number | null; extra_json: string; content_hash: string; payload_id: number; deleted_at: number | null };
 type MetricGroup = { metric: string; day: string; source: string };
 type Window = { source: string; start: number; end: number };
@@ -21,7 +22,7 @@ export class Derivations {
   private priorGroups = new Map<string, MetricGroup[]>();
   private priorNights = new Map<string, { day: string; source: string }>();
   constructor(private payloadId: number, uuids: string) {
-    for (const r of all<MetricGroup & { uuid: string }>("SELECT DISTINCT uuid,metric,day,source FROM hk_sample_values WHERE uuid IN (SELECT value FROM json_each(?))", uuids)) {
+    for (const r of all<MetricGroup & { uuid: string }>("SELECT DISTINCT uuid,metric,day,source FROM hk_values WHERE uuid IN (SELECT value FROM json_each(?))", uuids)) {
       const groups = this.priorGroups.get(r.uuid) ?? []; groups.push(r); this.priorGroups.set(r.uuid, groups);
     }
     for (const r of all<{ uuid: string; day: string; source: string }>("SELECT * FROM hk_sleep_members WHERE uuid IN (SELECT value FROM json_each(?))", uuids)) this.priorNights.set(r.uuid, r);
@@ -40,32 +41,13 @@ export class Derivations {
   }
   private group(g: MetricGroup) { this.metrics.set(JSON.stringify([g.metric, g.day, g.source]), g); }
 
-  project(s: Sample, live: boolean) {
-    run("DELETE FROM hk_sample_values WHERE uuid=?", s.uuid);
-    if (!live) return;
-    const mapping = HK_METRICS.get(s.type);
-    if (!mapping) return;
-    if (s.type === STAND_TYPE && s.kind === "category") {
-      const day = dayAt(Date.parse(s.start), s.start, s.tz);
-      run("INSERT INTO hk_sample_values(uuid,ord,metric,day,source,source_bundle,value,start_ms,end_ms) VALUES(?,0,?,?,?,?,?,?,?)",
-        s.uuid, mapping.def.key, day, s.source.name, s.source.bundle_id, s.value === 0 ? 1 : 0, Date.parse(s.start), Date.parse(s.end));
-      this.group({ metric: mapping.def.key, day, source: s.source.name });
-      return;
-    }
-    if (s.kind !== "quantity") return;
-    const { def, cumulative } = mapping;
-    const points = s.series?.length ? s.series : [[s.start, s.end, s.value] as [string, string, number]];
-    const insert = db.prepare("INSERT INTO hk_sample_values(uuid,ord,metric,day,source,source_bundle,value,start_ms,end_ms) VALUES(?,?,?,?,?,?,?,?,?)");
-    let ord = 0;
-    for (const [start, end, value] of points) {
-      const n = nativeValue(def.key, value, s.unit);
-      if (n === null) continue; // Unknown units remain lossless in the ledger, without mislabelled derived values.
-      const from = Date.parse(start), to = Date.parse(end);
-      const days = cumulative ? splitDays(from, to, start, s.tz) : [{ day: dayAt(from, start, s.tz), start: from, end: to, fraction: 1 }];
-      for (const d of days) {
-        insert.run(s.uuid, ord++, def.key, d.day, s.source.name, s.source.bundle_id, n * d.fraction, d.start, d.end);
-        this.group({ metric: def.key, day: d.day, source: s.source.name });
-      }
+  project(s: Sample, id: number, projection: Projection) {
+    const m = HK_METRICS.get(s.type);
+    if (!m) return;
+    if (projection.day !== null) this.group({ metric: m.def.key, day: projection.day, source: s.source.name });
+    for (const d of projection.days) {
+      run("INSERT INTO hk_value_days(sample_id,day,n,total,min,max) VALUES(?,?,?,?,?,?)", id, d.day, d.n, d.total, d.min, d.max);
+      this.group({ metric: m.def.key, day: d.day, source: s.source.name });
     }
   }
 
@@ -83,9 +65,21 @@ export class Derivations {
 
   finish() {
     const aggregates = all<MetricGroup & { n: number; sum: number; min: number; avg: number; max: number }>(`
-      WITH touched AS (SELECT json_extract(value,'$.metric') metric,json_extract(value,'$.day') day,json_extract(value,'$.source') source FROM json_each(?))
-      SELECT t.metric,t.day,t.source,COUNT(v.uuid) n,SUM(v.value) sum,MIN(v.value) min,AVG(v.value) avg,MAX(v.value) max
-      FROM touched t LEFT JOIN hk_sample_values v ON v.metric=t.metric AND v.day=t.day AND v.source=t.source GROUP BY t.metric,t.day,t.source`, JSON.stringify([...this.metrics.values()]));
+      WITH touched AS (
+        SELECT t.id type_id,json_extract(j.value,'$.metric') metric,json_extract(j.value,'$.day') day,json_extract(j.value,'$.source') source
+        FROM json_each(?) j JOIN hk_types t ON t.metric=json_extract(j.value,'$.metric')
+      ), pieces AS (
+        SELECT g.metric,g.day,g.source,COUNT(*) n,SUM(s.native_value) total,MIN(s.native_value) min,MAX(s.native_value) max
+        FROM touched g JOIN hk_sources src ON src.name=g.source
+        JOIN hk_samples s ON s.type_id=g.type_id AND s.day=g.day AND s.source_id=src.id
+        WHERE s.deleted_at IS NULL AND s.day IS NOT NULL AND s.native_value IS NOT NULL GROUP BY g.metric,g.day,g.source
+        UNION ALL
+        SELECT g.metric,g.day,g.source,SUM(v.n),SUM(v.total),MIN(v.min),MAX(v.max)
+        FROM touched g JOIN hk_value_days v ON v.day=g.day JOIN hk_samples s ON s.id=v.sample_id AND s.type_id=g.type_id
+        JOIN hk_sources src ON src.id=s.source_id AND src.name=g.source WHERE s.deleted_at IS NULL GROUP BY g.metric,g.day,g.source
+      ), totals AS (SELECT metric,day,source,SUM(n) n,SUM(total) total,MIN(min) min,MAX(max) max FROM pieces GROUP BY metric,day,source)
+      SELECT g.metric,g.day,g.source,COALESCE(a.n,0) n,a.total sum,a.min,a.total/a.n avg,a.max FROM touched g
+      LEFT JOIN totals a ON a.metric=g.metric AND a.day=g.day AND a.source=g.source`, JSON.stringify([...this.metrics.values()]));
     for (const a of aggregates) {
       const { metric, day, source } = a;
       if (!a.n) {
@@ -123,7 +117,7 @@ export class Derivations {
     // Expand to whole connected sessions, so changes to an early stage also move/remove its old wake-day row.
     const affected = this.sleepAffected;
     for (const { day, source } of affected.values()) {
-      for (const r of all<RawRow>("SELECT s.* FROM hk_sleep_members m JOIN hk_samples s USING(uuid) WHERE m.day=? AND m.source=?", day, source)) {
+      for (const r of all<RawRow>("SELECT s.* FROM hk_sleep_members m JOIN hk_raw s USING(uuid) WHERE m.day=? AND m.source=?", day, source)) {
         if (r.type === SLEEP_TYPE) this.sleepWindows.push({ source: r.source_name, start: r.start_ms, end: r.end_ms });
       }
     }
@@ -134,7 +128,10 @@ export class Derivations {
       let from = w.start, to = w.end;
       const duration = one<{ duration_ms: number }>("SELECT duration_ms FROM hk_sleep_bounds WHERE source=?", w.source)?.duration_ms ?? 0;
       for (;;) {
-        const found = all<RawRow>(`SELECT * FROM hk_samples WHERE type=? AND source_name=? AND start_ms BETWEEN ? AND ? AND end_ms>=?`, SLEEP_TYPE, w.source, from - 3 * HOUR - duration, to + 3 * HOUR, from - 3 * HOUR);
+        const found = all<RawRow>(`SELECT r.* FROM hk_samples s JOIN hk_raw r ON r.id=s.id
+          WHERE s.kind=1 AND s.deleted_at IS NULL AND s.type_id=(SELECT id FROM hk_types WHERE identifier=?)
+          AND s.source_id IN (SELECT id FROM hk_sources WHERE name=?) AND s.start_ms BETWEEN ? AND ? AND s.end_ms>=?`,
+          SLEEP_TYPE, w.source, from - 3 * HOUR - duration, to + 3 * HOUR, from - 3 * HOUR);
         let nextFrom = from, nextTo = to;
         for (const r of found) {
           // Include tombstoned segments as bridges when finding the old session; never count their hours.
@@ -161,7 +158,7 @@ export class Derivations {
     for (const [key, { day, source }] of affected) {
       const rs = nights.get(key) ?? [];
       // Another disconnected session on the same wake day (e.g. a nap) must remain included.
-      for (const r of all<RawRow>(`SELECT s.* FROM hk_sleep_members m JOIN hk_samples s USING(uuid) WHERE m.day=? AND m.source=? AND s.deleted_at IS NULL`, day, source)) {
+      for (const r of all<RawRow>(`SELECT s.* FROM hk_sleep_members m JOIN hk_raw s USING(uuid) WHERE m.day=? AND m.source=? AND s.deleted_at IS NULL`, day, source)) {
         if (!rs.some((x) => x.uuid === r.uuid)) rs.push(r);
       }
       const asleep = rs.filter((r) => [1, 3, 4, 5].includes(r.category_value!));
@@ -187,7 +184,7 @@ export class Derivations {
   }
 
   private workout(id: string) {
-    const r = one<RawRow>("SELECT * FROM hk_samples WHERE uuid=? AND kind='workout'", id);
+    const r = one<RawRow>("SELECT * FROM hk_raw WHERE uuid=? AND kind='workout'", id);
     if (!r || r.deleted_at !== null) {
       // Remove a native row if its UUID changed kind; overlapping HAE workouts retain their ownership.
       run("DELETE FROM hk_workouts WHERE id=? AND payload_id IN (SELECT id FROM payloads WHERE origin='v2')", id); return;
@@ -199,11 +196,23 @@ export class Derivations {
       const cv = (v: number | null | undefined) => v == null ? null : nativeValue("heart_rate", v, statistic.unit);
       hr = { min: cv(statistic.min), avg: cv(statistic.avg), max: cv(statistic.max) };
     } else {
-      const preferred = one<{ n: number }>(`SELECT COUNT(*) n FROM hk_sample_values WHERE metric='heart_rate'
-        AND source=? AND source_bundle=? AND start_ms>=? AND start_ms<=? AND end_ms<=?`, r.source_name, r.source_bundle, r.start_ms, r.end_ms, r.end_ms)!.n;
-      hr = one<{ min: number | null; avg: number | null; max: number | null }>(`SELECT MIN(value) min,AVG(value) avg,MAX(value) max FROM hk_sample_values
-        WHERE metric='heart_rate' AND start_ms>=? AND start_ms<=? AND end_ms<=?` + (preferred ? " AND source=? AND source_bundle=?" : ""),
-        r.start_ms, r.end_ms, r.end_ms, ...(preferred ? [r.source_name, r.source_bundle] : []))!;
+      // Use the end-time range index. The maintained maximum duration also includes unusually long series.
+      const type = one<{ id: number; duration_ms: number }>("SELECT id,duration_ms FROM hk_types WHERE identifier=?", HR_TYPE);
+      const readings: { source: string; bundle: string; value: number }[] = [];
+      if (type) for (const h of all<RawRow & { value: number; unit: string }>(`SELECT * FROM hk_raw
+        WHERE type_id=? AND deleted_at IS NULL AND end_ms BETWEEN ? AND ? AND start_ms<=?`,
+        type.id, r.start_ms, r.end_ms + type.duration_ms, r.end_ms)) {
+        const blob = blobFor(h.uuid);
+        const points = blob ? unpack(blob) as [string, string, number][] : [[h.start_iso, h.end_iso, h.value] as [string, string, number]];
+        for (const [start, end, value] of points) if (Date.parse(start) >= r.start_ms && Date.parse(start) <= r.end_ms && Date.parse(end) <= r.end_ms) {
+          const v = nativeValue("heart_rate", value, h.unit); if (v !== null) readings.push({ source: h.source_name, bundle: h.source_bundle, value: v });
+        }
+      }
+      const own = readings.filter((h) => h.source === r.source_name && h.bundle === r.source_bundle);
+      const values = (own.length ? own : readings).map((h) => h.value);
+      let min = Infinity, max = -Infinity, total = 0;
+      for (const v of values) { min = Math.min(min, v); max = Math.max(max, v); total += v; }
+      hr = { min: values.length ? min : null, avg: values.length ? total / values.length : null, max: values.length ? max : null };
     }
     const statValue = (type: string, key: string) => { const s = extra.statistics[type]; return s?.sum == null ? null : nativeValue(key, s.sum, s.unit); };
     run(`INSERT INTO hk_workouts(id,name,start,end,start_ms,end_ms,day,duration_s,active_kcal,hr_min,hr_avg,hr_max,distance_km,source,payload_id,updated_at)
@@ -214,4 +223,27 @@ export class Derivations {
       statValue("HKQuantityTypeIdentifierActiveEnergyBurned", "active_kcal"), hr.min, hr.avg, hr.max,
       statValue(Object.keys(extra.statistics).find((t) => t.startsWith("HKQuantityTypeIdentifierDistance")) ?? "", "distance_km"), r.source_name, this.payloadId, now());
   }
+}
+
+export type Projection = { day: string | null; value: number | null; days: { day: string; n: number; total: number; min: number; max: number }[] };
+export function projectSample(s: Sample): Projection {
+  const empty: Projection = { day: null, value: null, days: [] }, m = HK_METRICS.get(s.type);
+  if (!m) return empty;
+  if (s.type === STAND_TYPE && s.kind === "category") return { day: dayAt(Date.parse(s.start), s.start, s.tz), value: s.value === 0 ? 1 : 0, days: [] };
+  if (s.kind !== "quantity") return empty;
+  const points = s.series?.length ? s.series : [[s.start, s.end, s.value] as [string, string, number]];
+  const days = new Map<string, Projection["days"][number]>();
+  for (const [start, end, value] of points) {
+    const v = nativeValue(m.def.key, value, s.unit); if (v === null) continue;
+    const from = Date.parse(start), to = Date.parse(end);
+    const parts = m.cumulative ? splitDays(from, to, start, s.tz) : [{ day: dayAt(from, start, s.tz), fraction: 1 }];
+    for (const p of parts) {
+      const n = v * p.fraction, current = days.get(p.day);
+      if (current) { current.n++; current.total += n; current.min = Math.min(current.min, n); current.max = Math.max(current.max, n); }
+      else days.set(p.day, { day: p.day, n: 1, total: n, min: n, max: n });
+    }
+  }
+  const values = [...days.values()];
+  if (values.length === 1 && values[0].n === 1) return { day: values[0].day, value: values[0].total, days: [] };
+  return { day: null, value: null, days: values };
 }

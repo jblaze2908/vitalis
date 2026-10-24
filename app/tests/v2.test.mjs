@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { spawnSync } from "node:child_process";
 import { all, body, http, one, tokens } from "./_env.mjs";
+import { blobFor, unpack } from "../dist/src/v2-storage.js";
 import { db, run } from "../dist/src/db.js";
 import { reparse } from "../dist/src/ingest.js";
 import { freshness, freshFor } from "../dist/src/health.js";
@@ -20,7 +21,8 @@ const batch = (upserts = [], props = {}) => ({ schema: 1, batch_id: randomUUID()
   upserts, deletions: [], daily_stats: [], ...props });
 const post = (b, options = {}) => http("POST", "/v2/samples", { token: ingestToken, json: b, ...options });
 const payloadId = (id) => one("SELECT payload_id FROM hk_batches WHERE batch_id=?", id).payload_id;
-const row = (s) => one("SELECT * FROM hk_samples WHERE uuid=?", s.uuid);
+const row = (s) => one("SELECT * FROM hk_raw WHERE uuid=?", s.uuid);
+const points = s => { const b = blobFor(s.uuid); return b ? unpack(b) : []; };
 const metric = (key, day, source = "Native Watch") => one("SELECT * FROM metric_days WHERE metric=? AND day=? AND source=?", key, day, source);
 const sleep = (value, day, start, end, props = {}) => sample({ type: "HKCategoryTypeIdentifierSleepAnalysis", kind: "category", value,
   value_label: ["inBed", "asleepUnspecified", "awake", "asleepCore", "asleepDeep", "asleepREM"][value], start: at(day, start), end: at(day, end), ...props });
@@ -59,7 +61,7 @@ test("deletion before and after upsert is permanent; repeated tombstones do not 
     assert.equal((await post(batch([], { deletions: [d] }))).json.counts.deleted, 0);
     await post(batch([s])); await post(batch([{ ...s, value: 10000 }]));
     assert.ok(row(s).deleted_at); assert.equal(metric("steps", day), undefined);
-    assert.equal(one("SELECT COUNT(*) n FROM hk_sample_values WHERE uuid=?", s.uuid).n, 0);
+    assert.equal(one("SELECT COUNT(*) n FROM hk_values WHERE uuid=?", s.uuid).n, 0);
   }
 });
 
@@ -115,27 +117,27 @@ test("wire and decompressed size limits apply, including no Content-Length", () 
 test("quantity series are stored and replaced; discrete aggregates count points once", async () => {
   const s = sample({ type: type("HeartRate"), value: 100, unit: "count/min", start: at("2026-10-04", "10:00"), end: at("2026-10-04", "10:10"),
     series: [[at("2026-10-04", "10:01"), at("2026-10-04", "10:01"), 80], [at("2026-10-04", "10:02"), at("2026-10-04", "10:02"), 120]] });
-  await post(batch([s])); assert.equal(one("SELECT COUNT(*) n FROM hk_quantity_points WHERE uuid=?", s.uuid).n, 2);
+  await post(batch([s])); assert.equal(points(s).length, 2);
   let m = metric("heart_rate", "2026-10-04"); assert.deepEqual([m.min, m.avg, m.max], [80, 100, 120]);
   await post(batch([{ ...s, series: [[at("2026-10-04", "10:03"), at("2026-10-04", "10:03"), 95]] }]));
-  assert.equal(one("SELECT COUNT(*) n FROM hk_quantity_points WHERE uuid=?", s.uuid).n, 1);
+  assert.equal(points(s).length, 1);
   m = metric("heart_rate", "2026-10-04"); assert.deepEqual([m.min, m.avg, m.max], [95, 95, 95]);
   await post(batch([{ ...s, series: undefined }]));
-  assert.equal(one("SELECT COUNT(*) n FROM hk_quantity_points WHERE uuid=?", s.uuid).n, 0);
+  assert.equal(points(s).length, 0);
   assert.equal(metric("heart_rate", "2026-10-04").avg, 100);
 });
 
 test("route and heartbeat children replace wholesale; other kinds retain their fields", async () => {
   const point = [at("2026-10-05", "10:00"), 12.3, 45.6, 100, 2, 3, 4, 90];
   const s = sample({ kind: "route", type: "HKWorkoutRoute", workout_uuid: "workout-id", points: [point, [...point]] });
-  await post(batch([s])); assert.equal(one("SELECT COUNT(*) n FROM hk_route_points WHERE uuid=?", s.uuid).n, 2);
+  await post(batch([s])); assert.equal(points(s).length, 2);
   await post(batch([{ ...s, points: [[point[0], 13, ...point.slice(2)]] }]));
-  assert.equal(one("SELECT COUNT(*) n FROM hk_route_points WHERE uuid=?", s.uuid).n, 1);
-  assert.equal(one("SELECT lat FROM hk_route_points WHERE uuid=?", s.uuid).lat, 13);
+  assert.equal(points(s).length, 1);
+  assert.equal(points(s)[0][1], 13);
   const h = sample({ kind: "heartbeat", type: "HKHeartbeatSeriesSample", beats: [[0, false], [0.8, true]] });
   await post(batch([h]));
-  assert.deepEqual(all("SELECT seconds,preceded_by_gap FROM hk_heartbeat_beats WHERE uuid=? ORDER BY ord", h.uuid).map((r) => [r.seconds, r.preceded_by_gap]), [[0, 0], [0.8, 1]]);
-  await post(batch([{ ...h, beats: [[0.9, false]] }])); assert.equal(one("SELECT COUNT(*) n FROM hk_heartbeat_beats WHERE uuid=?", h.uuid).n, 1);
+  assert.deepEqual(points(h).map(([seconds, gap]) => [seconds, gap ? 1 : 0]), [[0, 0], [0.8, 1]]);
+  await post(batch([{ ...h, beats: [[0.9, false]] }])); assert.equal(points(h).length, 1);
   for (const specific of [
     { kind: "ecg", classification: 1, symptoms_status: 2, avg_hr: null, sampling_hz: 512, voltages_uv: [1.23456789, -5] },
     { kind: "correlation", objects: [s.uuid, h.uuid] },
@@ -144,7 +146,7 @@ test("route and heartbeat children replace wholesale; other kinds retain their f
   ]) {
     const other = sample({ ...specific, type: `Unknown-${specific.kind}` }), r = await post(batch([other]));
     assert.equal(r.json.counts.inserted, 1, r.text);
-    for (const [key, value] of Object.entries(specific)) assert.deepEqual(JSON.parse(row(other).extra_json)[key], value);
+    for (const [key, value] of Object.entries(specific)) assert.deepEqual(key === "voltages_uv" ? points(other) : JSON.parse(row(other).extra_json)[key], value);
   }
 });
 
@@ -205,7 +207,7 @@ test("historical sample tz overrides upload offset; DST midnight splits use elap
 test("unknown types and unsupported units remain raw without mislabelled derived metrics", async () => {
   const a = sample({ type: "FutureQuantity", value: 1.23456789, unit: "new-unit" }), b = sample({ type: type("BodyMass"), unit: "widgets" });
   assert.equal((await post(batch([a, b]))).json.counts.inserted, 2); assert.equal(row(a).value, 1.23456789);
-  assert.equal(one("SELECT * FROM hk_sample_values WHERE uuid IN (?,?)", a.uuid, b.uuid), undefined);
+  assert.equal(one("SELECT * FROM hk_values WHERE uuid IN (?,?)", a.uuid, b.uuid), undefined);
 });
 
 test("workouts use same-source HR; later HR updates, series points and deletions refresh workouts", async () => {
@@ -232,7 +234,7 @@ test("reparse repairs v2 projections and never undoes newer samples, daily stats
   const s = sample({ start: at("2026-10-18", "10:00"), end: at("2026-10-18", "11:00") });
   const b = batch([s], { daily_stats: [{ type: s.type, day: "2026-10-18", tz: "Asia/Kolkata", sum: 500, unit: "count" }] });
   await post(b); const id = payloadId(b.batch_id);
-  run("DELETE FROM metric_days WHERE day='2026-10-18'"); run("DELETE FROM hk_sample_values WHERE uuid=?", s.uuid);
+  run("DELETE FROM metric_days WHERE day='2026-10-18'"); run("UPDATE hk_samples SET native_value=NULL WHERE uuid=?", s.uuid);
   assert.equal(reparse(id).duplicate, false);
   assert.equal(metric("steps", "2026-10-18").qty, 100); assert.equal(metric("steps", "2026-10-18", "").qty, 500);
   await post(batch([{ ...s, value: 150 }], { daily_stats: [{ ...b.daily_stats[0], sum: 800 }] })); reparse(id);
@@ -365,7 +367,7 @@ test("additive schema starts against an existing production-format database and 
   `;
   const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr); const result = JSON.parse(r.stdout.trim());
-  assert.equal(result.health, 200); assert.equal(result.qty, 123); assert.equal(result.tables, 12);
+  assert.equal(result.health, 200); assert.equal(result.qty, 123); assert.equal(result.tables, 13);
   assert.deepEqual(result.status, { last_batch_at: null, types: [], batches: [] });
 });
 
@@ -374,9 +376,9 @@ test("a UUID changing kind replaces bulky children and removes its old derived w
   await post(batch([w])); assert.ok(one("SELECT * FROM hk_workouts WHERE id=?", w.uuid));
   await post(batch([sample({ uuid: w.uuid, start: w.start, end: w.end, series: [[w.start, w.end, 100]] })]));
   assert.equal(one("SELECT * FROM hk_workouts WHERE id=?", w.uuid), undefined);
-  assert.equal(one("SELECT COUNT(*) n FROM hk_quantity_points WHERE uuid=?", w.uuid).n, 1);
+  assert.equal(points(w).length, 1);
   await post(batch([w]));
-  assert.equal(one("SELECT COUNT(*) n FROM hk_quantity_points WHERE uuid=?", w.uuid).n, 0);
+  assert.equal(points(w).length, 0);
   assert.equal(metric("steps", "2026-08-04"), undefined);
 });
 
@@ -446,9 +448,9 @@ test("status counters track type replacement, newest deletion, unknown tombstone
 });
 
 test("sleep range is bounded on both sides and preserves long enclosing segments", async () => {
-  const plan = all(`EXPLAIN QUERY PLAN SELECT * FROM hk_samples WHERE type=? AND source_name=? AND start_ms BETWEEN ? AND ? AND end_ms>=?`,
-    "HKCategoryTypeIdentifierSleepAnalysis", "Bounded Watch", 0, 1, 0);
-  assert.ok(plan.some(r => /SEARCH.*hk_samples_source.*start_ms>\? AND start_ms<\?/.test(r.detail)), JSON.stringify(plan));
+  const plan = all(`EXPLAIN QUERY PLAN SELECT * FROM hk_samples WHERE kind=1 AND deleted_at IS NULL
+    AND source_id IN (SELECT id FROM hk_sources WHERE name=?) AND start_ms BETWEEN ? AND ? AND end_ms>=?`, "Bounded Watch", 0, 1, 0);
+  assert.ok(plan.some(r => /SEARCH.*hk_samples_sleep.*start_ms>\? AND start_ms<\?/.test(r.detail)), JSON.stringify(plan));
   const bed = sleep(0, "2027-01-07", "18:00", "19:00", { source: { name: "Bounded Watch", bundle_id: "bounded" }, end: at("2027-01-09", "08:00") });
   const core = sleep(3, "2027-01-09", "01:00", "07:00", { source: bed.source });
   await post(batch([bed])); await post(batch([core]));
@@ -468,7 +470,50 @@ test("tombstones clear every child and ECG content, including deletion-before-up
     await post(batch([], { deletions: [d] })); await post(batch([s]));
     const r = row(s); assert.ok(r.deleted_at); assert.equal(r.value, null); assert.equal(r.metadata_json, null);
     assert.deepEqual(JSON.parse(r.extra_json), {});
-    for (const table of ["hk_quantity_points", "hk_route_points", "hk_heartbeat_beats", "hk_sample_values"])
-      assert.equal(one(`SELECT COUNT(*) n FROM ${table} WHERE uuid=?`, s.uuid).n, 0);
+    assert.equal(blobFor(s.uuid), undefined);
+    assert.equal(one("SELECT COUNT(*) n FROM hk_value_days WHERE sample_id=(SELECT id FROM hk_samples WHERE uuid=?)", s.uuid).n, 0);
+    assert.equal(one("SELECT COUNT(*) n FROM hk_values WHERE uuid=?", s.uuid).n, 0);
   }
+});
+
+test("packed blobs preserve Float64 precision, timestamp offsets, fractional seconds and array order", async () => {
+  const start = "2027-03-01T10:00:00.123456+05:30", end = "2027-03-01T10:01:00Z";
+  for (const specific of [
+    { kind: "quantity", series: [[start, start, 1.234567891234567], [end, end, -0.0000000123456789]] },
+    { kind: "route", type: "HKWorkoutRoute", workout_uuid: "parent", points: [[start, 12.123456789123, -13.987654321987, 1.123456789, 0.123456789, 2.34567891234, 3.45678912345, 90.123456789]] },
+    { kind: "heartbeat", type: "HKHeartbeatSeriesSample", beats: [[0.123456789123, false], [0.987654321987, true]] },
+    { kind: "ecg", type: "HKElectrocardiogramType", classification: 1, symptoms_status: 0, avg_hr: 70, sampling_hz: 512, voltages_uv: [1.23456789123456, -0.000000123456789] },
+  ]) {
+    const s = sample({ ...specific, start, end }); const r = await post(batch([s])); assert.equal(r.status, 200, r.text);
+    assert.deepEqual(points(s), specific.series ?? specific.points ?? specific.beats ?? specific.voltages_uv);
+    assert.equal(row(s).start_iso, start); assert.equal(row(s).end_iso, end);
+    assert.equal(Buffer.from(blobFor(s.uuid))[0], 1);
+  }
+});
+
+test("compact scalar rows share dictionaries and avoid a duplicate per-sample projection", async () => {
+  const source = { name: "Dictionary Watch", bundle_id: "dictionary", version: "1" }, device = { model: "Dictionary Device", name: "Watch" };
+  const a = sample({ source, device, start: at("2027-03-02", "10:00"), end: at("2027-03-02", "10:01") });
+  const b = { ...a, uuid: randomUUID(), source: Object.fromEntries(Object.entries(source).reverse()), device: Object.fromEntries(Object.entries(device).reverse()) };
+  await post(batch([a, b]));
+  assert.equal(one("SELECT COUNT(*) n FROM hk_sources WHERE name='Dictionary Watch'").n, 1);
+  const rows = all("SELECT source_id,device_id,json FROM hk_samples WHERE uuid IN (?,?)", a.uuid, b.uuid);
+  assert.equal(rows[0].source_id, rows[1].source_id); assert.equal(rows[0].device_id, rows[1].device_id);
+  assert.equal(rows[0].json, null);
+  assert.equal(one("SELECT COUNT(*) n FROM hk_value_days WHERE sample_id IN (SELECT id FROM hk_samples WHERE uuid IN (?,?))", a.uuid, b.uuid).n, 0);
+  assert.equal(metric("steps", "2027-03-02", source.name).qty, 200);
+});
+
+test("compressed series summaries retain point-weighted means across samples and days", async () => {
+  const a = sample({ type: type("HeartRate"), value: 500, unit: "count/min", start: at("2027-03-03", "10:00"), end: at("2027-03-03", "10:10"),
+    series: [[at("2027-03-03", "10:00"), at("2027-03-03", "10:00"), 60], [at("2027-03-03", "10:01"), at("2027-03-03", "10:01"), 90]] });
+  const b = { ...a, uuid: randomUUID(), series: [[at("2027-03-03", "10:02"), at("2027-03-03", "10:02"), 150]] };
+  await post(batch([a, b]));
+  const m = metric("heart_rate", "2027-03-03"); assert.deepEqual([m.min, m.avg, m.max], [60, 100, 150]);
+  assert.equal(one("SELECT COUNT(*) n FROM hk_value_days WHERE sample_id=(SELECT id FROM hk_samples WHERE uuid=?)", a.uuid).n, 1);
+});
+
+test("malformed primitive daily stats remain per-object rejections in a batch lookup", async () => {
+  const r = await post(batch([sample()], { daily_stats: ["bad", 1, null, true, []] }));
+  assert.equal(r.status, 200, r.text); assert.equal(r.json.counts.inserted, 1); assert.equal(r.json.counts.rejected, 5);
 });

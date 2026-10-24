@@ -1,9 +1,10 @@
 // Isolate key layout and PRAGMA decisions from parsing/validation. Synthetic, file-backed SQLite.
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const dir = mkdtempSync(join(tmpdir(), 'vitalis-storage-bench-'));
+mkdirSync('.data/bench', { recursive: true });
+const dir = mkdtempSync('.data/bench/vitalis-storage-');
 const n = Number(process.env.STORAGE_N ?? 1000000);
 const results = [];
 for (const [name, layout, page, cache, mmap, checkpoint] of [
@@ -20,7 +21,7 @@ for (const [name, layout, page, cache, mmap, checkpoint] of [
     CREATE TABLE samples (${layout === 'integer' ? 'id INTEGER PRIMARY KEY,uuid TEXT NOT NULL UNIQUE' : 'uuid BLOB PRIMARY KEY'},type_id INTEGER,source_id INTEGER,device_id INTEGER,start_ms INTEGER,end_ms INTEGER,offset_min INTEGER,value REAL,unit TEXT,day TEXT,hash BLOB,payload_id INTEGER) ${layout === 'blob' ? 'WITHOUT ROWID' : ''};
     CREATE INDEX by_day ON samples(type_id,day,source_id); CREATE INDEX by_time ON samples(type_id,start_ms,end_ms);`);
   const insert = db.prepare('INSERT INTO samples(uuid,type_id,source_id,device_id,start_ms,end_ms,offset_min,value,unit,day,hash,payload_id) VALUES(?,1,1,1,?,?,0,70,\'count/min\',?,?,?)');
-  const key = i => { const b = Buffer.alloc(16); b.writeUInt32BE(i, 12); return layout === 'blob' ? b : `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`; };
+  const key = i => { const b = Buffer.alloc(16); b.writeUInt32BE(Math.imul(i, 2654435761) >>> 0, 0); b.writeUInt32BE(i, 12); return layout === 'blob' ? b : `${(Math.imul(i,2654435761)>>>0).toString(16).padStart(8,'0')}-0000-4000-8000-${i.toString(16).padStart(12, '0')}`; };
   const hash = Buffer.alloc(32), start = performance.now();
   for (let i = 0; i < n; i += 5000) {
     db.exec('BEGIN IMMEDIATE');

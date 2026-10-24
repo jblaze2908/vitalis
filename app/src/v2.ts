@@ -2,8 +2,11 @@
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { httpErr, now } from "./config.js";
-import { all, db, one, run, tx } from "./db.js";
-import { Derivations, type RawRow } from "./v2-derived.js";
+import { all, one, run, tx } from "./db.js";
+import { Derivations, projectSample, type RawRow } from "./v2-derived.js";
+import { KINDS, pack } from "./v2-storage.js";
+import { stampParts } from "./v2-time.js";
+import { beginProfile, endProfile, profile } from "./v2-profile.js";
 import { HK_METRICS } from "./v2-metrics.js";
 import { dailySchema, deletionSchema, envelopeSchema, sampleSchema, type Sample } from "./v2-schema.js";
 
@@ -21,19 +24,26 @@ function canonical(v: unknown): string {
 const result = (b: Batch, duplicate: boolean): SyncResult => ({ batch_id: b.batch_id, duplicate, counts: JSON.parse(b.counts_json), rejected: JSON.parse(b.rejected_json) });
 
 export function ingestV2(body: Buffer): SyncResult & { new_nights?: string[] } {
+  beginProfile();
   const sha = hash(body);
   let p = one<{ id: number }>("SELECT id FROM payloads WHERE sha256=?", sha);
-  if (!p) p = { id: Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz) VALUES(?,'v2',?,?,?)", now(), sha, body.length, gzipSync(body)).lastInsertRowid) };
-  return applyV2(p.id, body);
+  if (!p) {
+    const t = profile ? performance.now() : 0, compressed = gzipSync(body);
+    if (profile) profile.compress += performance.now() - t;
+    p = { id: Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz) VALUES(?,'v2',?,?,?)", now(), sha, body.length, compressed).lastInsertRowid) };
+  }
+  try { return applyV2(p.id, body); } finally { endProfile(body.length); }
 }
 
 export function applyV2(id: number, body: Buffer, replay = false): SyncResult & { new_nights?: string[] } {
   try {
+    const parseStarted = profile ? performance.now() : 0;
     let json: unknown;
     try { json = JSON.parse(body.toString("utf8")); } catch { throw httpErr(400, "Body is not JSON"); }
     const parsed = envelopeSchema.safeParse(json);
     if (!parsed.success) throw httpErr(400, `Invalid sync envelope: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
     const envelope = parsed.data;
+    if (profile) profile.parse += performance.now() - parseStarted;
     const touchedTypes = new Map<string, { live: number; deleted: number }>();
     const counter = (type: string, live: number, deleted: number) => {
       const delta = touchedTypes.get(type) ?? { live: 0, deleted: 0 };
@@ -55,19 +65,36 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
     tx(() => {
     const uuids = JSON.stringify([...envelope.upserts, ...envelope.deletions].flatMap((v) =>
       v && typeof v === "object" && "uuid" in v && typeof v.uuid === "string" ? [v.uuid] : []));
-    const oldRows = new Map(all<RawRow>("SELECT * FROM hk_samples WHERE uuid IN (SELECT value FROM json_each(?))", uuids).map((r) => [r.uuid, r]));
+    const oldRows = new Map(all<RawRow>("SELECT * FROM hk_raw WHERE uuid IN (SELECT value FROM json_each(?))", uuids).map((r) => [r.uuid, r]));
     const tombstones = new Map(all<{ uuid: string; type: string; deleted_at: number }>(
       "SELECT uuid,type,deleted_at FROM hk_tombstones WHERE uuid IN (SELECT value FROM json_each(?))", uuids).map((r) => [r.uuid, r]));
     const dailyRows = new Map(all<{ type: string; day: string; payload_id: number }>(
-      "SELECT type,day,payload_id FROM hk_daily_stats WHERE type IN (SELECT json_extract(value,'$.type') FROM json_each(?))", JSON.stringify(envelope.daily_stats)).map((r) => [JSON.stringify([r.type, r.day]), r]));
+      "SELECT type,day,payload_id FROM hk_daily_stats WHERE type IN (SELECT CASE WHEN type='object' THEN json_extract(value,'$.type') END FROM json_each(?))", JSON.stringify(envelope.daily_stats)).map((r) => [JSON.stringify([r.type, r.day]), r]));
     derived = new Derivations(id, uuids);
+    const types = new Map(all<{ id: number; identifier: string; duration_ms: number }>("SELECT id,identifier,duration_ms FROM hk_types").map(r => [r.identifier, r]));
+    const sources = new Map(all<{ id: number; json: string }>("SELECT id,json FROM hk_sources").map(r => [r.json, r.id]));
+    const devices = new Map(all<{ id: number; json: string }>("SELECT id,json FROM hk_devices").map(r => [r.json, r.id]));
+    const sourceId = (s: Sample) => {
+      const key = canonical(s.source); let id = sources.get(key);
+      if (id === undefined) { id = Number(run("INSERT INTO hk_sources(name,bundle,json) VALUES(?,?,?)", s.source.name, s.source.bundle_id, key).lastInsertRowid); sources.set(key, id); }
+      return id;
+    };
+    const deviceId = (s: Sample) => {
+      if (s.device == null) return null;
+      const key = canonical(s.device); let id = devices.get(key);
+      if (id === undefined) { id = Number(run("INSERT INTO hk_devices(json) VALUES(?)", key).lastInsertRowid); devices.set(key, id); }
+      return id;
+    };
       for (const object of envelope.upserts) {
+        const validationStarted = profile ? performance.now() : 0;
         const p = sampleSchema.safeParse(object);
+        if (profile) profile.validate += performance.now() - validationStarted;
         if (!p.success) { reject(object, p.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")); continue; }
         const s = p.data, old = oldRows.get(s.uuid);
         // Replaying old history must not undo a later replacement. --all still repairs the latest version.
         if (replay && old && old.payload_id > id) { counts.unchanged++; continue; }
-        const contentHash = hash(canonical(s));
+        const hashStarted = profile ? performance.now() : 0, contentHash = hash(canonical(s));
+        if (profile) profile.hash += performance.now() - hashStarted;
         if (old?.content_hash === contentHash && !replay) { counts.unchanged++; continue; }
         if (old) derived.touch(old);
         const tombstone = tombstones.get(s.uuid);
@@ -76,37 +103,64 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         if (old) counter(old.type, old.deleted_at === null ? -1 : 0, old.deleted_at !== null ? -1 : 0);
         else if (deletedAt !== null) counter(s.type, 0, -1); // the unknown tombstone already counted
         counter(s.type, deletedAt === null ? 1 : 0, deletedAt !== null ? 1 : 0);
-        const extra: Record<string, unknown> = { ...s };
-        for (const key of ["uuid", "type", "start", "end", "tz", "source", "device", "metadata"]) delete extra[key];
-        if (s.kind === "quantity") { delete extra.value; delete extra.unit; delete extra.series; }
-        if (s.kind === "category") delete extra.value;
-        if (s.kind === "route") delete extra.points;
-        if (s.kind === "heartbeat") delete extra.beats;
-        run(`INSERT INTO hk_samples(uuid,type,kind,start_ms,end_ms,start_iso,end_iso,tz,value,unit,category_value,source_name,source_bundle,
-          source_json,device_json,metadata_json,extra_json,content_hash,payload_id,created_at,updated_at,deleted_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uuid) DO UPDATE SET type=excluded.type,kind=excluded.kind,
-          start_ms=excluded.start_ms,end_ms=excluded.end_ms,start_iso=excluded.start_iso,end_iso=excluded.end_iso,tz=excluded.tz,value=excluded.value,
-          unit=excluded.unit,category_value=excluded.category_value,source_name=excluded.source_name,source_bundle=excluded.source_bundle,
-          source_json=excluded.source_json,device_json=excluded.device_json,metadata_json=excluded.metadata_json,extra_json=excluded.extra_json,
-          content_hash=excluded.content_hash,payload_id=excluded.payload_id,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at`,
-          s.uuid, s.type, s.kind, Date.parse(s.start), Date.parse(s.end), s.start, s.end, s.tz ?? null,
-          s.kind === "quantity" ? s.value : null, s.kind === "quantity" ? s.unit : null, s.kind === "category" ? s.value : null,
-          s.source.name, s.source.bundle_id, JSON.stringify(s.source), s.device === undefined ? null : JSON.stringify(s.device),
-          s.metadata === undefined ? null : JSON.stringify(s.metadata), JSON.stringify(extra), contentHash, id, now(), now(), deletedAt);
-        if (s.type === "HKCategoryTypeIdentifierSleepAnalysis" && deletedAt === null) run(`INSERT INTO hk_sleep_bounds(source,duration_ms) VALUES(?,?)
-          ON CONFLICT(source) DO UPDATE SET duration_ms=MAX(duration_ms,excluded.duration_ms)`, s.source.name, Date.parse(s.end) - Date.parse(s.start));
-        if (deletedAt === null) children(s); else clearContent(s.uuid);
-        derived.project(s, deletedAt === null);
-        const fresh: RawRow = { uuid: s.uuid, type: s.type, kind: deletedAt === null ? s.kind : "other", start_ms: deletedAt === null ? Date.parse(s.start) : 0,
-          end_ms: deletedAt === null ? Date.parse(s.end) : 0, start_iso: deletedAt === null ? s.start : "", end_iso: deletedAt === null ? s.end : "",
-          tz: s.tz ?? null, source_name: deletedAt === null ? s.source.name : "", source_bundle: deletedAt === null ? s.source.bundle_id : "",
-          category_value: deletedAt === null && s.kind === "category" ? s.value : null, extra_json: deletedAt === null ? JSON.stringify(extra) : "{}",
-          content_hash: contentHash, payload_id: id, deleted_at: deletedAt };
-        oldRows.set(s.uuid, fresh); derived.touch(fresh);
+        let type = types.get(s.type);
+        if (!type) {
+          const m = HK_METRICS.get(s.type);
+          type = { id: Number(run("INSERT INTO hk_types(identifier,metric,cumulative) VALUES(?,?,?)", s.type, m?.def.key ?? null, m?.cumulative ? 1 : 0).lastInsertRowid), identifier: s.type, duration_ms: 0 };
+          types.set(s.type, type);
+        }
+        let fresh: RawRow;
+        if (deletedAt !== null) {
+          run(`INSERT INTO hk_samples(uuid,type_id,content_hash,payload_id,created_at,updated_at,deleted_at) VALUES(?,?,?,?,?,?,?)
+            ON CONFLICT(uuid) DO UPDATE SET content_hash=excluded.content_hash,payload_id=excluded.payload_id,updated_at=excluded.updated_at`,
+            s.uuid, type.id, Buffer.from(contentHash, "hex"), id, now(), now(), deletedAt);
+          if (old) clearContent(s.uuid);
+          fresh = { id: old?.id ?? Number(one<{ id: number }>("SELECT id FROM hk_samples WHERE uuid=?", s.uuid)!.id), uuid: s.uuid, type: s.type, type_id: type.id, source_id: null,
+            kind: "other", start_ms: 0, end_ms: 0, start_iso: "", end_iso: "", tz: null, source_name: "", source_bundle: "", category_value: null, extra_json: "{}",
+            content_hash: contentHash, payload_id: id, deleted_at: deletedAt };
+        } else {
+          const from = Date.parse(s.start), to = Date.parse(s.end), a = stampParts(s.start), z = stampParts(s.end);
+          type.duration_ms = Math.max(type.duration_ms, to - from);
+          const extra: Record<string, unknown> = { ...s };
+          for (const key of ["uuid", "type", "kind", "start", "end", "tz", "source", "device", "metadata"]) delete extra[key];
+          if (s.kind === "quantity") { delete extra.value; delete extra.unit; delete extra.series; }
+          if (s.kind === "category") delete extra.value;
+          if (s.kind === "route") delete extra.points;
+          if (s.kind === "heartbeat") delete extra.beats;
+          if (s.kind === "ecg") delete extra.voltages_uv;
+          const packed: Record<string, unknown> = {};
+          if (Object.keys(extra).length) packed.extra = extra;
+          if (s.metadata != null && Object.keys(s.metadata).length) packed.metadata = s.metadata;
+          if (a.original || z.original) packed.times = { start: a.original, end: z.original };
+          const projection = projectSample(s), src = sourceId(s), dev = deviceId(s);
+          const stored = run(`INSERT INTO hk_samples(uuid,type_id,kind,start_ms,end_ms,start_offset,end_offset,start_format,end_format,tz,value,unit,category_value,
+            source_id,device_id,json,day,native_value,content_hash,payload_id,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uuid) DO UPDATE SET type_id=excluded.type_id,kind=excluded.kind,
+            start_ms=excluded.start_ms,end_ms=excluded.end_ms,start_offset=excluded.start_offset,end_offset=excluded.end_offset,start_format=excluded.start_format,
+            end_format=excluded.end_format,tz=excluded.tz,value=excluded.value,unit=excluded.unit,category_value=excluded.category_value,source_id=excluded.source_id,
+            device_id=excluded.device_id,json=excluded.json,day=excluded.day,native_value=excluded.native_value,content_hash=excluded.content_hash,
+            payload_id=excluded.payload_id,updated_at=excluded.updated_at`,
+            s.uuid, type.id, KINDS.indexOf(s.kind), from, to, a.offset, z.offset, a.format, z.format, s.tz ?? null,
+            s.kind === "quantity" ? s.value : null, s.kind === "quantity" ? s.unit : null, s.kind === "category" ? s.value : null,
+            src, dev, Object.keys(packed).length ? JSON.stringify(packed) : null, projection.day, projection.value, Buffer.from(contentHash, "hex"), id, now(), now());
+          const sampleId = old?.id ?? Number(stored.lastInsertRowid);
+          if (old) { run("DELETE FROM hk_blobs WHERE sample_id=?", sampleId); run("DELETE FROM hk_value_days WHERE sample_id=?", sampleId); }
+          const blob = pack(s); if (blob) run("INSERT INTO hk_blobs(sample_id,data) VALUES(?,?)", sampleId, blob);
+          if (s.type === "HKCategoryTypeIdentifierSleepAnalysis") run(`INSERT INTO hk_sleep_bounds(source,duration_ms) VALUES(?,?)
+            ON CONFLICT(source) DO UPDATE SET duration_ms=MAX(duration_ms,excluded.duration_ms)`, s.source.name, to - from);
+          derived.project(s, sampleId, projection);
+          fresh = { id: sampleId, uuid: s.uuid, type: s.type, type_id: type.id, source_id: src, kind: s.kind, start_ms: from, end_ms: to,
+            start_iso: s.start, end_iso: s.end, tz: s.tz ?? null, source_name: s.source.name, source_bundle: s.source.bundle_id,
+            category_value: s.kind === "category" ? s.value : null, extra_json: JSON.stringify(extra), content_hash: contentHash, payload_id: id, deleted_at: null };
+          derived.touch(fresh);
+        }
+        oldRows.set(s.uuid, fresh);
         if (!old) counts.inserted++; else if (old.content_hash === contentHash) counts.unchanged++; else counts.updated++;
       }
       for (const object of envelope.deletions) {
+        const validationStarted = profile ? performance.now() : 0;
         const p = deletionSchema.safeParse(object);
+        if (profile) profile.validate += performance.now() - validationStarted;
         if (!p.success) { reject(object, p.error.message); continue; }
         const { uuid, type } = p.data, old = oldRows.get(uuid);
         if (old && old.type !== type) { reject(object, "Deletion type does not match stored sample"); continue; }
@@ -115,14 +169,15 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         const tombstone = tombstones.get(uuid) ?? { uuid, type, deleted_at: now() };
         tombstones.set(uuid, tombstone);
         run("UPDATE hk_samples SET deleted_at=?,updated_at=? WHERE uuid=? AND deleted_at IS NULL", tombstone.deleted_at, now(), uuid);
-        run("DELETE FROM hk_sample_values WHERE uuid=?", uuid);
         clearContent(uuid);
         if (old) oldRows.set(uuid, { ...old, deleted_at: tombstone.deleted_at });
         if (marker.changes) counter(type, old?.deleted_at === null ? -1 : 0, old?.deleted_at !== null && old ? 0 : 1);
         counts.deleted += Number(marker.changes);
       }
       for (const object of envelope.daily_stats) {
+        const validationStarted = profile ? performance.now() : 0;
         const p = dailySchema.safeParse(object);
+        if (profile) profile.validate += performance.now() - validationStarted;
         if (!p.success) { reject(object, p.error.message); continue; }
         const s = p.data, m = HK_METRICS.get(s.type);
         if (m && (m.cumulative ? s.sum == null : [s.min, s.avg, s.max].every((v) => v == null))) {
@@ -135,11 +190,14 @@ export function applyV2(id: number, body: Buffer, replay = false): SyncResult & 
         dailyRows.set(JSON.stringify([s.type, s.day]), { type: s.type, day: s.day, payload_id: id });
         derived.daily(s); counts.daily_stats++;
       }
+      for (const t of types.values()) run("UPDATE hk_types SET duration_ms=MAX(duration_ms,?) WHERE id=?", t.duration_ms, t.id);
+      const deriveStarted = profile ? performance.now() : 0, deriveSql = profile?.sqlite ?? 0;
       derived.finish();
+      if (profile) { profile.derive += performance.now() - deriveStarted; profile.derive_sql += profile.sqlite - deriveSql; }
       for (const [type, delta] of touchedTypes) {
         run(`INSERT INTO hk_type_status(type,live,deleted) VALUES(?,?,?) ON CONFLICT(type)
           DO UPDATE SET live=live+excluded.live,deleted=deleted+excluded.deleted`, type, delta.live, delta.deleted);
-        run(`UPDATE hk_type_status SET newest_end=(SELECT end_iso FROM hk_samples
+        run(`UPDATE hk_type_status SET newest_end=(SELECT end_iso FROM hk_raw
           WHERE type=? AND deleted_at IS NULL ORDER BY end_ms DESC,uuid LIMIT 1) WHERE type=?`, type, type);
       }
       const received = one<{ received_at: number }>("SELECT received_at FROM payloads WHERE id=?", id)!.received_at;
@@ -160,26 +218,10 @@ function recordPayload(id: number, counts: Counts, rejected: Rejection[]) {
 }
 
 function clearContent(uuid: string) {
-  for (const table of ["hk_quantity_points", "hk_route_points", "hk_heartbeat_beats"]) run(`DELETE FROM ${table} WHERE uuid=?`, uuid);
-  // Retain only the identity and deleted state. Empty sentinels satisfy this undeployed schema's NOT NULL fields.
-  run(`UPDATE hk_samples SET kind='other',start_ms=0,end_ms=0,start_iso='',end_iso='',tz=NULL,value=NULL,unit=NULL,
-    category_value=NULL,source_name='',source_bundle='',source_json='{}',device_json=NULL,metadata_json=NULL,extra_json='{}' WHERE uuid=?`, uuid);
-}
-
-function children(s: Sample) {
-  for (const table of ["hk_quantity_points", "hk_route_points", "hk_heartbeat_beats"]) run(`DELETE FROM ${table} WHERE uuid=?`, s.uuid);
-  if (s.kind === "quantity" && s.series) {
-    const insert = db.prepare("INSERT INTO hk_quantity_points(uuid,ord,start_iso,end_iso,start_ms,end_ms,value) VALUES(?,?,?,?,?,?,?)");
-    s.series.forEach(([start, end, value], ord) => insert.run(s.uuid, ord, start, end, Date.parse(start), Date.parse(end), value));
-  }
-  if (s.kind === "route") {
-    const insert = db.prepare("INSERT INTO hk_route_points(uuid,ord,time_iso,lat,lon,alt_m,h_acc_m,v_acc_m,speed_mps,course_deg) VALUES(?,?,?,?,?,?,?,?,?,?)");
-    s.points.forEach((p, ord) => insert.run(s.uuid, ord, ...p));
-  }
-  if (s.kind === "heartbeat") {
-    const insert = db.prepare("INSERT INTO hk_heartbeat_beats(uuid,ord,seconds,preceded_by_gap) VALUES(?,?,?,?)");
-    s.beats.forEach(([seconds, gap], ord) => insert.run(s.uuid, ord, seconds, gap ? 1 : 0));
-  }
+  run("DELETE FROM hk_blobs WHERE sample_id=(SELECT id FROM hk_samples WHERE uuid=?)", uuid);
+  run("DELETE FROM hk_value_days WHERE sample_id=(SELECT id FROM hk_samples WHERE uuid=?)", uuid);
+  run(`UPDATE hk_samples SET kind=NULL,start_ms=NULL,end_ms=NULL,start_offset=NULL,end_offset=NULL,start_format=NULL,end_format=NULL,
+    tz=NULL,value=NULL,unit=NULL,category_value=NULL,source_id=NULL,device_id=NULL,json=NULL,day=NULL,native_value=NULL WHERE uuid=?`, uuid);
 }
 
 export function syncStatus() {
