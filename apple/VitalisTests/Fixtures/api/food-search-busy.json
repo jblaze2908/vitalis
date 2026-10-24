@@ -1,0 +1,7 @@
+{ "q": "paneer", "page": 1, "remote": "rate_limited", "count": 1,
+  "results": [
+    { "key": "saved:S1", "name": "Paneer wrap", "brand": null, "source": "saved", "source_ref": "S1", "estimate": false, "per_100g": null,
+      "serving": { "label": "2 ITEMS", "grams": null, "kcal": 520, "protein_g": 30, "carbs_g": null, "fat_g": 21 },
+      "label": "2 ITEMS · SAVED" }
+  ],
+  "next_page": null }

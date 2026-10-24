@@ -1,0 +1,3 @@
+{ "weight": { "trend_kg": 76.2, "month_change_kg": -0.1, "goal_kg": 74.0, "toward_goal": true,
+              "latest": { "kg": 76.2, "at": "2026-10-24T07:02:00+05:30", "source": "SCALE", "manual": false },
+              "series": [ { "day": "2026-10-23", "raw_kg": null, "trend_kg": 76.21 }, { "day": "2026-10-24", "raw_kg": 76.2, "trend_kg": 76.2 } ] } }

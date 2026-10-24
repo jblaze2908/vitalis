@@ -1,0 +1,14 @@
+{
+  "q": "paneer", "page": 1, "remote": "ok", "count": 2,
+  "results": [
+    { "key": "recent:Paneer tikka", "name": "Paneer tikka", "brand": null, "source": "recent", "source_ref": null, "estimate": true,
+      "per_100g": { "kcal": 210, "protein_g": 14, "carbs_g": 6, "fat_g": 14.5 },
+      "serving": { "label": "1 PLATE", "grams": 200, "kcal": 420, "protein_g": 28, "carbs_g": 12, "fat_g": 29 },
+      "label": "1 PLATE · ESTIMATE" },
+    { "key": "off:8901234567890", "name": "Malai Paneer", "brand": "Example Dairy", "source": "search", "source_ref": "8901234567890", "estimate": false,
+      "per_100g": { "kcal": 314, "protein_g": 20, "carbs_g": 4.5, "fat_g": 25 },
+      "serving": { "label": "100 G", "grams": 100, "kcal": 314, "protein_g": 20, "carbs_g": 4.5, "fat_g": 25 },
+      "label": "100 G · OPEN FOOD FACTS" }
+  ],
+  "next_page": 2
+}

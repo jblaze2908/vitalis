@@ -1,0 +1,380 @@
+{
+  "generated_at": "2026-10-24T16:44:24.083Z",
+  "count": 25,
+  "exercises": [
+    {
+      "id": "barbell-bench-press-medium-grip",
+      "name": "Barbell Bench Press - Medium Grip",
+      "equipment": "barbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [
+        "bench",
+        "bench press",
+        "flat bench",
+        "barbell bench"
+      ],
+      "custom": false
+    },
+    {
+      "id": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press",
+      "equipment": "dumbbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [
+        "db bench",
+        "dumbbell press",
+        "flat dumbbell press"
+      ],
+      "custom": false
+    },
+    {
+      "id": "incline-dumbbell-press",
+      "name": "Incline Dumbbell Press",
+      "equipment": "dumbbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [
+        "incline db press",
+        "incline dumbbell bench"
+      ],
+      "custom": false
+    },
+    {
+      "id": "barbell-incline-bench-press-medium-grip",
+      "name": "Barbell Incline Bench Press - Medium Grip",
+      "equipment": "barbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [
+        "incline bench",
+        "incline barbell press",
+        "incline bench press"
+      ],
+      "custom": false
+    },
+    {
+      "id": "bench-dips",
+      "name": "Bench Dips",
+      "equipment": "body only",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "bench-jump",
+      "name": "Bench Jump",
+      "equipment": "body only",
+      "primary": [
+        "quadriceps"
+      ],
+      "secondary": [
+        "calves",
+        "glutes",
+        "hamstrings"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "bench-sprint",
+      "name": "Bench Sprint",
+      "equipment": "other",
+      "primary": [
+        "quadriceps"
+      ],
+      "secondary": [
+        "calves",
+        "glutes",
+        "hamstrings"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "bench-press-powerlifting",
+      "name": "Bench Press - Powerlifting",
+      "equipment": "barbell",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "forearms",
+        "lats",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "incline-bench-pull",
+      "name": "Incline Bench Pull",
+      "equipment": "barbell",
+      "primary": [
+        "middle-back"
+      ],
+      "secondary": [
+        "lats",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "machine-bench-press",
+      "name": "Machine Bench Press",
+      "equipment": "machine",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "weighted-bench-dip",
+      "name": "Weighted Bench Dip",
+      "equipment": "other",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "barbell-guillotine-bench-press",
+      "name": "Barbell Guillotine Bench Press",
+      "equipment": "barbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "barbell-rollout-from-bench",
+      "name": "Barbell Rollout from Bench",
+      "equipment": "barbell",
+      "primary": [
+        "abdominals"
+      ],
+      "secondary": [
+        "glutes",
+        "hamstrings",
+        "lats",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "bench-press-with-bands",
+      "name": "Bench Press - With Bands",
+      "equipment": "bands",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "bench-press-with-chains",
+      "name": "Bench Press with Chains",
+      "equipment": "barbell",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "lats",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "decline-barbell-bench-press",
+      "name": "Decline Barbell Bench Press",
+      "equipment": "barbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "decline-dumbbell-bench-press",
+      "name": "Decline Dumbbell Bench Press",
+      "equipment": "dumbbell",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "flat-bench-cable-flyes",
+      "name": "Flat Bench Cable Flyes",
+      "equipment": "cable",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "reverse-band-bench-press",
+      "name": "Reverse Band Bench Press",
+      "equipment": "barbell",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "forearms",
+        "lats",
+        "middle-back",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "reverse-triceps-bench-press",
+      "name": "Reverse Triceps Bench Press",
+      "equipment": "barbell",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "smith-machine-bench-press",
+      "name": "Smith Machine Bench Press",
+      "equipment": "machine",
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "barbell-squat-to-a-bench",
+      "name": "Barbell Squat To A Bench",
+      "equipment": "barbell",
+      "primary": [
+        "quadriceps"
+      ],
+      "secondary": [
+        "calves",
+        "glutes",
+        "hamstrings",
+        "lower-back"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "close-grip-barbell-bench-press",
+      "name": "Close-Grip Barbell Bench Press",
+      "equipment": "barbell",
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "shoulders"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "dumbbell-squat-to-a-bench",
+      "name": "Dumbbell Squat To A Bench",
+      "equipment": "dumbbell",
+      "primary": [
+        "quadriceps"
+      ],
+      "secondary": [
+        "calves",
+        "glutes",
+        "hamstrings",
+        "lower-back"
+      ],
+      "aliases": [],
+      "custom": false
+    },
+    {
+      "id": "flat-bench-leg-pull-in",
+      "name": "Flat Bench Leg Pull-In",
+      "equipment": "body only",
+      "primary": [
+        "abdominals"
+      ],
+      "secondary": [],
+      "aliases": [],
+      "custom": false
+    }
+  ]
+}

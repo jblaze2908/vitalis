@@ -1,0 +1,84 @@
+{
+  "items": [
+    {
+      "name": "Paneer tikka",
+      "portion_text": "1 plate",
+      "grams": 200,
+      "kcal": 420,
+      "protein_g": 28,
+      "carbs_g": 12,
+      "fat_g": 29,
+      "confidence": "medium",
+      "portion_options": [
+        {
+          "label": "½ plate",
+          "factor": 0.5
+        },
+        {
+          "label": "1 plate",
+          "factor": 1
+        },
+        {
+          "label": "1½ plates",
+          "factor": 1.5
+        }
+      ]
+    },
+    {
+      "name": "Roti",
+      "portion_text": "2 rotis",
+      "grams": 80,
+      "kcal": 240,
+      "protein_g": 7,
+      "carbs_g": 44,
+      "fat_g": 4,
+      "confidence": "high",
+      "portion_options": [
+        {
+          "label": "1 roti",
+          "factor": 0.5
+        },
+        {
+          "label": "2 rotis",
+          "factor": 1
+        },
+        {
+          "label": "3 rotis",
+          "factor": 1.5
+        }
+      ]
+    },
+    {
+      "name": "Dal",
+      "portion_text": "1 bowl",
+      "grams": 150,
+      "kcal": 170,
+      "protein_g": 9,
+      "carbs_g": 24,
+      "fat_g": 4,
+      "confidence": "medium",
+      "portion_options": [
+        {
+          "label": "½ bowl",
+          "factor": 0.5
+        },
+        {
+          "label": "1 bowl",
+          "factor": 1
+        },
+        {
+          "label": "1½ bowls",
+          "factor": 1.5
+        }
+      ]
+    }
+  ],
+  "total": {
+    "kcal": 830,
+    "protein_g": 44,
+    "carbs_g": 80,
+    "fat_g": 37
+  },
+  "estimate": true,
+  "note": "ESTIMATED FROM YOUR WORDS · CHECK PORTIONS BEFORE ADDING"
+}

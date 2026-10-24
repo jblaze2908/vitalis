@@ -1,0 +1,86 @@
+{
+  "day": "2026-10-24",
+  "has_night": true,
+  "prev_day": "2026-10-23",
+  "next_day": null,
+  "night": {
+    "sleep_start": "2026-10-23T23:20:00+05:30",
+    "sleep_end": "2026-10-24T06:50:00+05:30",
+    "in_bed_start": "2026-10-23T23:10:00+05:30",
+    "in_bed_end": "2026-10-24T07:00:00+05:30",
+    "asleep_h": 7,
+    "asleep_label": "7H00",
+    "source": "Synthetic Watch"
+  },
+  "score": 93,
+  "band": "good",
+  "label": "GOOD",
+  "status": "ok",
+  "duration": {
+    "asleep_label": "7H00",
+    "vs_usual_min": 0,
+    "vs_usual_label": "+0M",
+    "need_h": 7,
+    "need_label": "7H00",
+    "need_basis": "history"
+  },
+  "parts": [
+    {
+      "key": "duration",
+      "label": "DURATION",
+      "detail": "OF YOUR 7H NEED",
+      "score": 100,
+      "flagged": false,
+      "weight": 0.4
+    },
+    {
+      "key": "consistency",
+      "label": "BEDTIME",
+      "detail": "ON TIME",
+      "score": 100,
+      "flagged": false,
+      "weight": 0.2
+    },
+    {
+      "key": "efficiency",
+      "label": "EFFICIENCY",
+      "detail": "89% ASLEEP",
+      "score": 81,
+      "flagged": false,
+      "weight": 0.2
+    },
+    {
+      "key": "wakeups",
+      "label": "WAKE-UPS",
+      "detail": "18 MIN AWAKE",
+      "score": 86,
+      "flagged": false,
+      "weight": 0.2
+    }
+  ],
+  "stages": {
+    "core_h": 4.2,
+    "deep_h": 1.1,
+    "rem_h": 1.7,
+    "awake_h": 0.3,
+    "note": "Stages are estimates and are not part of the score."
+  },
+  "tonight": {
+    "bed_by": "23:50",
+    "wake_time": "06:50",
+    "need_h": 7,
+    "label": "7H BEFORE YOUR 06:50 WAKE"
+  },
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}

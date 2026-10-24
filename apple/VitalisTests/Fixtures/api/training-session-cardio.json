@@ -1,0 +1,4 @@
+{ "id": "HKW-0001", "name": "Running", "start": "2026-10-21T07:00:00+05:30", "end": "2026-10-21T07:32:00+05:30", "day": "2026-10-21",
+  "duration_s": 1920, "active_kcal": 310.5, "hr_min": 102, "hr_avg": 148, "hr_max": 171, "distance_km": 5.2, "source": "Apple Watch",
+  "kind": "cardio",
+  "freshness": { "last_sync": "2026-10-24T22:10:00+05:30", "data_through": { "sleep": "2026-10-24" }, "today": "2026-10-24" } }

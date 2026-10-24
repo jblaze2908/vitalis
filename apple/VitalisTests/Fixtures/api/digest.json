@@ -1,0 +1,125 @@
+{
+  "day": "2026-10-24",
+  "available": true,
+  "night_ended_at": "2026-10-24T06:50:00+05:30",
+  "date_label": "SAT 24 OCT",
+  "greeting": "GOOD EVENING",
+  "headline": [
+    "You slept well.",
+    "Ready to push."
+  ],
+  "sleep": {
+    "score": 93,
+    "band": "good",
+    "rows": [
+      {
+        "key": "duration",
+        "label": "DURATION",
+        "value": "7H00",
+        "delta": "+0M",
+        "tint": "good"
+      },
+      {
+        "key": "bedtime",
+        "label": "BEDTIME",
+        "value": "23:20",
+        "delta": "ON TIME",
+        "tint": null
+      },
+      {
+        "key": "efficiency",
+        "label": "EFFICIENCY",
+        "value": "89%",
+        "tint": null
+      },
+      {
+        "key": "wakeups",
+        "label": "WAKE-UPS",
+        "value": null,
+        "tint": null
+      }
+    ]
+  },
+  "recovery": {
+    "score": 78,
+    "band": "ready",
+    "label": "READY",
+    "hrv": {
+      "value": 47.5,
+      "arrow": null,
+      "tint": null
+    },
+    "resting_hr": {
+      "value": 62,
+      "arrow": "up",
+      "tint": "watch"
+    }
+  },
+  "yesterday": {
+    "day": "2026-10-23",
+    "steps": 7500,
+    "active_kcal": 580,
+    "workout": null
+  },
+  "plan": [
+    {
+      "kind": "sleep",
+      "title": "Bed by 23:50",
+      "reason": "7H BEFORE YOUR 06:50 WAKE",
+      "primary": true
+    },
+    {
+      "kind": "eat",
+      "title": "Eat 2,300 kcal",
+      "reason": "150 G PROTEIN",
+      "primary": false
+    },
+    {
+      "kind": "walk",
+      "title": "Walk 8,000",
+      "reason": "YOUR USUAL",
+      "primary": false
+    }
+  ],
+  "pulse": {
+    "window": {
+      "start": "2026-10-24T06:50:00+05:30",
+      "end": "2026-10-24T23:50:00+05:30"
+    },
+    "now": "2026-10-24T22:14:23+05:30",
+    "events": [
+      {
+        "at": "2026-10-24T06:50:00+05:30",
+        "kind": "wake"
+      },
+      {
+        "at": "2026-10-24T08:10:00+05:30",
+        "kind": "meal"
+      },
+      {
+        "at": "2026-10-24T13:05:00+05:30",
+        "kind": "meal"
+      },
+      {
+        "at": "2026-10-24T18:00:00+05:30",
+        "kind": "workout"
+      },
+      {
+        "at": "2026-10-24T20:30:00+05:30",
+        "kind": "meal"
+      }
+    ]
+  },
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}

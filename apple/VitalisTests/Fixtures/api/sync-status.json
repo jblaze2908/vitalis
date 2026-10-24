@@ -1,0 +1,79 @@
+{
+  "token": {
+    "name": "fixture capture",
+    "scope": "write",
+    "can_push": true,
+    "can_read": true,
+    "can_write": true
+  },
+  "server": {
+    "version": "0.1.0",
+    "time": "2026-10-24T22:14:23+05:30",
+    "tz": "Asia/Kolkata"
+  },
+  "last_batch_at": "2026-10-24T16:14:13.675Z",
+  "types": [
+    {
+      "type": "HKQuantityTypeIdentifierActiveEnergyBurned",
+      "live": 5475,
+      "deleted": 0,
+      "newest_end": "2026-10-24T21:30:00.000+05:30"
+    },
+    {
+      "type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+      "live": 2190,
+      "deleted": 0,
+      "newest_end": "2026-10-24T05:10:00.000+05:30"
+    },
+    {
+      "type": "HKQuantityTypeIdentifierStepCount",
+      "live": 5475,
+      "deleted": 0,
+      "newest_end": "2026-10-24T21:30:00.000+05:30"
+    }
+  ],
+  "batches": [
+    {
+      "batch_id": "app-read-10000",
+      "payload_id": 4,
+      "received_at": "2026-10-24T16:14:13.675Z",
+      "counts": {
+        "inserted": 3140,
+        "updated": 0,
+        "unchanged": 0,
+        "deleted": 0,
+        "daily_stats": 0,
+        "rejected": 0
+      },
+      "rejected": []
+    },
+    {
+      "batch_id": "app-read-5000",
+      "payload_id": 3,
+      "received_at": "2026-10-24T16:14:13.584Z",
+      "counts": {
+        "inserted": 5000,
+        "updated": 0,
+        "unchanged": 0,
+        "deleted": 0,
+        "daily_stats": 0,
+        "rejected": 0
+      },
+      "rejected": []
+    },
+    {
+      "batch_id": "app-read-0",
+      "payload_id": 2,
+      "received_at": "2026-10-24T16:14:13.464Z",
+      "counts": {
+        "inserted": 5000,
+        "updated": 0,
+        "unchanged": 0,
+        "deleted": 0,
+        "daily_stats": 0,
+        "rejected": 0
+      },
+      "rejected": []
+    }
+  ]
+}

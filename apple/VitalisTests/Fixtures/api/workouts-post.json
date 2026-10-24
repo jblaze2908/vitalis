@@ -1,0 +1,93 @@
+{
+  "session": {
+    "id": "fx-s1",
+    "kind": "strength",
+    "title": "Legs",
+    "template": "legs",
+    "client_source": "watch",
+    "start": "2026-10-24T07:30:00+05:30",
+    "end": "2026-10-24T07:38:00+05:30",
+    "duration_min": 8,
+    "context_label": "SAT 24 OCT · 07:30 · 8 MIN",
+    "working_sets": 1,
+    "volume_kg": 720,
+    "avg_bpm": null,
+    "active_kcal": null,
+    "heat": {
+      "abdominals": 0,
+      "abductors": 0,
+      "adductors": 0,
+      "biceps": 0,
+      "calves": 2,
+      "chest": 0,
+      "forearms": 0,
+      "glutes": 2,
+      "hamstrings": 2,
+      "lats": 0,
+      "lower-back": 2,
+      "middle-back": 0,
+      "neck": 0,
+      "quadriceps": 2,
+      "shoulders": 0,
+      "traps": 0,
+      "triceps": 0
+    },
+    "exercises": [
+      {
+        "id": "barbell-squat",
+        "name": "Barbell Squat",
+        "working_sets": 1,
+        "top_set": {
+          "weight_kg": 120,
+          "reps": 6
+        },
+        "summary": "1 SETS · TOP 120 X 6",
+        "pr": true,
+        "sets": [
+          {
+            "id": "fx-a1",
+            "kind": "warmup",
+            "weight_kg": 60,
+            "reps": 8,
+            "at": "2026-10-24T07:34:00+05:30"
+          },
+          {
+            "id": "fx-a2",
+            "kind": "normal",
+            "weight_kg": 120,
+            "reps": 6,
+            "at": "2026-10-24T07:38:00+05:30"
+          }
+        ]
+      }
+    ],
+    "watch": null,
+    "freshness": {
+      "last_sync": "2026-10-24T21:44:13+05:30",
+      "data_through": {
+        "sleep": "2026-10-24",
+        "heart": "2026-10-24",
+        "activity": "2026-10-24",
+        "weight": "2026-10-24",
+        "food": "2026-10-24",
+        "training": "2026-10-24"
+      },
+      "today": "2026-10-24"
+    }
+  },
+  "accepted": {
+    "inserted": 2,
+    "updated": 0,
+    "deleted": 0,
+    "unchanged": 0
+  },
+  "prs": [
+    {
+      "exercise_id": "barbell-squat",
+      "exercise": "Barbell Squat",
+      "set": "120 kg × 6",
+      "e1rm_kg_estimate": 144,
+      "previous_best_estimate": 98.8
+    }
+  ]
+}

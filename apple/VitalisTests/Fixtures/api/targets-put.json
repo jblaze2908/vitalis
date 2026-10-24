@@ -1,0 +1,72 @@
+{
+  "values": {
+    "steps": 9000,
+    "kcal_mode": null,
+    "kcal": null,
+    "protein_g": null,
+    "sleep_need_h": null,
+    "wake_time": null,
+    "goal_weight_kg": null,
+    "exercise_min": null,
+    "weekly_sets_min": null,
+    "weekly_sets_max": null,
+    "rest_s": null,
+    "crown_step_kg": null
+  },
+  "effective": {
+    "steps": 9000,
+    "kcal": 2300,
+    "protein_g": 150,
+    "sleep_need_h": 7,
+    "wake_time": "06:50",
+    "bed_by": "23:50"
+  },
+  "suggested": {
+    "steps": {
+      "value": 8000,
+      "basis": "YOUR USUAL IS 8,000"
+    },
+    "kcal": {
+      "value": 2300,
+      "basis": "ADJUSTS WEEKLY FROM WEIGHT"
+    },
+    "protein_g": {
+      "value": 150,
+      "basis": "2.0 G PER KG"
+    },
+    "sleep_need_h": {
+      "value": 7,
+      "basis": "FROM YOUR LAST 60 NIGHTS"
+    },
+    "goal_weight_kg": {
+      "value": null,
+      "basis": "NOW 76.2 KG"
+    }
+  },
+  "is_set": {
+    "steps": true,
+    "kcal_mode": false,
+    "kcal": false,
+    "protein_g": false,
+    "sleep_need_h": false,
+    "wake_time": false,
+    "goal_weight_kg": false,
+    "exercise_min": false,
+    "weekly_sets_min": false,
+    "weekly_sets_max": false,
+    "rest_s": false,
+    "crown_step_kg": false
+  },
+  "freshness": {
+    "last_sync": "2026-10-24T21:44:13+05:30",
+    "data_through": {
+      "sleep": "2026-10-24",
+      "heart": "2026-10-24",
+      "activity": "2026-10-24",
+      "weight": "2026-10-24",
+      "food": "2026-10-24",
+      "training": "2026-10-24"
+    },
+    "today": "2026-10-24"
+  }
+}
