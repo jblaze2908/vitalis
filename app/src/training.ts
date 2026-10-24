@@ -202,6 +202,12 @@ export function getWorkout(id: string) {
 type Perf = { session_id: string; day: string; title: string | null; sets: ReturnType<typeof setView>[]; best_set: string | null; e1rm_kg_estimate: number | null };
 
 export function exerciseHistory(nameOrId: string, limit = 5) {
+  const { perfs: _p, ...view } = exerciseRecord(nameOrId, limit);
+  return view;
+}
+
+/** exerciseHistory plus every session's performance (oldest last), for the e1RM trend. */
+export function exerciseRecord(nameOrId: string, limit = 5) {
   const r = resolveExercise(nameOrId);
   if ("candidates" in r) throw httpErr(422, `"${nameOrId}" is unclear: ${r.candidates.map((c) => `${c.name} (${c.id})`).join(", ") || "no match; try find_exercises"}`);
   const ex = r.exercise;
@@ -220,22 +226,25 @@ export function exerciseHistory(nameOrId: string, limit = 5) {
   return { exercise: { id: ex.id, name: ex.name, equipment: ex.equipment, primary: ex.primary, secondary: ex.secondary },
     sessions_total: perfs.length, recent: perfs.slice(0, limit),
     records: record ? { best_e1rm_kg_estimate: record.e1rm_kg_estimate, best_set: record.best_set, on: record.day, heaviest_kg: heaviest } : null,
-    next: perfs[0] ? suggest(ex, perfs[0]) : { rule: "no history", suggestion: "No sets logged for this exercise yet." } };
+    next: perfs[0] ? suggest(ex, perfs[0]) : { rule: "no history", suggestion: "No sets logged for this exercise yet.", weight_kg: null, reps: null, sets: null },
+    perfs };
 }
 
 /** Double progression: when every working set hit its target reps, add one load step; otherwise repeat the weight. */
 function suggest(ex: Exercise, last: Perf) {
   const w = last.sets.filter((s) => s.kind !== "warmup" && s.reps != null);
-  if (!w.length) return { rule: "no working sets last time", suggestion: "Last session had only warm-ups." };
+  if (!w.length) return { rule: "no working sets last time", suggestion: "Last session had only warm-ups.", weight_kg: null, reps: null, sets: null };
   const weight = Math.max(...w.map((s) => s.weight_kg ?? 0));
   const top = w.filter((s) => (s.weight_kg ?? 0) === weight);
   const target = top[0].target_reps ?? top[0].reps!;
   const hit = top.every((s) => (s.reps ?? 0) >= (s.target_reps ?? target));
   const step = ex.equipment === "dumbbell" || ex.equipment === "kettlebells" ? 2 : ex.equipment === "body only" || !weight ? 0 : 2.5;
   const rule = `double progression on the top working weight; step ${step ? `${step} kg (${ex.equipment ?? "unknown equipment"})` : "1 rep (bodyweight)"}`;
-  if (hit && step) return { rule, last_top: `${weight} kg × ${top.map((s) => s.reps).join(", ")}`, suggestion: `${weight + step} kg × ${target} for ${top.length} sets` };
-  if (hit) return { rule, last_top: `${weight} kg × ${top.map((s) => s.reps).join(", ")}`, suggestion: `${target + 1} reps per set` };
-  return { rule, last_top: `${weight} kg × ${top.map((s) => s.reps).join(", ")}`, suggestion: `stay at ${weight} kg until every set reaches ${target} reps` };
+  // weight_kg/reps/sets are the same numbers the sentence is built from, for apps that prefill (never parsed back out).
+  const lastTop = `${weight} kg × ${top.map((s) => s.reps).join(", ")}`, sets = top.length;
+  if (hit && step) return { rule, last_top: lastTop, suggestion: `${weight + step} kg × ${target} for ${sets} sets`, weight_kg: weight + step, reps: target, sets };
+  if (hit) return { rule, last_top: lastTop, suggestion: `${target + 1} reps per set`, weight_kg: weight, reps: target + 1, sets };
+  return { rule, last_top: lastTop, suggestion: `stay at ${weight} kg until every set reaches ${target} reps`, weight_kg: weight, reps: target, sets };
 }
 
 export function trainingSummary(from: string, to: string) {

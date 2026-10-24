@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { ApiError, dayParam, handle, routeKey, withEtag } from "../http.js";
+import { catalog, exerciseDetail } from "../exercise-view.js";
 import { sleepDay, sleepWeek } from "../sleep-view.js";
 import { bodyDay } from "../weight.js";
 import { getTargets } from "../targets.js";
@@ -21,3 +22,5 @@ readRoutes.get("/v2/training/sessions", handle("v2/training/sessions", "read", (
   return withEtag(c, routeKey(c), () => sessionHistory(c.req.query("before") || undefined, limit));
 }));
 readRoutes.get("/v2/training/sessions/:id", handle("v2/training/session", "read", (c) => withEtag(c, routeKey(c), () => sessionDetail(c.req.param("id") ?? ""))));
+readRoutes.get("/v2/exercises", handle("v2/exercises", "read", (c) => withEtag(c, routeKey(c), () => catalog(c.req.query("q") || undefined, c.req.query("since") || undefined))));
+readRoutes.get("/v2/exercises/:id", handle("v2/exercise", "read", (c) => withEtag(c, routeKey(c), () => exerciseDetail(c.req.param("id") ?? ""))));

@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { httpErr, now } from "./config.js";
-import { all, db, one, run, tx } from "./db.js";
+import { all, bumpDataVersion, db, one, run, tx } from "./db.js";
 
 export type Exercise = { id: string; name: string; equipment: string | null; mechanic: string | null; category: string | null;
   primary: string[]; secondary: string[]; aliases: string[]; custom: boolean };
@@ -105,6 +105,7 @@ export function createExercise(input: { name: string; primary: string[]; seconda
   if (existing) return { exercise: existing, created: false };
   run(`INSERT INTO exercises(${COLS},created_at) VALUES(?,?,?,?,?,?,?,?,1,?)`, id, input.name.trim(), input.equipment ?? null, null, "strength",
     JSON.stringify(input.primary), JSON.stringify(input.secondary ?? []), JSON.stringify((input.aliases ?? []).map((a) => a.trim()).filter(Boolean)), now());
+  bumpDataVersion(); // the catalog ETag must change for the phone to see it
   cache = null;
   return { exercise: getExercise(id)!, created: true };
 }
