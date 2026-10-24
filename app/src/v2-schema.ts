@@ -3,7 +3,14 @@ import { z } from "zod";
 
 const text = z.string().min(1);
 export const stamp = z.iso.datetime({ offset: true }).refine((s) => Number.isFinite(Date.parse(s)), "Invalid timestamp");
-export const zone = z.string().refine((tz) => { try { new Intl.DateTimeFormat("en", { timeZone: tz }); return true; } catch { return false; } }, "Invalid time zone");
+const zones = new Map<string, boolean>();
+export const zone = z.string().refine((tz) => {
+  const known = zones.get(tz); if (known !== undefined) return known;
+  let valid: boolean;
+  try { new Intl.DateTimeFormat("en", { timeZone: tz }); valid = true; } catch { valid = false; }
+  if (zones.size >= 512) zones.delete(zones.keys().next().value!);
+  zones.set(tz, valid); return valid;
+}, "Invalid time zone");
 const object = z.record(z.string(), z.unknown());
 const interval = { start: stamp, end: stamp };
 const ordered = (s: { start: string; end: string }) => Date.parse(s.end) >= Date.parse(s.start);

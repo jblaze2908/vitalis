@@ -148,11 +148,15 @@ export const all = <T>(sql: string, ...p: SQLInputValue[]): T[] => {
 };
 export const marks = (n: number) => Array(n).fill("?").join(",");
 
+function transactionSQL(sql: string) {
+  if (!profile) { db.exec(sql); return; }
+  const t = performance.now(); try { db.exec(sql); } finally { profile.sqlite += performance.now() - t; }
+}
 export function tx<T>(fn: () => T): T {
-  db.exec("BEGIN IMMEDIATE");
-  try { const r = fn(); db.exec("COMMIT"); return r; } catch (e) {
+  transactionSQL("BEGIN IMMEDIATE");
+  try { const r = fn(); transactionSQL("COMMIT"); return r; } catch (e) {
     // SQLite can roll back automatically (e.g. SQLITE_FULL); preserve the original failure.
-    try { db.exec("ROLLBACK"); } catch { /* already rolled back */ }
+    try { transactionSQL("ROLLBACK"); } catch { /* already rolled back */ }
     throw e;
   }
 }

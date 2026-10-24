@@ -10,11 +10,11 @@ const { ingestV2 } = await import('../dist/src/v2.js');
 const batches = Number(process.env.PROFILE_BATCHES ?? 20), quantityType = process.env.PROFILE_TYPE ?? 'HeartRate';
 const source = { name: 'Profile Watch', bundle_id: 'com.apple.health', version: '26.1', product_type: 'Watch7,1', os_version: '26.1' };
 const device = { name: 'Synthetic device', manufacturer: 'Apple', model: 'Watch', hardware_version: '7', software_version: '26.1' };
-let seq = 0;
+let seq = 0; const seed = Date.now() >>> 0;
 for (let batch = 0; batch < batches; batch++) {
   const upserts = Array.from({ length: 5000 }, (_, i) => {
     const n = ++seq, t = new Date(1577836800000 + n * 300000).toISOString();
-    return { uuid: `${(Math.imul(n,2654435761)>>>0).toString(16).padStart(8,'0')}-0000-4000-8000-${n.toString(16).padStart(12,'0')}`, type: `HKQuantityTypeIdentifier${quantityType}`, kind: 'quantity',
+    return { uuid: `${(Math.imul((n ^ seed) >>> 0,2654435761)>>>0).toString(16).padStart(8,'0')}-0000-4000-8000-${n.toString(16).padStart(12,'0')}`, type: `HKQuantityTypeIdentifier${quantityType}`, kind: 'quantity',
       start: t, end: t, ...(process.env.PROFILE_TZ ? { tz: process.env.PROFILE_TZ } : {}), source, device, metadata: {}, value: 55 + i % 55, unit: quantityType === 'HeartRate' ? 'count/min' : 'count' };
   });
   const raw = Buffer.from(JSON.stringify({ schema: 1, batch_id: `profile-${Date.now()}-${batch}`, client: { install_id: 'synthetic', app_version: '1', os: 'iOS 26.1', model: 'iPhone17,1' }, upserts, deletions: [], daily_stats: [] }));
