@@ -1,0 +1,21 @@
+{
+  "batches": 12,
+  "warmup_batches": 3,
+  "average": {
+    "bytes": 2371089.222222222,
+    "wall_ms": 612.2608872222222,
+    "parse_ms": 13.971845555555623,
+    "validate_ms": 37.665080555549594,
+    "sqlite_ms": 370.2579927777852,
+    "derive_ms": 5.526365666666607,
+    "compress_ms": 2.9678893333334093,
+    "hash_ms": 75.12707977777401,
+    "other_ms": 106.74463355555771,
+    "scalar_samples_per_second": 8166.453393233386
+  },
+  "phases_path": ".data/profiles/ingest-Ry3Tjn/phases.jsonl",
+  "db_path": "/home/jblaze2908/projects/vitalis/app/.data/bench/vitalis-bench-O3Q7ik/bench.db",
+  "final_sample_count": 1097000,
+  "initial_sample_count": 1037000,
+  "instrumentation_note": "SQLite includes BEGIN/COMMIT/checkpoint wall time. Derivation SQL is included only in derive_ms."
+}

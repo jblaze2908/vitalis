@@ -1,0 +1,21 @@
+{
+  "batches": 8,
+  "warmup_batches": 3,
+  "average": {
+    "bytes": 2426089,
+    "wall_ms": 343.32614499999994,
+    "parse_ms": 15.724625000000014,
+    "validate_ms": 39.75681140000124,
+    "sqlite_ms": 94.96496339999894,
+    "derive_ms": 5.5023072000000415,
+    "compress_ms": 2.7095029999999496,
+    "hash_ms": 74.58133159999788,
+    "other_ms": 110.08660340000188,
+    "scalar_samples_per_second": 14563.411708712138
+  },
+  "phases_path": ".data/profiles/ingest-QDwiKt/phases.jsonl",
+  "db_path": ".data/profiles/ingest-QDwiKt/profile.db",
+  "final_sample_count": 40000,
+  "initial_sample_count": 0,
+  "instrumentation_note": "SQLite includes BEGIN/COMMIT/checkpoint wall time. Derivation SQL is included only in derive_ms."
+}

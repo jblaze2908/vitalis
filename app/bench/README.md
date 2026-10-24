@@ -54,6 +54,7 @@ VITALIS_DB=<synthetic.db> node bench/read-latency.mjs
 mkdir -p .data/profiles
 node --cpu-prof --cpu-prof-dir=.data/profiles bench/profile-ingest.mjs
 node bench/summarize-profile.mjs <file.cpuprofile> <summary.json>
+node bench/report.mjs --tests=63           # rebuild Markdown + interactive HTML from saved reports
 ```
 
 `PROFILE_DB` profiles scalar inserts into an existing synthetic DB, `PROFILE_TZ=UTC` exercises named

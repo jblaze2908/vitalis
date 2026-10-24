@@ -232,7 +232,9 @@
       "sqlite_schema": 16384,
       "sqlite_sequence": 4096,
       "tokens": 4096
-    }
+    },
+    "checkpoint_bytes_per_sample": 301.04385770750986,
+    "retained_payload_allocated_bytes": 30355456
   },
   "compression": {
     "gzip": {

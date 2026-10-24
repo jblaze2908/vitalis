@@ -7,6 +7,8 @@ process.env.VITALIS_ROOT = root;
 process.env.VITALIS_DB = process.env.PROFILE_DB ?? `${root}/profile.db`;
 process.env.VITALIS_PROFILE = `${root}/phases.jsonl`;
 const { ingestV2 } = await import('../dist/src/v2.js');
+const { one } = await import('../dist/src/db.js');
+const initialSamples = one('SELECT COUNT(*) n FROM hk_samples').n;
 const batches = Number(process.env.PROFILE_BATCHES ?? 20), quantityType = process.env.PROFILE_TYPE ?? 'HeartRate';
 const source = { name: 'Profile Watch', bundle_id: 'com.apple.health', version: '26.1', product_type: 'Watch7,1', os_version: '26.1' };
 const device = { name: 'Synthetic device', manufacturer: 'Apple', model: 'Watch', hardware_version: '7', software_version: '26.1' };
@@ -23,6 +25,6 @@ for (let batch = 0; batch < batches; batch++) {
 const rows = readFileSync(process.env.VITALIS_PROFILE, 'utf8').trim().split('\n').map(JSON.parse).slice(3);
 const summary = Object.fromEntries(Object.keys(rows[0]).map(key => [key, rows.reduce((n,r)=>n+r[key],0)/rows.length]));
 summary.scalar_samples_per_second = 5000000 / summary.wall_ms;
-const report = { batches, warmup_batches: 3, average: summary, phases_path: process.env.VITALIS_PROFILE, db_path: process.env.VITALIS_DB };
+const report = { batches, warmup_batches: 3, initial_sample_count: initialSamples, final_sample_count: one('SELECT COUNT(*) n FROM hk_samples').n, average: summary, phases_path: process.env.VITALIS_PROFILE, db_path: process.env.VITALIS_DB };
 writeFileSync(process.env.PROFILE_OUTPUT ?? 'bench/results/profile.json', JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify(report,null,2));

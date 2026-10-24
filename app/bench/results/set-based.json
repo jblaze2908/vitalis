@@ -204,7 +204,37 @@
       "sqlite_schema": 16384,
       "sqlite_sequence": 4096,
       "tokens": 4096
-    }
+    },
+    "point_kinds": {
+      "layout": "child-rows-and-ecg-json",
+      "kinds": {
+        "quantity": {
+          "points": 69000,
+          "allocated_bytes": 11743232,
+          "allocated_bytes_per_point": 170.19176811594204
+        },
+        "route": {
+          "points": 27000,
+          "allocated_bytes": 4370432,
+          "allocated_bytes_per_point": 161.86785185185184
+        },
+        "heartbeat": {
+          "points": 30000,
+          "allocated_bytes": 3350528,
+          "allocated_bytes_per_point": 111.68426666666667
+        },
+        "ecg": {
+          "points": 15000,
+          "encoded_bytes": 283439,
+          "encoded_bytes_per_point": 18.895933333333332,
+          "allocated_bytes": null,
+          "allocated_bytes_per_point": null
+        }
+      },
+      "allocation_note": "Child table and index pages measured directly. ECG JSON shares sample pages; only its logical bytes are attributed."
+    },
+    "checkpoint_bytes_per_sample": 1238.1819446640316,
+    "retained_payload_allocated_bytes": 30355456
   },
   "compression": {
     "gzip": {
