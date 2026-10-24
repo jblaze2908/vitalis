@@ -3,7 +3,8 @@ export function stampParts(iso: string) {
   const match = /([+-])(\d{2}):(\d{2})$/.exec(iso);
   const offset = match ? (match[1] === '-' ? -1 : 1) * (+match[2] * 60 + +match[3]) : 0;
   const digits = /\.(\d+)/.exec(iso)?.[1].length ?? 0;
-  return { offset, format: digits > 3 ? 255 : digits + (iso.endsWith('Z') ? 4 : 0), original: digits > 3 ? iso : undefined };
+  const exceptional = digits > 3 || iso.endsWith('-00:00');
+  return { offset, format: exceptional ? 255 : digits + (iso.endsWith('Z') ? 4 : 0), original: exceptional ? iso : undefined };
 }
 export function rebuildISO(ms: number, offset: number, format: number, original?: string): string {
   if (original) return original;

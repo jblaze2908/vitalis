@@ -1,6 +1,6 @@
 // Native sync: durable raw body first, then one atomic ledger + projection + batch commit.
 import { createHash } from "node:crypto";
-import { gzipSync } from "node:zlib";
+import { compressNative } from "./v2-payload.js";
 import { httpErr, now } from "./config.js";
 import { all, one, run, tx } from "./db.js";
 import { Derivations, projectSample, type RawRow } from "./v2-derived.js";
@@ -28,9 +28,9 @@ export function ingestV2(body: Buffer): SyncResult & { new_nights?: string[] } {
   const sha = hash(body);
   let p = one<{ id: number }>("SELECT id FROM payloads WHERE sha256=?", sha);
   if (!p) {
-    const t = profile ? performance.now() : 0, compressed = gzipSync(body);
+    const t = profile ? performance.now() : 0, compressed = compressNative(body);
     if (profile) profile.compress += performance.now() - t;
-    p = { id: Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz) VALUES(?,'v2',?,?,?)", now(), sha, body.length, compressed).lastInsertRowid) };
+    p = { id: Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz,codec) VALUES(?,'v2',?,?,?,?)", now(), sha, body.length, compressed.body, compressed.codec).lastInsertRowid) };
   }
   try { return applyV2(p.id, body); } finally { endProfile(body.length); }
 }

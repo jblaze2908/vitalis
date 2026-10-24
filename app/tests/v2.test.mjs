@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { spawnSync } from "node:child_process";
 import { all, body, http, one, tokens } from "./_env.mjs";
+import { decodePayload } from "../dist/src/v2-payload.js";
 import { blobFor, unpack } from "../dist/src/v2-storage.js";
 import { db, run } from "../dist/src/db.js";
 import { reparse } from "../dist/src/ingest.js";
@@ -38,8 +39,8 @@ test("insert, unchanged content, UUID replacement, duplicate batch id and lossle
   assert.equal(row(s).start_ms, Date.parse(s.start));
   assert.deepEqual(JSON.parse(row(s).metadata_json), s.metadata);
   assert.deepEqual(JSON.parse(row(s).extra_json).future_field, s.future_field);
-  const p = one("SELECT body_gz,origin FROM payloads WHERE id=?", payloadId(b.batch_id));
-  assert.deepEqual(JSON.parse(gunzipSync(p.body_gz)), b); assert.equal(p.origin, "v2");
+  const p = one("SELECT body_gz,origin,codec FROM payloads WHERE id=?", payloadId(b.batch_id));
+  assert.deepEqual(JSON.parse(decodePayload(p.body_gz, p.codec)), b); assert.equal(p.origin, "v2");
   const same = await post(batch([Object.fromEntries(Object.entries(s).reverse())]));
   assert.equal(same.json.counts.unchanged, 1);
   assert.equal((await post(batch([{ ...s, value: 110 }]))).json.counts.updated, 1);
@@ -92,7 +93,7 @@ test("gzip is decoded and stored; invalid gzip and unsupported encodings fail", 
   const s = sample(), b = batch([s]);
   const r = await post(undefined, { raw: gzipSync(body(b)), headers: { "content-encoding": "gzip" } });
   assert.equal(r.status, 200, r.text); assert.ok(row(s));
-  assert.deepEqual(JSON.parse(gunzipSync(one("SELECT body_gz FROM payloads WHERE id=?", payloadId(b.batch_id)).body_gz)), b);
+  assert.deepEqual(JSON.parse(decodePayload(one("SELECT body_gz FROM payloads WHERE id=?", payloadId(b.batch_id)).body_gz, one("SELECT codec FROM payloads WHERE id=?", payloadId(b.batch_id)).codec)), b);
   assert.equal((await post(undefined, { raw: "invalid", headers: { "content-encoding": "gzip" } })).status, 400);
   assert.equal((await post(batch(), { headers: { "content-encoding": "br" } })).status, 415);
 });
@@ -562,4 +563,37 @@ test("HR series windows use point bounds, including points outside the parent in
   assert.equal(get(), null);
   const wrongKind = sample({ type: type("HeartRate"), kind: "category", value: 1, value_label: "unmapped", start: at("2027-04-01", "10:30"), end: at("2027-04-01", "10:30") });
   assert.equal((await post(batch([wrongKind]))).status, 200); assert.equal(get(), null);
+});
+
+test("native replay decodes mixed gzip/zstd retention while legacy gzip payloads stay compatible", () => {
+  const script = `
+    process.env.VITALIS_DB=':memory:';
+    const {ingestV2}=await import('./dist/src/v2.js');
+    const {reparse}=await import('./dist/src/ingest.js');
+    const {one,run}=await import('./dist/src/db.js');
+    const {decodePayload}=await import('./dist/src/v2-payload.js');
+    const z=await import('node:zlib');
+    const results=[];
+    for (const codec of ['auto','gzip']) {
+      if(codec==='gzip')process.env.VITALIS_PAYLOAD_CODEC='gzip';else delete process.env.VITALIS_PAYLOAD_CODEC;
+      const b=${JSON.stringify(batch([sample({ start: at("2027-04-02", "10:00"), end: at("2027-04-02", "10:01") })]))};
+      b.batch_id=codec;b.upserts[0].uuid=codec;
+      const raw=Buffer.from(JSON.stringify(b));ingestV2(raw);
+      const p=one('SELECT id,codec,body_gz FROM payloads ORDER BY id DESC LIMIT 1');
+      if(!decodePayload(p.body_gz,p.codec).equals(raw))throw Error('retention round trip');
+      run("UPDATE hk_samples SET native_value=NULL WHERE uuid=?",codec);reparse(p.id);
+      results.push([p.codec,one("SELECT native_value FROM hk_samples WHERE uuid=?",codec).native_value]);
+    }
+    console.log(JSON.stringify({zstd:typeof z.zstdCompressSync==='function',results}));
+  `;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr); const result = JSON.parse(r.stdout.trim());
+  assert.deepEqual(result.results, [[result.zstd ? 'zstd' : 'gzip', 100], ['gzip', 100]]);
+});
+
+test("compact timestamps preserve explicit negative-zero offsets", async () => {
+  const s = sample({ start: '2027-04-03T10:00:00.123-00:00', end: '2027-04-03T10:01:00.123-00:00',
+    series: [['2027-04-03T10:00:00.123-00:00', '2027-04-03T10:01:00.123-00:00', 12]] });
+  assert.equal((await post(batch([s]))).status, 200);
+  assert.equal(row(s).start_iso, s.start); assert.equal(row(s).end_iso, s.end); assert.deepEqual(points(s), s.series);
 });

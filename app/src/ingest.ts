@@ -7,6 +7,7 @@ import { BY_HAE, convert } from "./catalog.js";
 import { httpErr, now } from "./config.js";
 import { all, one, run, tx } from "./db.js";
 import { localDay, parseStamp } from "./time.js";
+import { decodePayload } from "./v2-payload.js";
 import { applyV2 } from "./v2.js";
 
 export type IngestMeta = { origin: string; automation?: string | null; aggregation?: string | null; period?: string | null };
@@ -34,10 +35,10 @@ export function ingest(body: Buffer, meta: IngestMeta): IngestResult {
 
 /** Parse a stored payload again (after a parser fix). */
 export function reparse(id: number) {
-  const p = one<{ body_gz: Uint8Array; origin: string }>("SELECT body_gz,origin FROM payloads WHERE id=?", id);
+  const p = one<{ body_gz: Uint8Array; origin: string; codec: string }>("SELECT body_gz,origin,codec FROM payloads WHERE id=?", id);
   if (!p) throw httpErr(404, `No payload ${id}`);
   if (p.origin === "v2") {
-    const r = applyV2(id, gunzipSync(p.body_gz), true);
+    const r = applyV2(id, decodePayload(p.body_gz, p.codec), true);
     return { ...r, payload_id: id, warnings: r.rejected.map((r) => `${r.uuid ?? "object"}: ${r.reason}`) };
   }
   return apply(id, (JSON.parse(gunzipSync(p.body_gz).toString("utf8")) as Row).data as Row);

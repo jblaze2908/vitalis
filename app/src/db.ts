@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS tokens (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, scope TEXT NOT NULL CHECK (scope IN ('ingest','read','write')),
   hash TEXT NOT NULL UNIQUE, prefix TEXT NOT NULL, created_at INTEGER NOT NULL, last_used_at INTEGER, revoked_at INTEGER);
 
--- Every push is kept as received (gzipped) before parsing, so a parser fix can be replayed over history.
+-- Every push is retained before parsing for replay: gzip for HAE, codec-marked compression for v2.
 CREATE TABLE IF NOT EXISTS payloads (
   id INTEGER PRIMARY KEY AUTOINCREMENT, received_at INTEGER NOT NULL, origin TEXT NOT NULL, sha256 TEXT NOT NULL UNIQUE,
   bytes INTEGER NOT NULL, body_gz BLOB NOT NULL, automation TEXT, aggregation TEXT, period TEXT,
@@ -112,6 +112,13 @@ CREATE TABLE IF NOT EXISTS calls (
   ms INTEGER NOT NULL, detail TEXT);
 CREATE INDEX IF NOT EXISTS calls_at ON calls(at);
 `);
+
+// Additive retention codec marker: all existing HAE and gzip-native payloads keep their original bytes.
+const hasCodec = () => db.prepare("PRAGMA table_info(payloads)").all().some(c => c.name === "codec");
+if (!hasCodec()) {
+  try { db.exec("ALTER TABLE payloads ADD COLUMN codec TEXT NOT NULL DEFAULT 'gzip'"); }
+  catch (e) { if (!hasCodec()) throw e; } // another connection may have added it while this one waited
+}
 
 // Bound dynamic-query growth while reusing the hot statements on this connection.
 const statements = new Map<string, ReturnType<typeof db.prepare>>();

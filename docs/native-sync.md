@@ -78,8 +78,9 @@ that any sample in the batch touches. These feed the existing `metric_days` rows
   "rejected": [ { "uuid": "…", "reason": "…" } ] }
 ```
 
-- The whole body is stored gzipped in `payloads` (origin `v2`) before parsing, as `/ingest` does, so a
-  parser fix can be replayed with `vitalis reparse`.
+- The whole decoded JSON body is stored compressed in `payloads` (origin `v2`) before parsing, so a
+  parser fix can be replayed with `vitalis reparse`. Retention uses builtin zstd when available, with
+  gzip as a fallback; HTTP compression remains optionally gzip. Payload SHA-256 covers decoded JSON bytes.
 - The batch is applied in one transaction. A malformed envelope is `400` and nothing is applied.
 - Reusing a `batch_id` with a different payload SHA-256 returns `409`; no objects are applied.
 - A single bad object is `rejected` with a reason. The rest still apply.
@@ -137,14 +138,14 @@ The following choices resolve details not fixed by the original contract:
   fractional seconds are preserved, and timestamps without fractional seconds are also accepted.
   An invalid IANA `tz`, nonfinite number, or interval ending before it starts rejects that object.
 - Unknown sample fields, source/device/metadata fields, and unmapped types remain stored. Unknown
-  units stay raw without writing a misleading derived value. ECG voltages and other kind-specific
-  fields are JSON; quantity series, routes, and heartbeat beats use ordered child rows, replaced
-  wholesale on upsert. Sample equality compares all parsed JSON content with object keys sorted;
+  units stay raw without writing a misleading derived value. Quantity series, routes, heartbeat beats, and ECG voltages use lossless packed binary
+  blobs, replaced wholesale on upsert; other kind-specific fields share a JSON column with metadata. Sample equality compares all parsed JSON content with object keys sorted;
   object key order alone is unchanged. Array order and absent versus null fields remain significant.
 - Counts describe raw row operations: the first accepted UUID is inserted, changed content is
   updated, identical content is unchanged. A first deletion marker counts as deleted even for an
-  unknown UUID; repeated deletions do not. A late upsert stores only identity and the deleted state, with no sample content. Deletion
-  clears series, route, heartbeat and ECG content from the ledger; raw bodies remain for replay. Upserts run before deletions in a batch, so deletion wins. A deletion whose type differs
+  unknown UUID; repeated deletions do not. A late upsert stores only identity and the deleted state.
+  Deletion clears series, route, heartbeat and ECG content from the ledger; raw bodies remain for replay.
+  Upserts run before deletions in a batch, so deletion wins. A deletion whose type differs
   from an existing sample is rejected. Duplicate batches return the original counts/rejections with
   `duplicate: true`, only for an identical payload SHA-256; a different body returns `409`. Rejections without a
   usable sample UUID (including bad daily statistics) use `uuid: null`.
@@ -172,7 +173,7 @@ The following choices resolve details not fixed by the original contract:
   points fully inside the window (including endpoints) are used: prefer matching source name and
   bundle id, otherwise use all sources. Means are arithmetic. No readings means null HR columns. Later HR batches and deletions refresh overlapping native workouts. Workout
   energy/distance use their statistics sums with conversion to the catalog units.
-- Accepted-size bodies are durably gzipped with origin `v2` before JSON/envelope validation; malformed
+- Accepted-size decoded bodies are durably compressed with origin `v2` before JSON/envelope validation; malformed
   envelopes retain their body and `payloads.error` but apply no batch or derived changes. Both wire and
   decompressed bodies enforce `VITALIS_MAX_INGEST_MB` (413). Broken gzip is 400 and unsupported content
   encoding is 415. A database/transaction failure rolls back the batch, records the payload error, and
