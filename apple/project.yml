@@ -36,6 +36,7 @@ targets:
         TARGETED_DEVICE_FAMILY: '1'
         GENERATE_INFOPLIST_FILE: false
         INFOPLIST_FILE: Vitalis/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Vitalis/Vitalis.entitlements
         SUPPORTS_MACCATALYST: false
   VitalisWatch:
@@ -53,6 +54,7 @@ targets:
         TARGETED_DEVICE_FAMILY: '4'
         GENERATE_INFOPLIST_FILE: false
         INFOPLIST_FILE: VitalisWatch/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: VitalisWatch/VitalisWatch.entitlements
         SKIP_INSTALL: true
         WATCHOS_DEPLOYMENT_TARGET: '11.0'
