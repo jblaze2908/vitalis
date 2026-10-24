@@ -103,6 +103,85 @@ keeps working:
 Auth: any token. For the app's sync screen. Returns the last batch time, totals per `type` (live and
 deleted), the newest sample `end` per type, and the last 20 batches with counts and rejections.
 
+Response `200` (times are ISO 8601; empty storage returns null and empty arrays):
+
+```json
+{
+  "last_batch_at": "2026-10-23T12:00:00.000Z",
+  "types": [
+    { "type": "HKQuantityTypeIdentifierStepCount", "live": 100, "deleted": 2,
+      "newest_end": "2026-10-23T17:20:00.123+05:30" }
+  ],
+  "batches": [
+    { "batch_id": "6F1C…", "payload_id": 12, "received_at": "2026-10-23T12:00:00.000Z",
+      "counts": { "inserted": 100, "updated": 0, "unchanged": 0, "deleted": 2, "daily_stats": 1, "rejected": 0 },
+      "rejected": [] }
+  ]
+}
+```
+
+Types are sorted by identifier. `newest_end` is the original `end` of the newest **live** sample
+(by instant), or null when none are live. Deleted totals include unknown-UUID tombstones once,
+even after a late upsert. Batches are newest first, with payload id breaking timestamp ties;
+duplicate attempts do not create batches or advance `last_batch_at` or MCP `last_sync`.
+
+## Phase 1 implementation clarifications
+
+The following choices resolve details not fixed by the original contract:
+
+- All envelope fields in the example are required, including the three arrays (which may be empty)
+  and the four client fields. Identifiers are nonempty opaque strings; UUID formatting/case is not
+  normalized. Source `name` and `bundle_id` are required; revision fields are optional/null, and
+  `os_version` can be a string or an object. Timestamps require an explicit offset (`Z` accepted);
+  fractional seconds are preserved, and timestamps without fractional seconds are also accepted.
+  An invalid IANA `tz`, nonfinite number, or interval ending before it starts rejects that object.
+- Unknown sample fields, source/device/metadata fields, and unmapped types remain stored. Unknown
+  units stay raw without writing a misleading derived value. ECG voltages and other kind-specific
+  fields are JSON; quantity series, routes, and heartbeat beats use ordered child rows, replaced
+  wholesale on upsert. Sample equality compares all parsed JSON content with object keys sorted;
+  object key order alone is unchanged. Array order and absent versus null fields remain significant.
+- Counts describe raw row operations: the first accepted UUID is inserted, changed content is
+  updated, identical content is unchanged. A first deletion marker counts as deleted even for an
+  unknown UUID; repeated deletions do not. A late upsert may insert/update raw content but remains
+  deleted. Upserts run before deletions in a batch, so deletion wins. A deletion whose type differs
+  from an existing sample is rejected. Duplicate batches return the original counts/rejections with
+  `duplicate: true`, including when a different body reuses the batch id. Rejections without a
+  usable sample UUID (including bad daily statistics) use `uuid: null`.
+- A sample's IANA `tz`, when present, determines historical local days; otherwise its own ISO offset
+  does. A cumulative quantity interval crossing midnight is split proportionally by elapsed time,
+  accounting for DST with a named zone; the endpoint is exclusive. Discrete quantities use the
+  start day. Series points replace the parent value for aggregation; discrete averages are arithmetic
+  means of points (or scalar samples), not duration-weighted means. Per-source keys use source names,
+  as the existing tables do. Only `daily_stats` writes merged source `''`; deleting raw samples does
+  not infer new Apple-merged totals, so the phone must send replacement daily statistics.
+- Every catalog quantity maps to its equivalent HealthKit type. `stand_hours` uses the category
+  `HKCategoryTypeIdentifierAppleStandHour` (`stood` = raw value 0 contributes one hour, idle contributes
+  zero); `HKQuantityTypeIdentifierAppleStandTime` is a different measure and remains raw. A daily
+  stand-hour statistic, if supplied, uses that category identifier, `sum`, and unit `count`.
+  Native `%` values use [HKUnit.percent()](https://developer.apple.com/documentation/healthkit/hkunit/percent%28%29):
+  1.0 means 100%, converted to the existing catalog's 0–100 scale for both oxygen and body fat.
+- Sleep segments from the same source form a session when they overlap or the gap is at most three
+  hours, including an enclosing in-bed interval. The session belongs to the local day its last segment
+  ends; separate sessions waking on the same day combine in that day's row. Asleep includes raw enum
+  values 1/3/4/5 (unspecified/core/deep/REM); awake is 2, in-bed is 0. Overlapping intervals count once
+  within each stage and across total asleep. Bed edges come from in-bed segments; sleep edges come
+  from asleep segments. Stage columns are zero when a night exists but that stage is absent.
+- Workout HR uses live heart-rate scalar samples or series points fully inside the workout window,
+  including endpoints, matching both its source name and bundle id. Means are arithmetic. No readings
+  means null HR columns. Later HR batches and deletions refresh overlapping native workouts. Workout
+  energy/distance use their statistics sums with conversion to the catalog units.
+- Accepted-size bodies are durably gzipped with origin `v2` before JSON/envelope validation; malformed
+  envelopes retain their body and `payloads.error` but apply no batch or derived changes. Both wire and
+  decompressed bodies enforce `VITALIS_MAX_INGEST_MB` (413). Broken gzip is 400 and unsupported content
+  encoding is 415. A database/transaction failure rolls back the batch, records the payload error, and
+  returns 500 so the phone retries rather than advancing its anchor.
+- Reparse bypasses batch dedupe for the original accepted payload, repairs projections even for
+  unchanged content, and updates batch counts/rejections. It never overwrites a raw sample or daily
+  statistic accepted in a later payload, never removes tombstones, and never applies a duplicate
+  attempt's replacement body. Successfully accepted batches also feed MCP freshness; malformed and
+  duplicate attempts do not count as syncs. `reparse --all` reports malformed stored envelopes and
+  continues to later payloads, exiting nonzero if any payload failed.
+
 ## Training (phase 2)
 
 These are HTTP routes over the same functions as the MCP training tools (`app/src/training.ts`).

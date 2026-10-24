@@ -1,4 +1,4 @@
-// Bearer tokens, stored only as SHA-256. Scopes: ingest (POST /ingest only), read (MCP reads), write (MCP reads and writes).
+// Bearer tokens, stored only as SHA-256. Scopes: ingest (pushes + native sync status), read (reads), write (reads and writes).
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { all, one, run } from "./db.js";
 import { httpErr, now } from "./config.js";

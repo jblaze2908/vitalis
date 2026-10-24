@@ -1,14 +1,22 @@
 # Vitalis API
 
-Three endpoints. Everything else is the CLI.
+Health Auto Export, native HealthKit sync, and MCP. Administration uses the CLI.
 
 | Endpoint | Auth | For |
 |---|---|---|
 | `POST /ingest` | `ingest` or `write` token | Health Auto Export pushes and JSON exports |
+| `POST /v2/samples` | `ingest` or `write` token | Native HealthKit samples, deletions, and merged daily statistics |
+| `GET /v2/sync/status` | any token | Native sync totals and the last 20 batches |
 | `POST /mcp` | `read` or `write` token | Agents (MCP, stateless Streamable HTTP) |
 | `GET /health` | none | The reverse proxy and Docker health check |
 
-Tokens are bearer tokens (`Authorization: Bearer vtl_…`). `/ingest` also takes the bare token (`Authorization: vtl_…`) or `X-Api-Key: vtl_…`, for senders whose header editor can't hold a space. They are created with `vitalis token create <name> --scope ingest|read|write` and stored only as SHA-256. A `read` token sees the read tools; a `write` token also sees the write tools; an `ingest` token can only push.
+Tokens are bearer tokens (`Authorization: Bearer vtl_…`). `/ingest` also takes the bare token (`Authorization: vtl_…`) or `X-Api-Key: vtl_…`, for senders whose header editor can't hold a space. They are created with `vitalis token create <name> --scope ingest|read|write` and stored only as SHA-256. A `read` token sees the read tools; a `write` token also sees the write tools; an `ingest` token can push and read native sync status.
+
+Native routes accept these same auth headers. See [the native sync contract](native-sync.md) for
+the sample formats, gzip support, batch idempotency, permanent deletion tombstones, and status
+response. Native sync fills the existing metric, sleep, and Watch workout tables used by MCP.
+`vitalis reparse` supports both native and Health Auto Export payloads. Phase 2 training routes
+listed in that contract are not implemented yet.
 
 ## Semantics every consumer needs
 

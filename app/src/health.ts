@@ -19,7 +19,7 @@ export function latestDays() {
 }
 
 const lastPush = () => one<{ received_at: number; automation: string | null; counts: string | null; warnings: string | null; error: string | null }>(
-  "SELECT received_at,automation,counts,warnings,error FROM payloads ORDER BY id DESC LIMIT 1");
+  "SELECT received_at,automation,counts,warnings,error FROM payloads WHERE origin<>'v2' OR id IN (SELECT payload_id FROM hk_batches) ORDER BY id DESC LIMIT 1");
 
 /** The short freshness block every read carries. */
 export function freshFor(keys: string[]) {
@@ -31,8 +31,10 @@ export function freshFor(keys: string[]) {
 export function freshness() {
   const p = lastPush(), since = Date.now() - 7 * 86_400_000;
   const pushes = all<{ received_at: number; automation: string | null; counts: string | null; warnings: string | null; error: string | null }>(
-    "SELECT received_at,automation,counts,warnings,error FROM payloads WHERE received_at >= ? ORDER BY id DESC", since);
-  const problems = pushes.flatMap((x) => [...(x.error ? [x.error] : []), ...(JSON.parse(x.warnings ?? "[]") as string[])]);
+    "SELECT received_at,automation,counts,warnings,error FROM payloads WHERE received_at >= ? AND (origin<>'v2' OR id IN (SELECT payload_id FROM hk_batches)) ORDER BY id DESC", since);
+  // Failed native attempts do not advance last_sync, but their stored errors still belong in diagnostics.
+  const attempts = all<{ warnings: string | null; error: string | null }>("SELECT warnings,error FROM payloads WHERE received_at>=?", since);
+  const problems = attempts.flatMap((x) => [...(x.error ? [x.error] : []), ...(JSON.parse(x.warnings ?? "[]") as string[])]);
   const session = one<{ s: number; off: number }>("SELECT started_at s, tz_offset_min off FROM sessions WHERE deleted_at IS NULL ORDER BY started_at DESC LIMIT 1");
   const known = new Set(METRICS.map((m) => m.key));
   const latest = latestDays();
