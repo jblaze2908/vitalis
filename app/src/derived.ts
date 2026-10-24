@@ -5,7 +5,7 @@ import { curveFromSamples } from "./activity.js";
 import { getExercise } from "./exercises.js";
 import { all, bumpDataVersion, dataVersions, db, one, run } from "./db.js";
 import { adaptiveKcal, initialKcal, weightTrend } from "./fuel.js";
-import { bedHours, hrvPart, recoveryScore, rhrPart, sleepNeed, sleepParts, sleepScore } from "./scoring.js";
+import { bedHours, hrvPart, recoveryScore, rhrPart, sleepNeed, sleepParts, sleepScore, tonight } from "./scoring.js";
 import { BASELINE_DAYS, MIN_SCORE_DAYS, daily, nights, type Night } from "./stats.js";
 import { addDays, DAY_RE, eveningMinutes, localDay, ownerOffsetMin, today as todayOf } from "./time.js";
 import { dueTemplate, freshLabel, freshness, loadedLabel, SLUGS, TEMPLATES, type TrainingSet } from "./training-analytics.js";
@@ -165,6 +165,18 @@ type SleepScore = ReturnType<typeof sleepScore> & { parts: ReturnType<typeof sle
 export type Scores = { day: string; sleep: SleepScore | null; recovery: { score: number | null; band: string | null; label: string | null; status: string;
   reason: string | null; nights_of_history: number; nights_needed: number; parts: Record<string, Record<string, unknown>> } };
 
+/** Sleep need for a wake day: the target, else the 90th-percentile rule over the 60 nights before it (11 §3.1). */
+export function needFor(day: string, ignoreTarget = false) {
+  const asleep = nights(addDays(day, -BASELINE_DAYS), addDays(day, -1)).map((n) => n.asleep_h);
+  return sleepNeed({ target: ignoreTarget ? null : storedTarget<number>("sleep_need_h"), asleepHistory: asleep });
+}
+
+/** Wake time and bed-by for the night after `day` (11 §9.2): target, else median wake of the last 14 nights. */
+export function tonightFor(day: string) {
+  const wakes = nights(addDays(day, -13), day).filter((n) => n.sleep_end).map((n) => Number(n.sleep_end!.slice(11, 13)) * 60 + Number(n.sleep_end!.slice(14, 16)));
+  return tonight({ wakeTarget: storedTarget<string>("wake_time"), wakeHistoryMin: wakes, need_h: needFor(day).need_h });
+}
+
 /** Weight trend per day over [from, to], seeded from up to 120 days before `from` (11 §8.1). */
 export function weightSeries(from: string, to: string) {
   const seedFrom = addDays(from, -120), w = daily("weight_kg", seedFrom, to);
@@ -183,10 +195,13 @@ export function intakeByDay(from: string, to: string) {
     .map((r) => [r.day, r.kcal]));
 }
 
-/** This week's calorie target row, computed lazily on the first read of the week (or after `recompute`). */
-export function kcalTargetFor(weekStart: string, recompute = false): KcalRow {
+/**
+ * This week's calorie target row, computed lazily on the first read of the week (or when `inTx`, a targets write, forces it).
+ * An `initial` row follows the weight trend until a later week adapts, so a target read before the first weigh-in isn't frozen.
+ */
+export function kcalTargetFor(weekStart: string, inTx = false): KcalRow {
   const existing = one<KcalRow>("SELECT * FROM kcal_targets WHERE week_start=?", weekStart);
-  if (existing && !recompute) return existing;
+  if (existing && !inTx && existing.mode !== "initial") return existing;
   const yesterday = addDays(weekStart, -1);
   const trend = trendOn(yesterday);
   const mode = storedTarget<string>("kcal_mode") ?? "adaptive";
@@ -203,12 +218,14 @@ export function kcalTargetFor(weekStart: string, recompute = false): KcalRow {
     row = { kcal: a.kcal, mode: a.mode, tdee: a.tdee, intake_mean: a.intake_mean, slope_kg_day: a.slope_kg_day, rate_kg_week: a.rate_kg_week,
       intake_days: a.intake_days, weigh_ins: a.weigh_ins, reason: a.reason };
   }
+  if (existing && !inTx && existing.mode === row.mode && existing.kcal === row.kcal) return existing;
   const full: KcalRow = { week_start: weekStart, ...row, computed_at: Date.now() };
-  run(`INSERT INTO kcal_targets(week_start,kcal,mode,tdee,intake_mean,slope_kg_day,rate_kg_week,intake_days,weigh_ins,reason,computed_at)
+  const write = () => run(`INSERT INTO kcal_targets(week_start,kcal,mode,tdee,intake_mean,slope_kg_day,rate_kg_week,intake_days,weigh_ins,reason,computed_at)
     VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(week_start) DO UPDATE SET kcal=excluded.kcal,mode=excluded.mode,tdee=excluded.tdee,
     intake_mean=excluded.intake_mean,slope_kg_day=excluded.slope_kg_day,rate_kg_week=excluded.rate_kg_week,intake_days=excluded.intake_days,
     weigh_ins=excluded.weigh_ins,reason=excluded.reason,computed_at=excluded.computed_at`, full.week_start, full.kcal, full.mode, full.tdee,
     full.intake_mean, full.slope_kg_day, full.rate_kg_week, full.intake_days, full.weigh_ins, full.reason, full.computed_at);
+  if (inTx) write(); else cacheWrite(dataVersions().data, write);
   return full;
 }
 

@@ -28,6 +28,20 @@ export function freshFor(keys: string[]) {
     latest_day: Object.fromEntries(keys.map((k) => [k, latest[k] ?? null])), today: today() };
 }
 
+/** The freshness block every app read carries (10 §1.6): last accepted push and the latest day per domain. */
+export function freshnessBlock(at = Date.now()) {
+  const p = lastPush(), latest = latestDays();
+  const s = one<{ s: number; off: number }>(`SELECT started_at s, tz_offset_min off FROM sessions WHERE deleted_at IS NULL
+    AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=sessions.id AND x.deleted_at IS NULL) ORDER BY started_at DESC LIMIT 1`);
+  return {
+    last_sync: p ? isoAt(p.received_at, ownerOffsetMin(p.received_at)) : null,
+    data_through: { sleep: latest.sleep_h ?? null, heart: latest.hrv ?? null, activity: latest.steps ?? null, weight: latest.weight_kg ?? null,
+      food: one<{ d: string | null }>("SELECT MAX(day) d FROM food_entries WHERE deleted_at IS NULL")?.d ?? null,
+      training: s ? isoAt(s.s, s.off).slice(0, 10) : null },
+    today: today(at),
+  };
+}
+
 export function freshness() {
   const p = lastPush(), since = Date.now() - 7 * 86_400_000;
   const pushes = all<{ received_at: number; automation: string | null; counts: string | null; warnings: string | null; error: string | null }>(
