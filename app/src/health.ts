@@ -92,7 +92,7 @@ function judge(sleep: { flag?: string; reading?: string; usual: unknown; delta?:
   const have = parts.filter(([, c]) => c);
   const worse = have.filter(([, c]) => c!.reading === "worse").map(([n]) => n);
   const better = have.filter(([, c]) => c!.reading === "better").map(([n]) => n);
-  const rule = "Rule: compare last night's sleep, resting heart rate and HRV with the 30-day usual range (10th–90th percentile). Two or more worse: easy. One worse: as planned, no records. Two or more better: good. Otherwise: normal.";
+  const rule = "Rule: compare last night's sleep, resting heart rate and HRV with the 60-day usual range (10th–90th percentile). Two or more worse: easy. One worse: as planned, no records. Two or more better: good. Otherwise: normal.";
   if (!have.length) return { call: "unknown", reason: "No sleep, resting heart rate or HRV for this day yet.", worse, better, rule };
   // Judge only once some signal present today has a usual range to be judged against.
   const keyOf: Record<string, string> = { sleep: "sleep_h", "resting heart rate": "resting_hr", HRV: "hrv" };

@@ -12,7 +12,7 @@ import { KINDS, editSet, editWorkout, exerciseHistory, getWorkout, listWorkouts,
 
 export const INSTRUCTIONS = `Vitalis holds one person's health record: Apple Health data synced from their iPhone (sleep, heart, activity, weight, Watch workouts) and a strength-training log.
 - Days are the person's local days. A night of sleep belongs to the day they woke up.
-- Values come with "usual": their median over the 30 days before, and a usual range (10th–90th percentile). Quote these; don't compute your own.
+- Values come with "usual": their median over the 60 days before, and a usual range (10th–90th percentile). Quote these; don't compute your own.
 - "flag" low/high means outside the usual range; "reading" better/worse says which way is good for that metric.
 - A missing day is not zero. Check "freshness" (last_sync, latest_day) before saying they didn't sleep, walk or train.
 - Watch energy, VO2 max and estimated 1RM are estimates; say so when you use them.
@@ -77,7 +77,7 @@ export function buildServer(token: Token) {
   wrap(ctx, "get_sleep", (a: { from?: string; to?: string }) => getSleep(...span(a, 7))));
 
   s.registerTool("get_metrics", { title: "Health metrics over time", annotations: READ, outputSchema: Out,
-    description: "Daily or weekly values for synced health metrics between two dates, each with average, min, max and the usual from the 30 days before the range. Metrics: resting_hr, hrv, heart_rate, respiratory_rate, spo2, wrist_temp, steps, active_kcal, resting_kcal, exercise_min, stand_hours, distance_km, flights, daylight_min, walking_hr, vo2max, weight_kg, body_fat_pct, sleep_h, bedtime, deep_h, rem_h. For trends: 'is my resting heart rate going up', 'weight this month', 'steps vs last month'.",
+    description: "Daily or weekly values for synced health metrics between two dates, each with average, min, max and the usual from the 60 days before the range. Metrics: resting_hr, hrv, heart_rate, respiratory_rate, spo2, wrist_temp, steps, active_kcal, resting_kcal, exercise_min, stand_hours, distance_km, flights, daylight_min, walking_hr, vo2max, weight_kg, body_fat_pct, sleep_h, bedtime, deep_h, rem_h. For trends: 'is my resting heart rate going up', 'weight this month', 'steps vs last month'.",
     inputSchema: z.object({ metrics: z.array(z.string().min(1).max(60)).min(1).max(8), from: day.optional().describe("default 29 days before to"),
       to: day.optional().describe("default today"), every: z.enum(["day", "week"]).optional().describe("default day") }) },
   wrap(ctx, "get_metrics", (a: { metrics: string[]; from?: string; to?: string; every?: "day" | "week" }) => getMetrics(a.metrics, ...span(a, 30), a.every ?? "day")));

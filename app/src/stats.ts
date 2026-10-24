@@ -1,4 +1,4 @@
-// Per-day values and personal baselines. A baseline is the median of the 30 days before the day asked about, with the
+// Per-day values and personal baselines. A baseline is the median of the 60 days before the day asked about, with the
 // 10th–90th percentile as the usual range; a value outside that range is flagged. Fewer than 7 days gives no baseline.
 import { BY_KEY, type MetricDef } from "./catalog.js";
 import { all } from "./db.js";
@@ -7,8 +7,10 @@ import { HK_METRICS } from "./v2-metrics.js";
 
 const cumulativeKeys = new Set([...HK_METRICS.values()].filter(m => m.cumulative).map(m => m.def.key));
 
-export const BASELINE_DAYS = 30;
+export const BASELINE_DAYS = 60;
 export const MIN_BASELINE_DAYS = 7;
+/** Days with a value before a baseline is used inside a score (HRV, resting HR, bedtime consistency). */
+export const MIN_SCORE_DAYS = 14;
 
 type MetricRow = { day: string; source: string; qty: number | null; min: number | null; avg: number | null; max: number | null };
 export type Night = { day: string; source: string; sleep_start: string | null; sleep_end: string | null; in_bed_start: string | null;
@@ -56,6 +58,14 @@ export function heartRateBand(from: string, to: string) {
 function quantile(sorted: number[], q: number) {
   const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+/** 1.4826 × median absolute deviation (a normal SD estimate that ignores outliers), never below `floor`. */
+export function robustSpread(values: number[], floor: number) {
+  if (!values.length) return floor;
+  const sorted = [...values].sort((a, b) => a - b), med = quantile(sorted, 0.5);
+  const dev = sorted.map((v) => Math.abs(v - med)).sort((a, b) => a - b);
+  return Math.max(1.4826 * quantile(dev, 0.5), floor);
 }
 
 export type Baseline = { usual: number | string; low: number | string; high: number | string; days: number; window: string; method: string }

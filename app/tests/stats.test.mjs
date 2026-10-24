@@ -52,3 +52,13 @@ test("discrete HAE qty rows keep Watch ranking and deterministic ties", async ()
     run("INSERT INTO metric_days(metric,day,source,qty,unit,updated_at) VALUES('resting_hr','2027-02-02',?,?,'bpm',0)", source, qty);
   assert.equal(daily('resting_hr', '2027-02-02', '2027-02-02').get('2027-02-02'), 60);
 });
+
+test("robust spread is 1.4826 × MAD with a floor, and baselines span 60 days", async () => {
+  const { robustSpread, BASELINE_DAYS, MIN_SCORE_DAYS } = await import("../dist/src/stats.js");
+  assert.equal(robustSpread([1, 2, 3, 4, 100], 0), 1.4826);
+  assert.equal(robustSpread([5, 5, 5, 5], 2), 2);
+  assert.equal(robustSpread([], 0.1), 0.1);
+  assert.equal(BASELINE_DAYS, 60);
+  assert.equal(MIN_SCORE_DAYS, 14);
+  assert.equal(baseline("resting_hr", addDays(DAY, 29)).days, 30, "a day 29 days later still sees all 30 history days");
+});

@@ -50,13 +50,15 @@ test("35 days of history, then a short late night: the brief says easy and shows
   assert.equal(b.sleep.flag, "low");
   assert.equal(b.sleep.reading, "worse");
   assert.equal(b.sleep.fell_asleep, "02:51");
-  assert.equal(b.sleep.fell_asleep_vs_usual.usual, "23:30");
+  // 60-day window since S-03: all 35 nights count, 18 at 23:40 and 17 at 23:20, so the median is 23:40 (was 23:30 over 30).
+  assert.equal(b.sleep.fell_asleep_vs_usual.usual, "23:40");
   assert.equal(b.sleep.fell_asleep_vs_usual.reading, "worse");
   assert.equal(b.recovery.resting_hr.value, 73);
   assert.equal(b.recovery.resting_hr.usual, 60);
   assert.equal(b.recovery.hrv.reading, "worse");
-  assert.equal(b.recovery.resting_hr.baseline_days, 30);
-  assert.match(b.summary, /Slept 4h 54m \(usual 7h 00m\), asleep 02:51 \(usual 23:30\)/);
+  // 60-day window since S-03 (was 30): every one of the 35 history days now counts.
+  assert.equal(b.recovery.resting_hr.baseline_days, 35);
+  assert.match(b.summary, /Slept 4h 54m \(usual 7h 00m\), asleep 02:51 \(usual 23:40\)/);
   assert.match(b.summary, /Call: easy/);
   assert.ok(b.freshness.last_sync);
   assert.equal(b.freshness.latest_day.sleep_h, DAY);
