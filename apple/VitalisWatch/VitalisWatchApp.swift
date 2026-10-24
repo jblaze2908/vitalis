@@ -4,14 +4,11 @@ import VitalisUI
 
 @main
 struct VitalisWatchApp: App {
+    #if os(watchOS)
+    @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var delegate
+    #endif
     init() { VFont.register() }
     var body: some Scene {
-        WindowGroup {
-            VStack(spacing: 12) {
-                Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle)
-                Text("Workouts coming soon").multilineTextAlignment(.center)
-            }
-            .padding()
-        }
+        WindowGroup { WatchRootView(model: WorkoutModel.shared) }
     }
 }

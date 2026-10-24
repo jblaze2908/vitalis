@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIUserInterfaceStyle</key>
-	<string>Dark</string>
 	<key>CFBundleDisplayName</key>
 	<string>Vitalis</string>
 	<key>CFBundleExecutable</key>
@@ -21,12 +19,18 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Export your Health samples to your own Vitalis server.</string>
-	<key>WKApplication</key>
-	<true/>
-	<key>WKCompanionAppBundleIdentifier</key>
-	<string>$(BUNDLE_PREFIX).vitalis</string>
+	<string>Read heart rate and active energy during workouts you record with Vitalis.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Save workouts you record with Vitalis on Apple Watch.</string>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
+	<key>WKApplication</key>
+	<true/>
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>$(BUNDLE_PREFIX).vitalis</string>
 </dict>
 </plist>
