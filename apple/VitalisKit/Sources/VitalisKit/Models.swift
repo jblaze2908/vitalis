@@ -117,9 +117,10 @@ public struct SampleBatch: Codable, Sendable, Equatable {
 }
 
 public struct RejectedItem: Codable, Sendable, Equatable {
-    public let uuid: String
+    /// Null for rejected daily statistics, which have no sample UUID; a non-optional here failed the whole receipt.
+    public let uuid: String?
     public let reason: String
-    public init(uuid: String, reason: String) { self.uuid = uuid; self.reason = reason }
+    public init(uuid: String?, reason: String) { self.uuid = uuid; self.reason = reason }
 }
 public struct UploadResponse: Codable, Sendable, Equatable {
     public let batch_id: String
