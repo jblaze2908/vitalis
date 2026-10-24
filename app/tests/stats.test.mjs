@@ -44,3 +44,11 @@ test("source selection prefers merged rows, largest cumulative qty, and determin
   put("resting_hr", "2027-02-01", "Phone", null, 90);
   assert.equal(daily("resting_hr", "2027-02-01", "2027-02-01").get("2027-02-01"), 60);
 });
+
+test("discrete HAE qty rows keep Watch ranking and deterministic ties", async () => {
+  const { run } = await import('../dist/src/db.js');
+  const { daily } = await import('../dist/src/stats.js');
+  for (const [source, qty] of [['Z Watch', 75], ['A Watch', 60], ['Phone', 90]])
+    run("INSERT INTO metric_days(metric,day,source,qty,unit,updated_at) VALUES('resting_hr','2027-02-02',?,?,'bpm',0)", source, qty);
+  assert.equal(daily('resting_hr', '2027-02-02', '2027-02-02').get('2027-02-02'), 60);
+});

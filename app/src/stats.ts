@@ -3,6 +3,9 @@
 import { BY_KEY, type MetricDef } from "./catalog.js";
 import { all } from "./db.js";
 import { addDays, clock, eveningMinutes, fromEveningMinutes } from "./time.js";
+import { HK_METRICS } from "./v2-metrics.js";
+
+const cumulativeKeys = new Set([...HK_METRICS.values()].filter(m => m.cumulative).map(m => m.def.key));
 
 export const BASELINE_DAYS = 30;
 export const MIN_BASELINE_DAYS = 7;
@@ -41,7 +44,7 @@ export function daily(key: string, from: string, to: string): Map<string, number
     return out;
   }
   const rows = all<MetricRow>("SELECT day,source,qty,min,avg,max FROM metric_days WHERE metric=? AND day BETWEEN ? AND ?", key, from, to);
-  for (const [day, r] of pickPerDay(rows, rows.some((r) => r.qty !== null))) { const v = r.qty ?? r.avg; if (v !== null) out.set(day, v); }
+  for (const [day, r] of pickPerDay(rows, cumulativeKeys.has(key))) { const v = r.qty ?? r.avg; if (v !== null) out.set(day, v); }
   return out;
 }
 
