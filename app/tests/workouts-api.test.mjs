@@ -15,6 +15,9 @@ const sets = [
 ];
 const post = (json, token = write) => http("POST", "/v2/workouts", { token, json });
 
+// "Now" minus a few minutes: fixed clock times like 07:05 would be in the future just after midnight.
+const nowIso = (minAgo) => new Date(Date.now() - minAgo * 60000 + 330 * 60000).toISOString().slice(0, 19) + "+05:30";
+
 test("posting the same body three times creates one session and N sets", async () => {
   let r;
   for (let i = 0; i < 3; i++) { r = await post({ session: session(), sets }); assert.equal(r.status, 200, r.text); }
@@ -53,8 +56,8 @@ test("an unclear exercise name is 422 with candidates and nothing is written", a
 });
 
 test("PRs come back from the server; validation and scope", async () => {
-  const r = await post({ session: session({ client_id: "S-4", started_at: `${today()}T07:00:00+05:30` }),
-    sets: [{ id: "P1", exercise: "barbell-squat", weight_kg: 110, reps: 6, performed_at: `${today()}T07:05:00+05:30` }] });
+  const r = await post({ session: session({ client_id: "S-4", started_at: nowIso(10) }),
+    sets: [{ id: "P1", exercise: "barbell-squat", weight_kg: 110, reps: 6, performed_at: nowIso(5) }] });
   assert.equal(r.status, 200, r.text);
   assert.equal(r.json.prs.length, 1);
   assert.equal(r.json.prs[0].exercise_id, "barbell-squat"); assert.equal(r.json.prs[0].previous_best_estimate, 120);

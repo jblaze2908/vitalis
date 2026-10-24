@@ -11,13 +11,16 @@ const ingestTok = tokens.createToken("body ingest", "ingest").token;
 const T = today(), Y = addDays(T, -1);
 ingest(body(payload(addDays(T, -40), 39, (i) => ({ weight: 78 - i * 0.05, hrv: 50 + (i % 5), rhr: 58 + (i % 3) }))), { origin: "test" });
 
+// "Now" minus a few minutes: fixed clock times like 07:05 would be in the future just after midnight.
+const nowIso = (minAgo) => new Date(Date.now() - minAgo * 60000 + 330 * 60000).toISOString().slice(0, 19) + "+05:30";
+
 test("posting the same weight id twice leaves one entry; a changed body updates it; latest source is VITALIS", async () => {
-  const entry = { id: "W1", kg: 76.6, measured_at: `${T}T07:05:00+05:30` };
+  const entry = { id: "W1", kg: 76.6, measured_at: nowIso(5) };
   const a = await http("POST", "/v2/weight", { token: write, json: entry });
   assert.equal(a.status, 200, a.text);
   assert.deepEqual(a.json.entry, { id: "W1", kg: 76.6, day: T });
   assert.equal(a.json.weight.latest.source, "VITALIS"); assert.equal(a.json.weight.latest.manual, true);
-  assert.equal(a.json.weight.latest.at, `${T}T07:05:00+05:30`);
+  assert.equal(a.json.weight.latest.at, entry.measured_at);
   await http("POST", "/v2/weight", { token: write, json: entry });
   assert.equal(one("SELECT COUNT(*) n FROM weight_entries").n, 1);
   const b = await http("POST", "/v2/weight", { token: write, json: { ...entry, kg: 76.4 } });
@@ -58,4 +61,9 @@ test("GET /v2/body: 30-day series with trend, activity week, vitals against the 
   const day = addDays(T, -2), past = bodyDay(day);
   assert.equal(past.vitals[0].value !== null, true); assert.ok(past.vitals[0].usual !== null);
   assert.equal(past.vitals[3].reading, null, "breathing is neutral");
+});
+
+test("vitals fall back to the latest reading in the 2 days before when today has none", () => {
+  const v = bodyDay(addDays(T, -1)).vitals.find((x) => x.key === "hrv");
+  assert.notEqual(v.value, null);
 });

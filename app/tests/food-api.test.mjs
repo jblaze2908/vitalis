@@ -12,6 +12,9 @@ const entry = (id, meal, props = {}) => ({ id, meal_id: meal, slot: "breakfast",
   portion_text: "3 eggs", kcal: 310, protein_g: 21, carbs_g: 6, fat_g: 22, source: "manual", ...props });
 const post = (entries, token = write) => http("POST", "/v2/food/entries", { token, json: { entries } });
 
+// "Now" minus a few minutes: fixed clock times like 07:05 would be in the future just after midnight.
+const nowIso = (minAgo) => new Date(Date.now() - minAgo * 60000 + 330 * 60000).toISOString().slice(0, 19) + "+05:30";
+
 test("three identical posts make one entry; a changed body updates it; the day comes back in the response", async () => {
   let r;
   for (let i = 0; i < 3; i++) r = await post([entry("E1", "M1")]);
@@ -52,7 +55,7 @@ test("the usual appears only after three occurrences within 28 days", async () =
 });
 
 test("kcal_left negative sets over; empty day; read scope; validation", async () => {
-  await post([entry("BIG", "MB", { eaten_at: at(T, "08:00"), name: "Feast", kcal: 5000 })]);
+  await post([entry("BIG", "MB", { eaten_at: nowIso(5), name: "Feast", kcal: 5000 })]);
   const d = foodDay(T);
   assert.equal(d.over, true); assert.ok(d.kcal_left < 0); assert.equal(d.date_label.startsWith("TODAY · "), true); assert.equal(d.next_day, null);
   assert.equal(d.meals[0].just_added, true);

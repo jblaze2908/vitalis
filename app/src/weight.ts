@@ -59,9 +59,11 @@ export function bodyDay(day: string, at = Date.now()) {
     activity: { steps: rnd(v("steps")), steps_target: t.steps, active_kcal: rnd(v("active_kcal")), exercise_min: rnd(v("exercise_min")),
       exercise_target_min: t.exercise_min, week: Array.from({ length: 7 }, (_, i) => addDays(day, i - 6)).map((d) => ({ day: d, steps: rnd(steps.get(d) ?? null) })) },
     vitals: VITALS.map(({ key, label, unit }) => {
-      const value = v(key);
+      // Just after midnight the new day has no reading yet: show the latest from the 2 days before, compared on its own day.
+      const at = [day, addDays(day, -1), addDays(day, -2)].find((d) => v(key, d) !== null);
+      const value = at ? v(key, at) : null;
       if (value === null) return { key, label, value: null, unit, usual: null, usual_range: null, flag: null, reading: null };
-      const c = compare(key, day, value);
+      const c = compare(key, at!, value);
       return { key, label, value: c.value, unit, usual: c.usual, usual_range: c.usual_range ?? null, flag: c.flag ?? null, reading: c.reading ?? null };
     }),
     freshness: freshnessBlock(at),
