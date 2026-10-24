@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { deleteEntries, deleteSaved, entriesSchema, foodDay, foodQuick, postEntries, putSaved, savedSchema, slotAt, SLOTS, type Slot } from "../food.js";
 import { ApiError, dayParam, handle, readJson, routeKey, setDetail, withEtag } from "../http.js";
+import { describe, DescribeRequest } from "../describe.js";
 import { barcode, barcodePutSchema, putBarcode, searchFood } from "../off.js";
 import { ownerOffsetMin } from "../time.js";
 
@@ -48,3 +49,10 @@ foodRoutes.get("/v2/food/search", handle("v2/food/search", "read", async (c) => 
 foodRoutes.get("/v2/food/barcode/:code", handle("v2/food/barcode", "read", async (c) => c.json(await barcode(c.req.param("code") ?? ""), 200, PUBLIC_CACHE)));
 foodRoutes.put("/v2/food/barcode/:code", handle("v2/food/barcode:put", "write", async (c) =>
   c.json(putBarcode(c.req.param("code") ?? "", (await readJson(c, barcodePutSchema)).item))));
+
+// Nothing is stored; the audit row keeps only the item count (12 §4).
+foodRoutes.post("/v2/food/describe", handle("v2/food/describe", "write", async (c, token) => {
+  const r = await describe(await readJson(c, DescribeRequest), token.id);
+  setDetail(c, `items=${r.items.length}`);
+  return c.json(r);
+}));
