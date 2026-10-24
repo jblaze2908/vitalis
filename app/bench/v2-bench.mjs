@@ -113,7 +113,7 @@ await Promise.all([ingest(concurrent, 'concurrent_cumulative'), readPromise]);
 const readSpecs = {
   status: ['/v2/sync/status'],
   freshness: ['get_freshness', {}],
-  metrics_90d: ['get_metrics', { metrics: ['heart_rate', 'steps', 'active_kcal'], from: '2024-01-01', to: '2024-03-30' }],
+  metrics_90d: ['get_metrics', { metrics: ['heart_rate', 'steps', 'active_kcal'], from: '2021-01-01', to: '2021-03-31' }],
   sleep_30n: ['get_sleep', { from: '2024-03-01', to: '2024-03-30' }],
   list_workouts: ['list_workouts', { from: '2023-10-01', to: '2024-03-30' }],
 };
@@ -149,10 +149,10 @@ try { tables = Object.fromEntries(all('SELECT name,SUM(pgsize) bytes FROM dbstat
 }
 const rawBodies = one("SELECT SUM(length(body_gz)) n FROM payloads WHERE origin='v2'").n;
 const sampleCount = one('SELECT COUNT(*) n FROM hk_samples').n;
-const sampleBytes = tables.samples ?? Object.entries(tables).filter(([k]) => /^hk_(samples|tombstones|sample_values|types|sources|devices)|^sqlite_autoindex_hk_(samples|tombstones|sample_values|types|sources|devices)/.test(k)).reduce((n, [, v]) => n + v, 0);
+const sampleBytes = tables.samples ?? Object.entries(tables).filter(([k]) => /^hk_(samples|tombstones|sample_values|values|types|sources|devices|contributions)|^sqlite_autoindex_hk_(samples|tombstones|sample_values|types|sources|devices|contributions)/.test(k)).reduce((n, [, v]) => n + v, 0);
 const pointBytes = tables.points ?? Object.entries(tables).filter(([k]) => /hk_(quantity_points|route_points|heartbeat_beats|blobs)/.test(k)).reduce((n, [, v]) => n + v, 0);
 // Generator counts: 60 points per 500th HR object, ten 2700-point routes, 50 x 600 beats, one 15K ECG.
-const pointCount = Math.min(batches, 115) * 10 * 60 + (batches > 198 ? 600 : 0) + (batches > 199 ? 27000 : 0) + (batches > 200 ? 45000 : 0);
+const pointCount = ['hk_quantity_points', 'hk_route_points', 'hk_heartbeat_beats'].reduce((n, table) => n + one(`SELECT COUNT(*) n FROM ${table}`).n, 0);
 const compressionBody = Buffer.from(JSON.stringify(envelope(generate('cumulative'))));
 const compression = {};
 for (const [name, compress] of [['gzip', b => zlib.gzipSync(b)], ...(zlib.zstdCompressSync ? [['zstd', b => zlib.zstdCompressSync(b)]] : [])]) {
@@ -165,7 +165,7 @@ async function coldStart(path) {
   const times = [];
   for (let i = 0; i < 3; i++) {
     const start = performance.now();
-    const child = spawn(process.execPath, ['dist/src/server.js'], { env: { ...process.env, VITALIS_DB: path, PORT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, ['dist/src/server.js'], { env: { ...process.env, VITALIS_DB: path.endsWith('empty.db') ? join(dir, `empty-${i}.db`) : path, PORT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '', errors = '';
     child.stderr.on('data', s => { errors += s; });
     const port = await new Promise((resolve, reject) => {
