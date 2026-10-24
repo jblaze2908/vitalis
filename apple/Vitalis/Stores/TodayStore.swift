@@ -141,6 +141,7 @@ final class TodayStore {
         #if canImport(WidgetKit)
         WidgetCenter.shared.reloadAllTimelines()
         #endif
+        WatchBridge.sendToday(snapshot)
     }
 
     /// Follows the exporter: its state feeds the stale rule, and a new successful upload refetches (spec 20 §4).

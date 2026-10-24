@@ -219,6 +219,7 @@ extension SyncStore.Dependencies {
                 return (await outbox.pendingItems, await outbox.failedItems)
             },
             exporterPendingBatches: { root.map(SyncStore.countPendingBatches(in:)) ?? 0 },
+            watchSetsHeld: { PhoneSessionDelegate.shared.watchSetsHeld },
             probe: {
                 guard let api = Services.shared.api else { throw APIError.transport(URLError(.badURL)) }
                 return try await api.syncStatus()

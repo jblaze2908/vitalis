@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         AppModel.shared.start()
         Services.shared.start()
+        PhoneSessionDelegate.shared.activate()
         return true
     }
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {

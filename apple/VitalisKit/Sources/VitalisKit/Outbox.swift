@@ -54,6 +54,9 @@ public actor Outbox {
     private var flushing = false
     private var transport: (any OutboxTransport)?
     private var authFailureHandler: (@Sendable (Int) -> Void)?
+    /// Sees each delivered response, so a caller can use the server's answer (e.g. a Watch session's PRs) without refetching.
+    private var deliveryHandler: (@Sendable (Delivery) -> Void)?
+    public func setOnDelivered(_ handler: (@Sendable (Delivery) -> Void)?) { deliveryHandler = handler }
     /// The 401/403 that halted flushing, or nil.
     public private(set) var authHaltStatus: Int?
     public var authHalted: Bool { authHaltStatus != nil }
@@ -161,6 +164,7 @@ public actor Outbox {
             case 200..<300:
                 removeHead(head.id)
                 result.delivered.append(Delivery(item: head, status: status, body: outcome.body))
+                deliveryHandler?(Delivery(item: head, status: status, body: outcome.body))
             case 401, 403:
                 haltForAuth(head.id, status: status, message: message ?? "HTTP \(status)")
                 result.stop = .unauthorized(status); return result
