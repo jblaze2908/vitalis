@@ -97,3 +97,41 @@ export const TRAINING = {
       exercises: ["wide-grip-lat-pulldown", "bent-over-barbell-row", "seated-cable-rows", "face-pull", "barbell-curl"] },
   ],
 } as const;
+
+/** 11 §8: weight trend, calorie, protein and steps targets. */
+export const FUEL = {
+  trend_alpha: 0.1,
+  seed_lookback_days: 120,
+  month_change_days: 30,
+  initial_kcal_per_kg: 30,
+  default_kcal: 2200,
+  kcal_per_kg_body: 7700,
+  adapt_window_days: 21,
+  min_intake_days: 14,
+  min_weigh_ins: 8,
+  min_intake_day_kcal: 1000,
+  adapt_clamp_kcal: 150,
+  kcal_floor: 1400,
+  goal_deadband_kg: 0.5,
+  lose_rate_per_kg: 0.005,
+  lose_rate_max_kg_week: 0.75,
+  gain_rate_per_kg: 0.0025,
+  gain_rate_max_kg_week: 0.35,
+  protein_g_per_kg: 2.0,
+  default_protein_g: 140,
+  steps_window_days: 28,
+  steps_min_days: 7,
+  default_steps: 8000,
+} as const;
+
+/** 11 §6: ahead / behind usual by now. */
+export const ACTIVITY = {
+  usual_window_days: 28,
+  min_usual_days: 7,
+  min_curve_days: 7,
+  ahead_ratio: 1.1,
+  behind_ratio: 0.9,
+  early_steps: 300,
+  early_kcal: 30,
+  default_exercise_min: 30,
+} as const;
