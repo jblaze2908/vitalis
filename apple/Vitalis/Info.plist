@@ -31,6 +31,10 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan food barcodes and read nutrition labels.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Vitalis saves the weights, meals and iPhone workouts you log to Apple Health, so they sit alongside your other health data.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Export your Health samples to your own Vitalis server.</string>
 	<key>LSRequiresIPhoneOS</key>

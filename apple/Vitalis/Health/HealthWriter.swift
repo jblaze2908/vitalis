@@ -25,8 +25,9 @@ struct FoodItemSample: Sendable {
 
 /// The types Vitalis writes; requested alongside the exporter's read types during setup.
 enum HealthShareTypes {
+    /// The food correlation itself can't be requested (HealthKit raises); saving it is authorised through its members.
     static let all: Set<HKSampleType> = [
-        HKQuantityType(.bodyMass), HKCorrelationType(.food), HKQuantityType(.dietaryEnergyConsumed), HKQuantityType(.dietaryProtein),
+        HKQuantityType(.bodyMass), HKQuantityType(.dietaryEnergyConsumed), HKQuantityType(.dietaryProtein),
         HKQuantityType(.dietaryCarbohydrates), HKQuantityType(.dietaryFatTotal), HKObjectType.workoutType(),
     ]
 }

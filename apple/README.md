@@ -82,10 +82,10 @@ Personal Team profiles expire after **7 days**; rebuild and reinstall to renew. 
 
 ## Connect and export
 
-1. In Settings, enter the base URL of your Vitalis server and its write token. Use HTTPS for a remote server. Local HTTP hosts are permitted by the local-network ATS exception; accept the local-network prompt when applicable.
-2. Save settings, then tap **Test connection**. The app makes `GET /v2/sync/status` and displays its JSON, without assuming an undocumented response shape. Redirects are rejected; configure the final server URL.
-3. On Sync, tap **Allow Health access** and enable the read types you want to export. Correlations are authorized through their member quantities. No write access is requested on iPhone. HealthKit deliberately hides read denials, so a successful permission dialog does not mean every type was granted.
-4. Tap **Sync now**, leave the app foregrounded for the initial backfill, and inspect batches and per-type background delivery. The first query for each type has a nil anchor; 5,000-object pages continue until a short page. Repeated syncs resume from the persisted anchors. Completing the Health permission sheet explicitly queues a fresh history pass, preserving local history; this covers newly allowed historical samples because HealthKit does not disclose which read grants changed.
+1. On first launch, setup asks for the base URL of your Vitalis server and a write token (`vitalis token create iphone --scope write`). Use HTTPS for a remote server. Local HTTP hosts are permitted by the local-network ATS exception; accept the local-network prompt when applicable.
+2. **Continue** saves the token to the Keychain and calls `GET /v2/sync/status`. It proceeds only on HTTP 200 with `token.can_write`; an invalid URL, an unreachable server, a 401 and a read-only token each show an inline error. Redirects are rejected; configure the final server URL. Later, **Settings → Replace token** swaps the token and retries everything held.
+3. **Allow in Health** requests the read types you want to export **and write access for weight (`bodyMass`), food (`dietaryEnergyConsumed`, `dietaryProtein`, `dietaryCarbohydrates`, `dietaryFatTotal`) and workouts**, so weights, meals and iPhone workouts you log in Vitalis also land in Apple Health (`NSHealthUpdateUsageDescription`). Correlations, including food, are authorized through their member quantities. HealthKit deliberately hides read denials, so a successful permission dialog does not mean every type was granted.
+4. Setup's **Reading your history** step shows the initial backfill; leave the app foregrounded while it runs. Afterwards **Settings → Sync** (`vitalis://settings/sync`) has **Sync now** and shows batches and per-type background delivery. The first query for each type has a nil anchor; 5,000-object pages continue until a short page. Repeated syncs resume from the persisted anchors. Completing the Health permission sheet explicitly queues a fresh history pass, preserving local history; this covers newly allowed historical samples because HealthKit does not disclose which read grants changed.
 
 The token is stored only in Keychain as a generic password with `AfterFirstUnlockThisDeviceOnly` accessibility. It is not written to defaults, logs, source or the export journal. The settings form necessarily holds the token in memory while editing it.
 
@@ -148,7 +148,6 @@ apple/
 │   ├── Info.plist
 │   ├── SettingsView.swift
 │   ├── SyncEngine.swift
-│   ├── SyncView.swift
 │   ├── Vitalis.entitlements
 │   └── VitalisApp.swift
 ├── VitalisKit/

@@ -77,14 +77,15 @@ final class AppModel: ObservableObject {
         isAuthorizing = true
         defer { isAuthorizing = false }
         do {
-            try await healthStore.requestAuthorization(toShare: [], read: registry.readTypes)
+            try await healthStore.requestAuthorization(toShare: HealthShareTypes.all, read: registry.readTypes)
             try await prepareEngine()?.requestHistoryBackfill()
             // Permission success doesn't disclose which read types the user allowed.
             // Reinstall observers that may have failed before permission was requested.
             for observer in observers { healthStore.stop(observer) }
             observers.removeAll()
             registerObservers()
-            await syncNow()
+            // Don't hold the caller for the whole backfill: setup moves on once the sheet closes.
+            Task { await self.syncNow() }
         } catch { await report("Health authorization: \(error.localizedDescription)") }
     }
     func syncNow() async {
@@ -107,6 +108,9 @@ final class AppModel: ObservableObject {
     func resetExport() async throws {
         guard let engine = prepareEngine() else { throw SyncEngine.EngineError.protectedDataUnavailable }
         try await engine.resetExport()
+        try? await Services.shared.cache?.removeAll()
+        try? await Services.shared.outbox?.removeAll()
+        await Services.shared.flush()
         retryBackgroundDelivery()
         await refresh()
     }

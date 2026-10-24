@@ -17,15 +17,3 @@ struct TabPlaceholder: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
-
-/// Stand-in for setup (I-05): the existing server settings, then Done.
-struct SetupPlaceholder: View {
-    @ObservedObject var model: AppModel
-    let done: () -> Void
-    var body: some View {
-        VStack(spacing: 0) {
-            SettingsView(model: model)
-            PrimaryButton("Done", action: done).padding(VSpace.gutter)
-        }
-    }
-}
