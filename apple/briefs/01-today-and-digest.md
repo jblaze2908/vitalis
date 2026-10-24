@@ -1,11 +1,13 @@
 # 01 · Today (Home) and morning digest
 
 Implements:
-- **V · Morning digest** `kh6EtZFCP9`
-- **V · Home (Today)** `PwXZkuGWcu`
-- **V · State · Today, sync stale** `Z6akLUWcKH` (the Today side; the Sync side is in 03)
+- **V · Morning digest** `kh6EtZFCP9` → `spec/design/02-morning-digest.png`
+- **V · Home (Today)** `PwXZkuGWcu` → `spec/design/03-home-today.png`
+- **V · State · Today, sync stale** `Z6akLUWcKH` → `spec/design/24-state-today-sync-stale.png` (the Today side; the Sync side is in 03)
 
-Uses from 00: StatusRow, PulseLine, ScreenHeader, ReadingRow, MonoLabel, MuscleMap, PrimaryButton, SecondaryButton, TabBar.
+Uses from [spec/30-design-system.md](../../spec/30-design-system.md): StatusRow, PulseLine, ScreenHeader, ReadingRow, MonoLabel, MuscleMap, PrimaryButton, SecondaryButton, TabBar.
+
+**Revised for the server-computes model.** Every number and word on these screens comes from `GET /v2/today` and `GET /v2/digest` ([spec/10 §4](../../spec/10-server-api.md#4-today-and-digest)); formulas are in [spec/11](../../spec/11-scoring.md). The app formats and lays out; it does not score, compare, or pick copy. Behaviour and states: [spec/20 §4, §6](../../spec/20-ios-app.md#today). This brief keeps the visual measurements.
 
 ## What the decision log fixes
 
@@ -14,166 +16,93 @@ Uses from 00: StatusRow, PulseLine, ScreenHeader, ReadingRow, MonoLabel, MuscleM
 - **Morning digest** on the first open after waking.
 - **Sleep score parts**: duration vs need, bedtime consistency, efficiency, wake-ups. Sleep stages are excluded.
 - **Recovery parts**: sleep, HRV, resting HR.
+- **The server computes everything** (24 Oct, owner decision for this package).
 - From the research note: no black-box score (parts always visible, against your usual), every block ends in a next step, no streaks or guilt, sync freshness always visible.
 
-## Screen: Home (Today) — `PwXZkuGWcu`
+## Screen: Home (Today) — `spec/design/03-home-today.png`
 
-Top to bottom, 24 gutters:
+Top to bottom, 24 gutters. Field names are from the `GET /v2/today` body.
 
-1. **StatusRow**: right label `SYNCED HH:MM` (steel). Stale → see States.
-2. **PulseLine** (phone).
-3. **NOW block**: MonoLabel `NOW · <RECOVERY BAND>` in `pulse` (e.g. `NOW · READY`). Headline 46, two lines max: the verdict ("Train legs / hard today"). 
-4. **Recovery block** (14 top): Number 92 (`78`) with MonoLabel `RECOVERY` 8 below; to its right, 20 gap, three ReadingRows: `SLEEP 85` (bone), `HRV 62 ↑` (tint by better/worse vs usual), `RESTING 57 ↑` (tint), last row without rule. Tapping the block opens the Sleep tab for the Sleep row, Body → Vitals for HRV / resting rows (TBD: confirm targets).
+1. **StatusRow**: right label `SYNCED HH:MM` (steel) from `freshness.last_sync`. Offline/stale → see States.
+2. **PulseLine** (phone): `pulse.window`, `pulse.now`, `pulse.events` (dips for wake, weigh-in, meals, workout; [spec/30 → PulseLine](../../spec/30-design-system.md#pulseline)).
+3. **NOW block**: MonoLabel `NOW · <verdict.label>` in `pulse` (e.g. `NOW · READY`). Headline 46, two lines max: `verdict.headline` ("Train legs / hard today"), broken at the word boundary nearest the middle.
+4. **Recovery block** (14 top): Number 92 `recovery.score` with MonoLabel `RECOVERY` 8 below; to its right, 20 gap, three ReadingRows: `SLEEP <parts.sleep.score>` (bone), `HRV <parts.hrv.value> <arrow>` (tint = `parts.hrv.tint`), `RESTING <parts.resting_hr.value> <arrow>` (tint = `parts.resting_hr.tint`), last row without rule. Arrows ↑/↓ from `arrow`. Tap Sleep row or the number → Sleep tab; HRV / Resting rows → Body tab, vitals section.
 5. **Fuel | Activity** (16 top, rule above, 12 padding), two equal columns:
-   - Left: MonoLabel `FUEL LEFT`, Number 32 (`1,780`), MonoLabel bone `+ LOG <NEXT MEAL>` (tap → quick add, 03).
-   - Right: MonoLabel `STEPS`, Number 32 (`3,206`), MonoLabel `OF 9,000 · AHEAD` (`AHEAD` / `BEHIND` vs usual pace).
-   - **TBD**: the hierarchy says Activity = steps **and** active energy, but the frame shows steps only. Decide whether active kcal gets a line here (e.g. second MonoLabel) or stays on Body.
-6. **Training block** (14 top, rule above): MuscleMap both views at width 130, 14 gap, Headline 22 two lines: first line bone ("Legs fresh"), second steel ("Chest loaded").
-7. **PrimaryButton** pinned 17 above the TabBar: the one action of the verdict ("Start legs on Watch"). Its target follows the verdict: start workout (03 start-choice sheet, or straight to Watch if remembered), log a meal, or wind down. **TBD**: action list per verdict.
+   - Left: MonoLabel `FUEL LEFT`, Number 32 `fuel.kcal_left` (negative → `OVER BY <abs>` in `watch`), MonoLabel bone `+ <fuel.next_label>` (tap → Quick add for `fuel.next_slot`).
+   - Right: MonoLabel `STEPS`, Number 32 `activity.steps`, MonoLabel `OF <steps_target> · <PACE>` where PACE is `AHEAD` / `BEHIND` / `ON PACE` from `activity.steps_pace` (nothing for `early`/`unknown`). Second MonoLabel line: `<active_kcal> ACTIVE KCAL` + ` · <PACE>` from `active_kcal_pace` (decided: honours "Activity = steps and active energy" without changing the frame's layout).
+6. **Training block** (14 top, rule above): MuscleMap both views at width 130 with `training.heat`, 14 gap, Headline 22 two lines: `training.fresh_label` bone ("Legs fresh"), `training.loaded_label` steel ("Chest loaded"; omitted when null).
+7. **PrimaryButton** pinned 17 above the TabBar: `verdict.action.label`. Routing by `verdict.action.kind`: `start_workout` → start-choice sheet (03) or the remembered choice; `log_meal` → Quick add for `fuel.next_slot`; `bed_reminder` → schedule a notification 30 min before bed-by. Rule table: [spec/11 §5](../../spec/11-scoring.md#5-verdict-headline--one-action).
 8. **TabBar**, TODAY active.
 
 The screen does not scroll at 390×844 with default type. At larger Dynamic Type it scrolls; the PrimaryButton stays pinned.
 
-## Screen: Morning digest — `kh6EtZFCP9`
+## Screen: Morning digest — `spec/design/02-morning-digest.png`
 
-Full-screen cover over Today, no TabBar.
+Full-screen cover over Today, no TabBar. Body: `GET /v2/digest`.
 
-1. StatusRow (`SYNCED 07:04`), PulseLine with the wake dip and now-dot near the start.
-2. MonoLabel `SAT 24 OCT · GOOD MORNING`; Headline 44 two lines: line 1 bone ("You slept well."), line 2 `pulse` ("Ready to push.") — the approved exception to rule 2.
-3. **Sleep**: Number 96 (`85`) + MonoLabel `SLEEP`; ReadingRows (6 vertical padding): `DURATION 7H41 +12M` (delta tinted), `BEDTIME 23:02`, `EFFICIENCY 94%`, `WAKE-UPS 2` (tinted `watch` when worse than usual).
-4. **Recovery** (rule above): Number 48 (`78`), MonoLabel `RECOVERY · READY` in band tint, reading line `HRV 62 ↑ · RESTING 57 ↑` with tinted arrows.
-5. **YESTERDAY**: three columns — Number 24 steps, Number 24 kcal, Headline 26 workout name or `Rest` with small label `NO WORKOUT`. **TBD**: "KCAL" here is total or active energy (2,240 in the example reads like total).
-6. **TODAY** plan: up to three rows, 50 tall, top rule each: 8 pt dot (first row `pulse`, others `steel`), Headline 22 action, right MonoLabel reason. Example rows: Train legs / 6 DAYS SINCE · Eat 2,300 kcal / 160 G PROTEIN · Walk 9,000 / YOUR USUAL.
+1. StatusRow (`SYNCED HH:MM`), PulseLine from `pulse` (wake dip, now-dot near the start).
+2. MonoLabel `<date_label> · <greeting>`; Headline 44 two lines: `headline[0]` bone, `headline[1]` `pulse` (the approved exception to rule 2).
+3. **Sleep**: Number 96 `sleep.score` + MonoLabel `SLEEP`; ReadingRows (6 vertical padding) from `sleep.rows`: label, value, optional delta, tint per row.
+4. **Recovery** (rule above): Number 48 `recovery.score`, MonoLabel `RECOVERY · <recovery.label>` in band tint (ready/steady `good`, ease and rest `watch`), reading line `HRV <v> <arrow> · RESTING <v> <arrow>` with tints from the response.
+5. **YESTERDAY**: three columns: Number 24 `yesterday.steps` + `STEPS`, Number 24 `yesterday.active_kcal` + `ACTIVE KCAL` (decided: active energy, the Activity pillar), Headline 26 `yesterday.workout.title` or `Rest` with small label `NO WORKOUT`.
+6. **TODAY** plan: `plan[]` (up to three rows), 50 tall, top rule each: 8 pt dot (`primary` row `pulse`, others `steel`), Headline 22 `title`, right MonoLabel `reason`.
 7. **PrimaryButton** "Start my day", height 54, 38 from the bottom. Dismisses the digest.
 
-### Trigger (define exactly)
+### Trigger (decided)
 
-Show the digest when **all** hold:
-- The app comes to the foreground (`scenePhase == .active`).
-- HealthKit has a `sleepAnalysis` asleep sample whose `endDate` falls on **today's local date** and the night it belongs to has ended (no asleep sample for a settle window; **TBD** the window, proposal 30 min). The night belongs to the day you woke up, same rule as the server.
-- `digestDismissedDay != today` (local, persisted in `UserDefaults`).
+- Server: `GET /v2/today` → `digest.available` is true when today's night exists and its `sleep_end` is at least 30 minutes ago; only the first night of the day counts (naps never re-trigger). [spec/10 §4](../../spec/10-server-api.md#get-v2digest--read).
+- App: on `scenePhase == .active`, if `digest.available` and `UserDefaults digestDismissedDay != today.day` → fetch `/v2/digest` and present. "Start my day" sets `digestDismissedDay = day`.
+- Reopen: tapping the date label on Today shows today's digest again; it never re-sets the dismissed flag.
+- No night today → no digest; Today shows Recovery as missing.
 
-"Start my day" sets `digestDismissedDay = today`. If no sleep sample for today exists, there is no digest; Today shows the no-score state.
+## Data
 
-Reopen: tapping the date label on Today (`SAT 24 OCT`) shows today's digest again; it never re-sets the dismissed flag.
-
-**TBD**: whether naps (a second asleep block later the same day) can re-trigger; proposal: no, first night block only.
-
-## Data model
-
-Put models in `VitalisKit` (shared with the Watch and widgets). All `Sendable`, `Codable`.
-
-```swift
-struct Baseline: Codable, Sendable {           // per metric
-    var median: Double?
-    var low: Double?                           // usual range low
-    var high: Double?                          // usual range high
-    var nights: Int                            // history used
-}
-
-struct SleepScore: Codable, Sendable {
-    var total: Int?                            // 0–100, nil when not computable
-    var duration: Part                         // asleep vs need
-    var bedtimeConsistency: Part               // bedtime vs usual bedtime
-    var efficiency: Part                       // asleep / in bed
-    var wakeUps: Part                          // count + minutes awake
-    var asleep: TimeInterval; var need: TimeInterval
-    var bedtime: Date; var wake: Date
-    struct Part: Codable, Sendable { var score: Int?; var detail: String; var flag: Flag? }
-}
-
-struct RecoveryScore: Codable, Sendable {
-    var total: Int?                            // 0–100
-    var band: Band                             // .ready / … (copy drives "READY")
-    var sleep: Int?                            // = SleepScore.total
-    var hrv: Reading                           // last night vs HRV baseline
-    var restingHR: Reading                     // vs resting-HR baseline
-}
-
-struct Reading: Codable, Sendable { var value: Double?; var baseline: Baseline; var flag: Flag? } // flag: .better/.worse/nil
-struct ActivityToday: Codable, Sendable { var steps: Int; var stepsTarget: Int; var activeKcal: Double; var pace: Pace }
-struct FuelToday: Codable, Sendable { var kcalTarget: Int; var kcalEaten: Int; var proteinTarget: Int; var proteinEaten: Int }
-struct MuscleFreshness: Codable, Sendable { var daysSince: [Muscle: Int?]; var heat: [Muscle: Int]; var due: WorkoutSuggestion? }
-struct TodaySnapshot: Codable, Sendable {      // also written to the App Group for widgets (03)
-    var day: String; var recovery: RecoveryScore?; var sleep: SleepScore?
-    var activity: ActivityToday?; var fuel: FuelToday?; var training: MuscleFreshness?
-    var verdict: Verdict?; var lastSync: Date?; var computedAt: Date
-}
-```
-
-### Score rules: what is locked, what is TBD
-
-| Item | Status |
-|---|---|
-| Recovery parts = sleep score, HRV, resting HR | Locked |
-| HRV and resting HR compared against a **60-night personal baseline** | Specified in the task brief for this work |
-| Server "usual" = median of the 30 days before the day, range = 10th–90th percentile, `null` under 7 days (`docs/api.md`) | Exists on the server |
-| Sleep need "from your last 60 nights" | Shown on the Targets frame `uNuXYF1h84` |
-| **TBD** | Align the baselines: 60 nights on device vs the server's 30 days. Pick one window or show which is used. |
-| **TBD** | Recovery formula: weights of the three parts and how each part maps to 0–100. |
-| **TBD** | Sleep formula: how duration vs need, bedtime deviation, efficiency and wake-ups each map to 0–100 (frame examples: 7h41 of 8h → 90, 18 min late → 85, 94 % → 94, 2 wake-ups / 25 min → 70, total 85), and their weights. |
-| **TBD** | Bands and copy: score ranges for READY and the other bands, and their colours. |
-| **TBD** | Minimum history before a score shows (server uses 7 days for `usual`). |
-| **TBD** | Verdict rule: how recovery band + training due + fuel produce the headline and the one action. The server's `get_brief.verdict.call` enum (`easy · as_planned_no_records · normal · good · unknown`) can seed it. |
-| **TBD** | Steps pace (`AHEAD`/`BEHIND`): against target pro-rata or against usual-by-this-hour. |
-| Wake-ups and efficiency use sleep/wake only; stages (core/deep/REM) are never inputs | Locked |
-
-Build the scoring as a pure function (`ScoreEngine.score(nights:hrv:restingHR:need:)`) with unit tests, so the formula can change without touching views.
-
-## Data sources
-
-| Data | Source | Notes |
+| Block | Source field | Notes |
 |---|---|---|
-| Sleep night (in bed, asleep, awake segments) | HealthKit `sleepAnalysis` on device | Sleep/wake only. Group into nights by wake day. |
-| HRV | HealthKit `heartRateVariabilitySDNN` | Overnight value; **TBD** which sample (last overnight, overnight mean). |
-| Resting HR | HealthKit `restingHeartRate` | Daily value for today. |
-| Steps, active energy | HealthKit statistics (`HKStatisticsQuery`, cumulative, source-merged) | Same merge Apple uses, as the exporter's `daily_stats`. |
-| Calories eaten, protein | Local meal store (03 Eat), mirrored to HealthKit | Not on the server. |
-| Targets (steps, kcal, protein, sleep need) | Local settings (03 Setup → Targets) | |
-| Training freshness | Local set store (02, 03) | Days since each muscle's last working set (warm-ups excluded, primary muscles only — server rule in `daysSinceTrained`). |
-| Last sync | `SyncHistory.lastSuccess` from `SyncEngine.snapshot()` | Drives `SYNCED HH:MM` and the stale state. |
-| Server-computed brief | `get_brief` over MCP only | **TBD** whether the app should ever read the server for Today. No HTTP read route exists. |
+| Verdict | `verdict.{label, headline, reason, action}` | One action only |
+| Recovery | `recovery.{score, band, status, reason, nights_needed, parts}` | `status` drives the no-score states |
+| Fuel | `fuel.{kcal_left, kcal_target, protein_g, protein_target_g, next_slot, next_label}` | |
+| Activity | `activity.{steps, steps_target, steps_pace, active_kcal, active_kcal_pace}` | No client-side pace |
+| Training | `training.{heat, fresh_label, loaded_label, due, trained_today}` | 17 slugs in `heat` |
+| PulseLine | `pulse.{window, now, events}` | Map time → x only |
+| Freshness | `freshness.{last_sync, data_through}` | Stale rule in spec/20 §6 |
 
-**Default for v1: compute Today on device from HealthKit and local stores.** The server receives the same raw samples through the existing exporter, so nothing is lost. This is a build decision, flagged for the owner to confirm: the stale-state frame's copy ("Last night's sleep and heart data haven't reached Vitalis yet") assumes the score comes from the server. If v1 computes on device, a sync outage does not remove the score; the no-score state happens only when HealthKit lacks the night. **TBD**: confirm on-device scoring, then adjust that copy.
+Models: `VitalisKit/APIModels/Today.swift`, `Digest.swift` (task I-03), decoded from the JSON in spec/10 with snake-case conversion. After each successful fetch, write `TodaySnapshot` for widgets and complications ([spec/20 §9](../../spec/20-ios-app.md#9-widgets-and-the-app-group)).
 
-Refresh Today on foreground, on HealthKit observer callbacks the app already registers, and after any local log (meal, set). Cache the last `TodaySnapshot` so the screen opens instantly.
+Refresh: on foreground, after the exporter's `syncNow()` completes, after any Outbox flush, every 15 min while foregrounded, and on pull to refresh (which also triggers `AppModel.syncNow()`). Requests send `If-None-Match`; a 304 keeps the cached body.
 
 ## States
 
 | State | When | What shows |
 |---|---|---|
-| Loading | First compute after launch, no cached snapshot | Layout with labels; numbers as `–` in `steel`; no skeleton shimmer (rule 3). PrimaryButton hidden. |
-| Cached | Cached snapshot older than this foreground | Show cached values immediately, refresh in place. No spinner. |
-| No score yet | No sleep night for today, or under the minimum history (TBD) | Recovery number `–` in steel, MonoLabel `NO RECOVERY SCORE`, one body line saying why ("No sleep recorded for last night" / "Needs N more nights"). Fuel, Activity, Training still show. |
-| Stale sync | `now − lastSuccess` above the stale threshold (**TBD**: no value in the log or frames) | Frame `Z6akLUWcKH`: StatusRow `LAST SYNC <DAY>` in `watch`; a section with a 1.5 pt `watch` top rule, MonoLabel `NOT SYNCED SINCE <DAY>` in `watch`, Headline 36 cause, body "Everything is safe on this phone until it's fixed.", PrimaryButton **Fix sync** (it becomes the screen's one red action, so the training block's Start turns secondary). |
-| Stale: token rejected | Last sync error is `HTTPAPIClient.Failure.http(401)` | Headline "Your server stopped accepting uploads." Fix sync → Settings → Sync (03). |
-| Stale: other cause | Network, 5xx, protected data unavailable | **TBD**: copy for each cause (frame covers 401 only). |
-| Empty training | No sets ever logged | Training block shows the MuscleMap all heat 0 and "No workouts yet"; action "Start on Watch" as secondary. |
-| Empty fuel | Nothing logged today | `FUEL LEFT` shows the full target; label `+ LOG BREAKFAST`. |
-| HealthKit denied | No readable sleep/heart types | No-score state with "Allow Health access" SecondaryButton → Settings app. HealthKit hides read denials, so detect by "no samples ever", not by auth status. |
+| Loading | No cached body yet | Layout with labels; numbers `–` in `steel`; no shimmer (rule 3). PrimaryButton hidden. |
+| Cached / offline | Refresh failed, cached body exists | Cached values; StatusRow `OFFLINE · UPDATED HH:MM` when older than 15 min. |
+| Calibrating | `recovery.status = calibrating` | Recovery number `–` in steel, MonoLabel `NO RECOVERY SCORE`, body line `recovery.reason` ("Needs 9 more nights"). Other blocks render. |
+| Night missing | `recovery.status = missing` | Same layout with `recovery.reason` ("No sleep recorded for last night"). |
+| Stale sync | `freshness.last_sync` older than 12 h, or the exporter's last upload failed and its last success is older than 12 h | `24-state-today-sync-stale.png`: StatusRow `LAST SYNC <DAY>` in `watch`; a section with a 1.5 pt `watch` top rule, MonoLabel `NOT SYNCED SINCE <DAY>` in `watch`, Headline 36 cause, body "Everything is safe on this phone until it's fixed.", PrimaryButton **Fix sync** (the screen's one red action; the verdict action turns secondary). Cause copy per failure type: [spec/20 §6](../../spec/20-ios-app.md#6-offline-cache-and-stale-rules). |
+| Empty training | `training.due` null and no sessions ever | MuscleMap all heat 0, "No workouts yet"; action "Start on Watch" as secondary. |
+| Empty fuel | Nothing logged today | `FUEL LEFT` = full target (server value); label `+ LOG BREAKFAST` (server `next_label`). |
 
 ## Interactions
 
 - Tap Recovery number or Sleep row → Sleep tab. HRV / Resting rows → Body tab, Vitals section.
-- Tap `+ LOG LUNCH` → quick add sheet for that meal (03).
+- Tap `+ LOG <SLOT>` → Quick add sheet for that slot (03).
 - Tap Steps → Body tab, Activity section.
 - Tap MuscleMap / Training text → Train tab.
-- PrimaryButton → per verdict (above).
+- PrimaryButton → per `verdict.action.kind` (above).
 - Tap date label → reopen digest.
-- Pull to refresh: re-runs the score and triggers `AppModel.syncNow()`.
 - Haptic: none on Today.
 
 ## Acceptance checklist
 
-- [ ] Home matches `PwXZkuGWcu` at 390×844 with fixture data (overlay the frame PNG at 50 % in a preview; edges within 2 pt).
+- [ ] Home matches `spec/design/03-home-today.png` at 390×844 with fixture data (overlay the PNG at 50 % in a preview; edges within 2 pt).
 - [ ] Order never changes across morning / afternoon / evening fixtures; only content changes.
 - [ ] Weight appears nowhere on Today.
-- [ ] Exactly one red action on Home, the digest and the stale state (stale: Fix sync is red, Start is secondary).
-- [ ] HRV and resting HR tints follow better/worse (resting 57 above usual → `watch`), arrows shown.
-- [ ] Digest matches `kh6EtZFCP9`; shows once per day after the night ends; "Start my day" dismisses; date tap reopens; killing and relaunching the app the same day does not show it again.
-- [ ] No sleep sample for today → no digest, Today shows the no-score state.
-- [ ] Stale state matches `Z6akLUWcKH` when `lastSuccess` is older than the threshold and the last error is 401.
-- [ ] `ScoreEngine` is a pure function with unit tests for each part and for missing inputs (returns `nil`, never 0).
-- [ ] Scores never use sleep stages (test: changing stage labels does not change the score).
-- [ ] VoiceOver reads "Now, ready. Train legs hard today", "Recovery 78", each reading row as one element.
-- [ ] Previews: Home (normal, no score, stale 401, empty training, empty fuel, loading), digest (good night, short night, wake-ups flagged).
+- [ ] Exactly one red action on Home, the digest and the stale state (stale: Fix sync is red, the verdict action is secondary).
+- [ ] HRV and resting HR arrows and tints come straight from the response (`arrow`, `tint`); resting 57 vs usual 55 fixture → ↑ in `watch`.
+- [ ] No arithmetic in views or stores beyond formatting and PulseLine time → x (code review item).
+- [ ] Digest matches `spec/design/02-morning-digest.png`; shows once per day when `digest.available`; "Start my day" dismisses; date tap reopens; relaunching the same day does not show it again.
+- [ ] `digest.available = false` → no digest.
+- [ ] Stale state matches `spec/design/24-state-today-sync-stale.png` with each cause's copy.
+- [ ] VoiceOver reads "Now, ready. Train legs hard today", "Recovery 82", each reading row as one element.
+- [ ] Previews: Home (normal, calibrating, missing night, stale 401, stale unreachable, empty training, empty fuel, loading, offline), digest (good night, short night, wake-ups flagged).

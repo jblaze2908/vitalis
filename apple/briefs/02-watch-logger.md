@@ -7,7 +7,9 @@ Implements (all @2x frames: 416×496 px = **208×248 pt**; halve every number in
 - **V · Watch summary** `k_nhjKQwwv`
 - **V · Watch face** `9KeK3X1BI1` (complication content; see below)
 
-Next-exercise handoff, add exercise and end-workout have **no approved V frame**; build them from the rules here with the same tokens, and mark the screens for design review. (Pre-V frames "J2 · Watch · Next exercise handoff", "Add exercise mid-session" and "End workout" show the intent only; do not copy their style.)
+Live metrics, next-exercise handoff, add exercise and end workout have **no approved V frame**; they are specified in words in [spec/21-watch-app.md §2.4–2.7](../../spec/21-watch-app.md#24-live-metrics-no-frame--specify-in-words). Build them with the same tokens and flag them for design review. (Pre-V frames "J2 · Watch · …" show the intent only; do not copy their style.)
+
+**Canonical behaviour and data: [spec/21-watch-app.md](../../spec/21-watch-app.md).** This brief keeps the visual measurements. The Watch never calls the server and never computes scores; prefill, the due template, settings and session heat come from the server through the phone (`WatchPack`, `result` messages).
 
 Target: `VitalisWatch` (existing single-target watch app, watchOS 11, embedded in `Vitalis`). Uses `VitalisUI` (tokens, fonts, PulseLine watch variant, MuscleMap) and `VitalisKit` (shared models).
 
@@ -31,7 +33,7 @@ Target: `VitalisWatch` (existing single-target watch app, watchOS 11, embedded i
 - Headline 54 pt, the suggested workout name ("Legs").
 - PrimaryButton **Start**, 8 pt below the headline block.
 - Below, rows 35 pt tall with a 1 pt `rule` on top: Headline 17 pt left ("Repeat push"), MonoLabel right (`THU`, the day it was last done). Scrollable list of alternatives: repeat last sessions, then "Choose exercises".
-- **Suggestion rule (TBD)**: the frames show a muscle-group template ("Legs" = squat, Romanian deadlift, leg press, leg curl, calf raise in `3qVL-kZTgZ`) chosen by freshness. Define the templates (Legs / Push / Pull / …), their exercise lists, and the pick rule (proposal: the template whose primary muscles have the highest minimum days-since-trained). Freshness comes from the local set store (synced from iPhone, see Transfer).
+- **Suggestion (decided, server):** the due template, its exercise list and `days_since` come from `GET /v2/training` → `due`, relayed in `WatchPack.due` ([spec/11 §7.2–7.3](../../spec/11-scoring.md#72-templates-v1-default)). The Watch shows it; it does not pick.
 - Started from the iPhone (`HKHealthStore.startWatchApp(with:)` from 03's start-choice sheet): skip this screen and open set entry for the plan sent over WatchConnectivity.
 
 ## Screen: Set entry — `pCSw4PpAhl`
@@ -43,18 +45,18 @@ Target: `VitalisWatch` (existing single-target watch app, watchOS 11, embedded i
 - PrimaryButton **Log set** pinned at the bottom.
 
 Interaction:
-- Two focusable fields: weight (default focus) and reps. Tap a field to focus it; the focused field gets a 1.5 pt `bone` underline (**TBD**: focus indicator has no frame; confirm).
+- Two focusable fields: weight (default focus) and reps. Tap a field to focus it; the focused field gets a 1.5 pt `bone` underline (design default; no frame shows focus).
 - **Crown edits the focused field**: weight in **2.5 kg** steps, reps in steps of 1, with haptic detents:
   ```swift
   .focusable()
   .digitalCrownRotation($weight, from: 0, through: 500, by: settings.crownWeightStep,   // 2.5 default
                         sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
   ```
-  The step comes from Settings → Training → Crown weight step (03, default 2.5 kg). The 0…500 bounds are a sanity clamp, not a product value.
-- **Prefill**: weight and reps from the previous set of this exercise in this session; for set 1, from the same set number last time this exercise was done (Hevy-style, research note); if never done, empty fields with focus on weight.
+  The step is the server target `crown_step_kg` (default 2.5 kg, edited in Settings → Training), relayed in `WatchPack.settings`. The 0…500 bounds are a sanity clamp, not a product value.
+- **Prefill**: set 1 from the server's `next` suggestion (`GET /v2/exercises/:id` via `WatchPack.exercises[id].prefill.next`), falling back to last session's set 1; set n > 1 from the previous logged set in this session; never done → empty fields with focus on weight.
 - **Log set**: tap, or **double tap** where supported: `.handGestureShortcut(.primaryAction)` on the button (Apple Watch Series 9 / Ultra 2 and later; elsewhere tapping is the only path). On log: success haptic (`WKInterfaceDevice.current().play(.success)`), the set is written to the local queue, a new dip appears on the line, then the rest timer opens.
-- Warm-up sets: long-press Log set → "Log as warm-up" (**TBD**: confirm gesture; the iPhone table shows a `W` row). Warm-ups never count toward volume, freshness or records (server rule).
-- Swipe left: live metrics (heart rate, elapsed, active kcal) from the workout builder. **TBD**: no V frame; follow the type roles.
+- Warm-up sets: long-press Log set (0.5 s) → "Log as warm-up" (design default). Warm-ups never count toward volume, freshness or records (server rule).
+- Swipe left: live metrics (heart rate, elapsed, active kcal) from the workout builder; specified in [spec/21 §2.4](../../spec/21-watch-app.md#24-live-metrics-no-frame--specify-in-words).
 
 ## Screen: Rest — `AIJAljEgAy`
 
@@ -63,24 +65,24 @@ Interaction:
 - MonoLabel `NEXT`, then Headline 20 pt next set ("Squat 100 kg · 6").
 - Bottom row (21 pt from the bottom, 27 pt sides): `−15` and `+15` (MonoLabel in `bone`) at the corners, `TAP TO SKIP` (MonoLabel 9 pt) centred.
 - **Progress around the screen edge**: a rounded rectangle inset 4 pt, corner radius 40 pt, stroke 3 pt. Track in `rule`; remaining time in `pulse`, round caps. The red arc **starts at top centre and runs clockwise**, its length = remaining / total (the frame shows 84 s of 120 s = 70 %). Build a custom `Shape` whose path starts at top centre so `.trim(from: 0, to: remaining)` works; animate with `.linear` each second.
-- Duration: Settings → Training → Default rest (03; the Settings frame shows 2:00). Per-exercise rest: **TBD**.
+- Duration: the server target `rest_s` (default 120 s; Settings → Training edits it via `PUT /v2/targets`), relayed in `WatchPack.settings`. One rest duration for all exercises in v1.
 - Tap anywhere → skip to set entry. ±15 adjust the remaining time. At zero: haptic (`.notification`), then set entry with the next set prefilled.
 - The rest timer must keep time while the wrist is down: drive it from the workout session's elapsed clock (`TimelineView(.periodic(from:by: 1))` + start date), not from a `Timer`.
 
 ## Next-exercise handoff
 
-After the planned sets of an exercise, show the next exercise instead of set entry: MonoLabel `NEXT · <n>/<total>`, Headline 32 pt exercise name, MonoLabel last time (`LAST 95 × 8`), MuscleMap (front or back, whichever shows its primary muscles) at 120 pt with its muscles at heat 4, PrimaryButton **Start**. Crown scrolls to skip to a later exercise. No V frame: **TBD** design review.
+After the planned sets of an exercise, show the next exercise instead of set entry: MonoLabel `NEXT · <n>/<total>`, Headline 32 pt exercise name, MonoLabel last time (`LAST 95 × 8`), MuscleMap (front or back, whichever shows its primary muscles) at 120 pt with its muscles at heat 4, PrimaryButton **Start**. Crown scrolls to skip to a later exercise. No V frame: build per [spec/21 §2.5](../../spec/21-watch-app.md#25-next-exercise-handoff-no-frame) and flag for design review.
 
 ## Add exercise
 
-From set entry or handoff, swipe up (or "+" corner button) → list: exercises in the current template not done yet, recent exercises, then search (dictation / scribble). Selecting one inserts it as next. Exercises come from the local catalog cache (see Catalog). No V frame: **TBD** design review.
+From set entry or handoff, swipe up (or "+" corner button) → list: exercises in the current template not done yet, recent exercises, then search (dictation / scribble). Selecting one inserts it as next. Exercises come from the catalog the phone sends (see Catalog). No V frame: build per [spec/21 §2.6](../../spec/21-watch-app.md#26-add-exercise-no-frame) and flag for design review.
 
 ## End workout and summary — `k_nhjKQwwv`
 
-- End: side-swipe to a controls page (**End**, **Pause**) like the system Workout app; End asks once ("End workout?" with End / Resume). No V frame: **TBD** design review.
+- End: side-swipe to a controls page (**End**, **Pause**) like the system Workout app; End asks once ("End workout?" with End / Resume). No V frame: build per [spec/21 §2.7](../../spec/21-watch-app.md#27-end-workout-no-frame) and flag for design review.
 - Summary: top row MonoLabel `SAVED` in `pulse`. MuscleMap both views at 145 pt, 2 pt below the top row. Bottom block (15 pt from the bottom, 23 pt sides): Headline 32 pt workout name ("Legs"), MonoLabel `61 MIN · 16 SETS · ` + `PR` in `pulse` when a record was set.
-- Summary heat = **this session's load**, not freshness. Frame example: quadriceps, glutes, hamstrings 4; adductors, calves 3; lower back 2. **TBD**: the rule (proposal: primary muscles of exercises done = 4, secondary = 3, muscles with only one secondary set = 2).
-- PR: estimated 1RM (Epley, `w × (1 + reps/30)`, 1–12 reps only, server rule) above the best previous for that exercise in the local store. **TBD**: whether a rep PR at the same weight also counts.
+- Summary heat = **this session's load**, computed by the server ([spec/11 §7.4](../../spec/11-scoring.md#74-session-heat-watch-summary-session-detail)) and relayed in the `result` message after the phone posts `POST /v2/workouts`. Until it arrives, show catalog lighting (primary 4, secondary 3) with `SYNCING` instead of `PR`.
+- PR: from the server response's `prs` (Epley e1RM above every earlier best; rep PRs at the same weight do not count in v1).
 - Done → back to Start.
 
 ## Watch face — `9KeK3X1BI1`
@@ -94,7 +96,7 @@ watchOS does not allow custom watch faces. Treat the frame as the content spec f
 | `accessoryCorner` | recovery number, gauge = recovery / 100 |
 | `accessoryInline` | `78 READY · 3,206 STEPS` |
 
-Tap opens the watch app on Start. Data: `TodaySnapshot` (01) sent from the iPhone with `WCSession.transferCurrentComplicationUserInfo` and stored in the watch App Group container; the extension reads that file. Watch App Group: **TBD** on the free team (same caveat as phone widgets). Rendering mode: in tinted faces the `pulse` colour may be replaced by the system tint; use `widgetAccentable()` on the line and number only.
+Tap opens the watch app on Start. Data: `TodaySnapshot` (01) sent from the iPhone with `WCSession.transferCurrentComplicationUserInfo` and stored in the watch App Group container; the extension reads that file. Watch App Group: unverified on the free team ([spec/50 Q2](../../spec/50-open-questions.md#q2-app-groups-on-the-free-personal-team)). Rendering mode: in tinted faces the `pulse` colour may be replaced by the system tint; use `widgetAccentable()` on the line and number only.
 
 ## Workout session (HealthKit)
 
@@ -107,7 +109,7 @@ Tap opens the watch app on Start. Data: `TodaySnapshot` (01) sent from the iPhon
 
 ## Local storage and offline queue (watch)
 
-SwiftData store in the watch app container (or a JSON-lines file per session; either, but writes must be durable before the UI confirms a log).
+One JSON file per session, written atomically before the UI confirms a log (decided, [spec/21 §5](../../spec/21-watch-app.md#5-local-store-offline-queue)). The canonical models are in spec/21 §5; the sketch below is superseded where it differs.
 
 ```swift
 struct LoggedSet: Codable, Sendable, Identifiable {
@@ -138,13 +140,13 @@ Field names follow the server's `log_sets` / documented `POST /v2/workouts` inpu
 - Channel: `WCSession.default.transferUserInfo(_:)` — queued, survives app termination, delivered in order when the phone is reachable.
 - Payload: one message per change: `{"type": "sets", "session": WorkoutSessionRecord, "sets": [LoggedSet]}`. Send each set as soon as it is logged (so the phone has it even if the watch dies), and the session again on End.
 - **Idempotent**: ids are client UUIDs; the phone upserts by id, so re-sends are harmless.
-- **Keep until acked**: `session(_:didFinish:error:)` on the watch only means delivered. The phone, after persisting, sends back `{"type": "ack", "setIDs": [...], "sessionID": ...}` via `transferUserInfo`. Only then may the watch mark records `ackedByPhone` and prune them (keep at least the last 14 days locally for freshness and prefill; **TBD** retention).
+- **Keep until acked**: `session(_:didFinish:error:)` on the watch only means delivered. The phone, after persisting, sends back `{"type": "ack", "setIDs": [...], "sessionID": ...}` via `transferUserInfo`. Only then may the watch mark records `ackedByPhone` and prune them (keep acked sessions 14 days, then delete; never delete an un-acked session).
 - Phone → watch: plan from the start-choice sheet (`{"type": "plan", ...}`), freshness snapshot for the Start suggestion, settings (rest, crown step), catalog updates, complication data.
-- **Phone → server: TBD.** `POST /v2/workouts` is documented but not implemented on the server. Until it exists, the phone can send sets with the MCP `log_sets` tool (write token, set `id` makes retries safe, `session_id` keeps them together) or hold them locally. Decide which before wiring; held sets show in Settings → Sync as `WATCH SETS HELD` (03, frame `l4ps-S20fp`).
+- **Phone → server (decided):** the phone puts each session into its Outbox as a `POST /v2/workouts` body ([spec/10 §6](../../spec/10-server-api.md#post-v2workouts--write), task S-15), acks the Watch after the Outbox write, and relays the response's `session.heat` and `prs` as a `result` message. Held sets show in Settings → Sync as `WATCH SETS HELD` (frame `l4ps-S20fp`).
 
 ## Catalog
 
-The Watch picker needs the exercise catalog offline. The server's catalog is free-exercise-db (public domain) plus custom exercises, with ids like `barbell-squat` and primary/secondary muscles. `GET /v2/exercises?since=` is documented but **not implemented**. **TBD**: either implement it, read it over MCP `find_exercises`, or bundle a snapshot (check free-exercise-db's licence terms before bundling). The iPhone owns the cache and sends it to the watch.
+The Watch picker needs the exercise catalog offline. The server's catalog is free-exercise-db (public domain) plus custom exercises, with ids like `barbell-squat` and primary/secondary muscles. The phone fetches `GET /v2/exercises` (task S-14, ETag-cached) and sends the full list with `transferFile` when it changes; prefill for the due and recent exercises travels in `WatchPack` ([spec/21 §6](../../spec/21-watch-app.md#6-transfer-to-iphone-and-the-server)).
 
 ## Signing and device caveats
 
