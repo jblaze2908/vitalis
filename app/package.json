@@ -9,7 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/src/server.js",
     "cli": "node dist/src/cli.js",
-    "test": "TZ=UTC node --test tests/*.test.mjs"
+    "test": "TZ=UTC node --test tests/*.test.mjs",
+    "bench": "npm run build && node bench/v2-bench.mjs"
   },
   "engines": { "node": ">=22.13" },
   "dependencies": {
