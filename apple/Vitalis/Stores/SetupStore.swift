@@ -7,6 +7,15 @@ enum SetupStep: Int, CaseIterable, Sendable {
     case welcome, connect, health, history, targets
 
     var number: Int? { self == .welcome ? nil : rawValue }
+
+    static let savedKey = "setupStep"
+
+    /// Where setup reopens: no server → Welcome; server but no token → Connect; both → the furthest step reached (at least Health).
+    static func resume(hasServer: Bool, hasToken: Bool, saved: Int?) -> SetupStep {
+        guard hasServer else { return .welcome }
+        guard hasToken else { return .connect }
+        return max(SetupStep(rawValue: saved ?? 0) ?? .health, .health)
+    }
     var statusLabel: String { number.map { "STEP \($0) OF 4" } ?? "SETUP" }
 
     /// PulseLine progress variant: now at step / 4.5, a dip at the previous step.
@@ -269,7 +278,8 @@ final class SetupStore {
     }
 
     private let deps: Dependencies
-    var step: SetupStep
+    /// Saved on every move so quitting mid-setup resumes at the same step instead of asking for the token again.
+    var step: SetupStep { didSet { UserDefaults.standard.set(step.rawValue, forKey: SetupStep.savedKey) } }
     var serverText: String { didSet { if serverText != oldValue { connect = .idle } } }
     /// Held only until Connect succeeds; never logged or shown.
     var tokenText = "" { didSet { if tokenText != oldValue { connect = .idle } } }
@@ -380,8 +390,14 @@ extension SetupStore {
             didConnect: { Services.shared.noteAuthOK() },
             authorizeHealth: { await model.authorize() },
             send: { _ = await Services.shared.send($0) })
-        // A saved server means the token was cleared after setup: resume at Connect (spec 20 §4).
         let saved = SettingsStore.baseURL
-        return SetupStore(deps: deps, step: saved.isEmpty ? .welcome : .connect, serverText: saved)
+        let hasToken = ((try? TokenStore.read()) ?? nil)?.isEmpty == false
+        let step = SetupStep.resume(hasServer: !saved.isEmpty, hasToken: hasToken,
+                                    saved: UserDefaults.standard.object(forKey: SetupStep.savedKey) as? Int)
+        return SetupStore(deps: deps, step: step, serverText: saved)
     }
+}
+
+extension SetupStep: Comparable {
+    static func < (a: SetupStep, b: SetupStep) -> Bool { a.rawValue < b.rawValue }
 }

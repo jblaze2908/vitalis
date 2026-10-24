@@ -236,3 +236,14 @@ import VitalisKit
         #expect(TargetField.patch([.weeklySetsMin: 10, .weeklySetsMax: 20]).patch?.weeklySetsMax == .set(20))
     }
 }
+
+@Suite struct SetupResumeTests {
+    @Test func resumesWhereSetupLeftOff() {
+        #expect(SetupStep.resume(hasServer: false, hasToken: false, saved: nil) == .welcome)
+        #expect(SetupStep.resume(hasServer: true, hasToken: false, saved: 3) == .connect, "a cleared token asks again")
+        #expect(SetupStep.resume(hasServer: true, hasToken: true, saved: nil) == .health)
+        #expect(SetupStep.resume(hasServer: true, hasToken: true, saved: 1) == .health, "never back to Connect once the token is saved")
+        #expect(SetupStep.resume(hasServer: true, hasToken: true, saved: 3) == .history)
+        #expect(SetupStep.resume(hasServer: true, hasToken: true, saved: 4) == .targets)
+    }
+}
