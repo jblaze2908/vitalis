@@ -8,10 +8,20 @@ struct RootView: View {
     @ObservedObject var model: AppModel
     @State private var router = Router()
     @AppStorage("setupCompleted") private var setupCompleted = false
+    @Environment(\.scenePhase) private var scenePhase
+    // A restored phone has no Keychain token, so it goes back through setup.
+    @State private var hasToken = (try? TokenStore.read()) != nil
 
     var body: some View {
         Group {
-            if setupCompleted { shell } else { SetupFlow(model: model) { setupCompleted = true } }
+            if (setupCompleted && hasToken) || Services.shared.isDemo { shell }
+            else { SetupFlow(model: model) { setupCompleted = true; hasToken = true } }
+        }
+        .onReceive(model.$snapshot) { SyncStore.shared.observe($0) }
+        // The digest must appear on the first foreground after waking, whichever tab was left open.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, setupCompleted else { return }
+            Task { await TodayStore.shared.refresh(); TodayStore.shared.presentDigestIfDue(router: router) }
         }
         .vScreen()
         .environment(router)
@@ -47,5 +57,7 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: $router.showsDigest) { DigestScreen() }
         .fullScreenCover(isPresented: $router.showsLiveWorkout) { LiveWorkoutScreen() }
+        // A session saved before a crash or quit reopens where it was.
+        .task { if LiveSessionStore.shared.isLive { router.showsLiveWorkout = true } }
     }
 }

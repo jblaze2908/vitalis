@@ -143,9 +143,9 @@ final class DemoURLProtocol: URLProtocol, @unchecked Sendable {
         ("/v2/sync/status", "sync-status"), ("/v2/targets", "targets"), ("/v2/today", "today"), ("/v2/digest", "digest"),
         ("/v2/sleep/week", "sleep-week"), ("/v2/sleep", "sleep"), ("/v2/body", "body"), ("/v2/training/sessions/", "training-session"),
         ("/v2/training/sessions", "training-sessions"), ("/v2/training", "training"), ("/v2/exercises/", "exercise"),
-        ("/v2/exercises", "exercises-search"), ("/v2/food/day", "food-day"), ("/v2/food/quick", "food-quick"),
+        ("/v2/exercises", "exercises-search"), ("/v2/food/day", "food-day"), ("/v2/food/entries", "food-entries-post"), ("/v2/food/meals/", "food-meal-delete"), ("/v2/food/quick", "food-quick"),
         ("/v2/food/search", "food-search"), ("/v2/food/barcode/00000000", "barcode-not-found"), ("/v2/food/barcode/", "barcode"),
-        ("/v2/food/describe", "describe"),
+        ("/v2/food/describe", "describe"), ("/v2/weight", "weight-post"),
     ]
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

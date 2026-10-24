@@ -1,0 +1,369 @@
+import Foundation
+import Observation
+import VitalisKit
+
+/// A ticked set. `id` is minted once at check time and becomes the server set id, so every upsert repeats it.
+struct LoggedSet: Codable, Equatable, Sendable, Identifiable {
+    let id: UUID
+    var exercise: String
+    /// `normal` | `warmup`
+    var kind: String
+    var weightKg: Double?
+    var reps: Int?
+    var targetWeightKg: Double?
+    var targetReps: Int?
+    var performedAt: Date
+}
+
+/// One line of the set table: prefill text until it is ticked, then it points at its `LoggedSet`.
+struct SetRow: Codable, Equatable, Sendable, Identifiable {
+    var id = UUID()
+    var kind = "normal"
+    /// Last session's set as `60 x 10`; nil when there was none.
+    var last: String?
+    var weight = ""
+    var reps = ""
+    var targetWeightKg: Double?
+    var targetReps: Int?
+    var loggedID: UUID?
+
+    var isWarmup: Bool { kind == "warmup" }
+    var isDone: Bool { loggedID != nil }
+}
+
+struct LiveExercise: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    var name: String
+    /// `records.best_set` from the exercise detail, as the server wrote it.
+    var best: String?
+    var rows: [SetRow]
+    /// Set once rows came from `GET /v2/exercises/:id` (network or cache); otherwise prefill is retried.
+    var prefilled = false
+
+    var pendingRowIndex: Int? { rows.firstIndex { !$0.isDone } }
+}
+
+/// The iPhone logger's whole state; written to disk after every change (spec 20 §4).
+struct LiveSession: Codable, Equatable, Sendable {
+    let id: UUID
+    var title: String
+    var template: String?
+    var startedAt: Date
+    var endedAt: Date?
+    var hkWorkoutUUID: String?
+    var exercises: [LiveExercise]
+    var currentIndex: Int
+    var sets: [LoggedSet] = []
+    var restEnd: Date?
+    var restTotal: TimeInterval = 0
+    var restSeconds = RestTimer.defaultSeconds
+
+    var current: LiveExercise? { exercises.indices.contains(currentIndex) ? exercises[currentIndex] : nil }
+    var plannedSets: Int { exercises.reduce(0) { $0 + $1.rows.count } }
+}
+
+/// Rest countdown from a stored end date, so it survives relaunch and needs no ticking state.
+enum RestTimer {
+    static let defaultSeconds = 120
+    static let step: TimeInterval = 15
+
+    static func remaining(end: Date?, now: Date) -> TimeInterval {
+        guard let end else { return 0 }
+        return max(0, end.timeIntervalSince(now))
+    }
+
+    /// Remaining share of the rest for the ProgressTrack.
+    static func fraction(end: Date?, total: TimeInterval, now: Date) -> Double {
+        guard total > 0 else { return 0 }
+        return min(1, remaining(end: end, now: now) / total)
+    }
+
+    /// `1:24`, rounding up so the last second shows `0:01`, not `0:00`.
+    static func text(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds.rounded(.up))
+        return "\(s / 60):" + String(format: "%02d", s % 60)
+    }
+}
+
+@MainActor @Observable
+final class LiveSessionStore {
+    static let shared = LiveSessionStore(fileURL: LiveSessionStore.defaultFileURL(), api: { Services.shared.api },
+                                         send: { _ = await Services.shared.send($0) },
+                                         health: HealthWriter(store: AppModel.shared.healthStore))
+
+    private(set) var session: LiveSession?
+    /// True while a Watch session is live (W-02 sets it from `WatchMessage.sessionState`); the phone is read-only then.
+    var watchSessionLive = false
+
+    @ObservationIgnored private let fileURL: URL?
+    @ObservationIgnored private let api: @MainActor () -> VitalisAPI?
+    @ObservationIgnored private let send: @MainActor (APIRequest) async -> Void
+    @ObservationIgnored private let health: HealthWriting
+    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let timeZone: TimeZone
+    @ObservationIgnored private var editedSinceUpsert = false
+
+    init(fileURL: URL?, api: @escaping @MainActor () -> VitalisAPI?, send: @escaping @MainActor (APIRequest) async -> Void,
+         health: HealthWriting, now: @escaping () -> Date = Date.init, timeZone: TimeZone = .current) {
+        self.fileURL = fileURL; self.api = api; self.send = send; self.health = health; self.now = now; self.timeZone = timeZone
+        if let fileURL, let data = try? Data(contentsOf: fileURL) {
+            session = try? JSONDecoder().decode(LiveSession.self, from: data)
+        }
+    }
+
+    nonisolated static func defaultFileURL() -> URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("Vitalis", isDirectory: true).appendingPathComponent("live-session.json")
+    }
+
+    var isLive: Bool { session != nil }
+
+    // MARK: Start
+
+    /// Starts a session from the due template (or an empty one); an existing session is resumed instead.
+    func begin(due: DueWorkout?) {
+        guard session == nil else { return }
+        let exercises = (due?.exercises ?? []).map { e in
+            LiveExercise(id: e.id, name: e.name, best: nil, rows: [Self.row(fromLast: e.last)])
+        }
+        session = LiveSession(id: UUID(), title: due?.name ?? "Workout", template: due?.template, startedAt: now(),
+                              exercises: exercises, currentIndex: 0)
+        persist()
+    }
+
+    /// Rest length and per-exercise prefill; safe to call again (only exercises not yet prefilled are fetched).
+    func prepare() async {
+        guard session != nil else { return }
+        if let api = api() {
+            var targets = try? await api.targets().value
+            if targets == nil { targets = await api.cached(TargetsResponse.self, path: "v2/targets")?.value }
+            // `rest_s` lives in `values` (the spec's `effective` block has no rest field); null keeps the 120 s default.
+            if let rest = targets?.values.restS, session != nil { session?.restSeconds = rest; persist() }
+        }
+        for id in session?.exercises.filter({ !$0.prefilled }).map(\.id) ?? [] { await prefill(id) }
+    }
+
+    /// `GET /v2/exercises/:id`, else its cached body; with neither the rows stay as they are.
+    func prefill(_ exerciseID: String) async {
+        guard let api = api() else { return }
+        let detail: ExerciseDetail?
+        do { detail = try await api.exercise(id: exerciseID).value }
+        catch { detail = await api.cached(ExerciseDetail.self, path: "v2/exercises/\(HTTPCore.pathSegment(exerciseID))")?.value }
+        if let detail { apply(detail, to: exerciseID) }
+    }
+
+    /// Replaces the placeholder rows only while nothing in that exercise was ticked.
+    func apply(_ detail: ExerciseDetail, to exerciseID: String) {
+        guard let i = index(of: exerciseID), var ex = session?.exercises[i] else { return }
+        ex.best = detail.records?.bestSet
+        if !ex.rows.contains(where: \.isDone) { ex.rows = Self.rows(from: detail) }
+        ex.prefilled = true
+        session?.exercises[i] = ex
+        persist()
+    }
+
+    /// Frame 12: one row per set of the last session (warm-ups as `W`), fields from `next` for working sets,
+    /// extra rows up to `next.sets`; one empty row when there is no history.
+    nonisolated static func rows(from detail: ExerciseDetail) -> [SetRow] {
+        let next = detail.next
+        var rows = (detail.lastSession?.sets ?? []).map { s -> SetRow in
+            let warm = s.kind == "warmup"
+            let w = warm ? s.weightKg : (next?.weightKg ?? s.weightKg)
+            let r = warm ? s.reps : (next?.reps ?? s.reps)
+            return SetRow(kind: warm ? "warmup" : "normal", last: TrainFormat.set(s.weightKg, s.reps), weight: TrainFormat.kg(w, empty: ""),
+                          reps: r.map(String.init) ?? "", targetWeightKg: warm ? nil : next?.weightKg, targetReps: warm ? nil : next?.reps)
+        }
+        let working = rows.filter { !$0.isWarmup }.count
+        if let planned = next?.sets, planned > working {
+            for _ in working..<planned {
+                rows.append(SetRow(weight: TrainFormat.kg(next?.weightKg, empty: ""), reps: next?.reps.map(String.init) ?? "",
+                                   targetWeightKg: next?.weightKg, targetReps: next?.reps))
+            }
+        }
+        return rows.isEmpty ? [SetRow()] : rows
+    }
+
+    nonisolated static func row(fromLast last: DueWorkout.Exercise.Last?) -> SetRow {
+        guard let last else { return SetRow() }
+        return SetRow(last: TrainFormat.set(last.weightKg, last.reps), weight: TrainFormat.kg(last.weightKg, empty: ""),
+                      reps: last.reps.map(String.init) ?? "")
+    }
+
+    // MARK: Editing
+
+    func select(_ exerciseIndex: Int) {
+        guard let s = session, s.exercises.indices.contains(exerciseIndex) else { return }
+        session?.currentIndex = exerciseIndex
+        persist()
+    }
+
+    func setWeight(_ text: String, row: UUID, in exerciseIndex: Int) { edit(row, in: exerciseIndex) { $0.weight = text } }
+    func setReps(_ text: String, row: UUID, in exerciseIndex: Int) { edit(row, in: exerciseIndex) { $0.reps = text } }
+
+    private func edit(_ rowID: UUID, in exerciseIndex: Int, _ change: (inout SetRow) -> Void) {
+        guard let s = session, s.exercises.indices.contains(exerciseIndex),
+              let r = s.exercises[exerciseIndex].rows.firstIndex(where: { $0.id == rowID }) else { return }
+        var row = s.exercises[exerciseIndex].rows[r]
+        change(&row)
+        session?.exercises[exerciseIndex].rows[r] = row
+        // A ticked row edits its logged set; the next upsert carries the correction under the same id.
+        if let id = row.loggedID, let k = s.sets.firstIndex(where: { $0.id == id }) {
+            session?.sets[k].weightKg = Self.number(row.weight)
+            session?.sets[k].reps = Int(row.reps)
+            editedSinceUpsert = true
+        }
+        persist()
+    }
+
+    /// Keyboard Done: send corrections to already-logged sets.
+    func commitEdits() async {
+        guard editedSinceUpsert else { return }
+        editedSinceUpsert = false
+        await upsert()
+    }
+
+    func addSet(to exerciseIndex: Int) {
+        guard let ex = session?.exercises[safe: exerciseIndex] else { return }
+        let last = ex.rows.last { !$0.isWarmup } ?? ex.rows.last
+        session?.exercises[exerciseIndex].rows.append(SetRow(weight: last?.weight ?? "", reps: last?.reps ?? "",
+                                                             targetWeightKg: last?.targetWeightKg, targetReps: last?.targetReps))
+        persist()
+    }
+
+    /// Adds (or re-selects) an exercise and makes it current; the caller prefills it.
+    func addExercise(id: String, name: String) {
+        guard session != nil else { return }
+        if let i = index(of: id) { select(i); return }
+        session?.exercises.append(LiveExercise(id: id, name: name, best: nil, rows: [SetRow()]))
+        let last = (session?.exercises.count ?? 1) - 1
+        session?.currentIndex = last
+        persist()
+    }
+
+    // MARK: Logging
+
+    /// The row whose check is live: the first unticked row of the current exercise.
+    var currentRowID: UUID? {
+        guard let ex = session?.current, let i = ex.pendingRowIndex else { return nil }
+        return ex.rows[i].id
+    }
+
+    nonisolated static func canLog(_ row: SetRow) -> Bool { (Int(row.reps) ?? 0) > 0 }
+
+    /// Check tap: append the set, start rest, persist, queue the whole session as one idempotent upsert.
+    func check() async {
+        guard !watchSessionLive, var s = session, let ex = s.current, let r = ex.pendingRowIndex, Self.canLog(ex.rows[r]) else { return }
+        let row = ex.rows[r], at = now()
+        let set = LoggedSet(id: UUID(), exercise: ex.id, kind: row.isWarmup ? "warmup" : "normal", weightKg: Self.number(row.weight),
+                            reps: Int(row.reps), targetWeightKg: row.targetWeightKg, targetReps: row.targetReps, performedAt: at)
+        s.sets.append(set)
+        s.exercises[s.currentIndex].rows[r].loggedID = set.id
+        // Done with this exercise: move on to the next one that still has sets to do.
+        if s.exercises[s.currentIndex].pendingRowIndex == nil,
+           let next = s.exercises.indices.first(where: { $0 > s.currentIndex && s.exercises[$0].pendingRowIndex != nil }) {
+            s.currentIndex = next
+        }
+        s.restTotal = TimeInterval(s.restSeconds)
+        s.restEnd = at.addingTimeInterval(s.restTotal)
+        session = s
+        persist()
+        await upsert()
+    }
+
+    // MARK: Rest
+
+    func adjustRest(by delta: TimeInterval) {
+        guard let end = session?.restEnd else { return }
+        let t = now(), newEnd = end.addingTimeInterval(delta)
+        if newEnd <= t { skipRest(); return }
+        // Read before writing: `session` is observation-tracked, so a read inside its own mutation trips exclusivity.
+        let total = max((session?.restTotal ?? 0) + delta, newEnd.timeIntervalSince(t))
+        session?.restEnd = newEnd
+        session?.restTotal = total
+        persist()
+    }
+
+    func skipRest() {
+        session?.restEnd = nil
+        persist()
+    }
+
+    // MARK: Finish
+
+    /// Saves the HKWorkout (a failure never blocks the server write), sends the final upsert and clears the session.
+    /// Returns the session id (`client_id` = server `sessions.id`), or nil when nothing was logged.
+    func finish() async -> String? {
+        guard var s = session else { return nil }
+        guard !s.sets.isEmpty else { discard(); return nil }
+        let end = now()
+        s.endedAt = end
+        s.restEnd = nil
+        session = s
+        persist()
+        if s.hkWorkoutUUID == nil, let uuid = try? await health.saveStrengthWorkout(start: s.startedAt, end: end) {
+            session?.hkWorkoutUUID = uuid.uuidString
+            persist()
+        }
+        await upsert()
+        let id = s.id.uuidString
+        session = nil
+        persist()
+        return id
+    }
+
+    /// Leaves without saving; only offered while nothing was logged.
+    func discard() {
+        session = nil
+        persist()
+    }
+
+    // MARK: Server body
+
+    func upsertBody() -> WorkoutUpsert? {
+        guard let s = session else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        iso.timeZone = timeZone
+        let header = WorkoutUpsert.Session(clientId: s.id.uuidString, title: s.title, template: s.template, source: "phone",
+                                           startedAt: iso.string(from: s.startedAt), endedAt: s.endedAt.map(iso.string(from:)),
+                                           tzOffsetMin: timeZone.secondsFromGMT(for: s.startedAt) / 60, hkWorkoutUuid: s.hkWorkoutUUID)
+        let sets = s.sets.map {
+            WorkoutUpsert.Set(id: $0.id.uuidString, exercise: $0.exercise, kind: $0.kind, weightKg: $0.weightKg, reps: $0.reps,
+                              targetWeightKg: $0.targetWeightKg, targetReps: $0.targetReps, performedAt: iso.string(from: $0.performedAt))
+        }
+        return WorkoutUpsert(session: header, sets: sets)
+    }
+
+    private func upsert() async {
+        editedSinceUpsert = false
+        guard let body = upsertBody(), !body.sets.isEmpty, let request = try? APIRequest.postWorkout(body) else { return }
+        await send(request)
+    }
+
+    // MARK: Helpers
+
+    private func index(of exerciseID: String) -> Int? { session?.exercises.firstIndex { $0.id == exerciseID } }
+
+    /// Field text → kg; accepts a decimal comma from the keypad.
+    nonisolated static func number(_ text: String) -> Double? {
+        Double(text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
+    }
+
+    private func persist() {
+        guard let fileURL else { return }
+        do {
+            if let session {
+                try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try JSONEncoder().encode(session).write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            } else if FileManager.default.fileExists(atPath: fileURL.path) {
+                try FileManager.default.removeItem(at: fileURL)
+            }
+        } catch {
+            // Locked-device writes fail until first unlock; the next change rewrites the whole file.
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}

@@ -64,7 +64,11 @@ public struct SecondaryButton: View {
             .stroke(enabled ? VColor.future : VColor.rule, lineWidth: 1.5)
         switch size {
         case .full:
-            Text(title).vAction(20).frame(maxWidth: .infinity, minHeight: VSpace.buttonHeight).overlay(stroke)
+            HStack(spacing: 10) {
+                if let systemImage { Image(systemName: systemImage).font(.system(size: 18, weight: .semibold)) }
+                Text(title).vAction(20)
+            }
+            .foregroundStyle(VColor.bone).frame(maxWidth: .infinity, minHeight: VSpace.buttonHeight).overlay(stroke)
         case .compact:
             HStack(spacing: 6) {
                 if let systemImage { Image(systemName: systemImage).font(.system(size: 14, weight: .bold)) }
