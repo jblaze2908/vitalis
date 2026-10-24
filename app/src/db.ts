@@ -137,14 +137,78 @@ CREATE TABLE IF NOT EXISTS calls (
   id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, token_id TEXT, tool TEXT NOT NULL, ok INTEGER NOT NULL,
   ms INTEGER NOT NULL, detail TEXT);
 CREATE INDEX IF NOT EXISTS calls_at ON calls(at);
+
+-- Monotonic counters bumped by every write that can change a computed value; ETags are built from them.
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL) WITHOUT ROWID;
+INSERT OR IGNORE INTO meta(key, value) VALUES ('data_version', 0), ('targets_version', 0);
+
+-- Owner targets and training preferences, one JSON value per key. Defaults are computed, never stored.
+CREATE TABLE IF NOT EXISTS targets (
+  key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at INTEGER NOT NULL) WITHOUT ROWID;
+
+-- Weekly adaptive calorie targets; week_start is the local Monday.
+CREATE TABLE IF NOT EXISTS kcal_targets (
+  week_start TEXT PRIMARY KEY, kcal INTEGER NOT NULL, mode TEXT NOT NULL CHECK (mode IN ('initial','adaptive','fixed','kept')),
+  tdee INTEGER, intake_mean INTEGER, slope_kg_day REAL, rate_kg_week REAL, intake_days INTEGER, weigh_ins INTEGER,
+  reason TEXT, computed_at INTEGER NOT NULL) WITHOUT ROWID;
+
+-- Per-day features (this day's inputs only) and cached scores (this day plus the 60 before it).
+CREATE TABLE IF NOT EXISTS daily_derived (
+  day TEXT PRIMARY KEY,
+  asleep_h REAL, need_basis TEXT, bedtime_min REAL, bed_h REAL, wakeups INTEGER, awake_min REAL,
+  hrv_ms REAL, hrv_basis TEXT CHECK (hrv_basis IN ('overnight','daily')), rhr_bpm REAL,
+  steps_curve TEXT, kcal_curve TEXT,
+  features_at INTEGER, features_stale INTEGER NOT NULL DEFAULT 1,
+  sleep_json TEXT, recovery_json TEXT, scores_at INTEGER, scores_stale INTEGER NOT NULL DEFAULT 1) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS daily_derived_stale ON daily_derived(day) WHERE features_stale = 1 OR scores_stale = 1;
+
+-- Manual weigh-ins from the app, projected into metric_days as source 'Vitalis manual'.
+CREATE TABLE IF NOT EXISTS weight_entries (
+  id TEXT PRIMARY KEY, measured_at INTEGER NOT NULL, tz_offset_min INTEGER NOT NULL, day TEXT NOT NULL,
+  kg REAL NOT NULL CHECK (kg > 0 AND kg < 500), hk_uuid TEXT, created_at INTEGER NOT NULL, deleted_at INTEGER);
+CREATE INDEX IF NOT EXISTS weight_entries_day ON weight_entries(day) WHERE deleted_at IS NULL;
+
+-- Food log. meal_id groups the items of one add action, so Undo removes them together.
+CREATE TABLE IF NOT EXISTS food_entries (
+  id TEXT PRIMARY KEY, meal_id TEXT NOT NULL, day TEXT NOT NULL,
+  slot TEXT NOT NULL CHECK (slot IN ('breakfast','lunch','snack','dinner')),
+  eaten_at INTEGER NOT NULL, tz_offset_min INTEGER NOT NULL,
+  name TEXT NOT NULL, portion_text TEXT, grams REAL,
+  kcal REAL NOT NULL CHECK (kcal >= 0 AND kcal <= 10000), protein_g REAL, carbs_g REAL, fat_g REAL,
+  source TEXT NOT NULL CHECK (source IN ('search','barcode','describe','manual','label_photo','usual','recent','saved')),
+  source_ref TEXT, estimate INTEGER NOT NULL DEFAULT 0, hk_uuid TEXT,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER);
+CREATE INDEX IF NOT EXISTS food_entries_day ON food_entries(day, slot) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS food_entries_meal ON food_entries(meal_id);
+
+CREATE TABLE IF NOT EXISTS saved_meals (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, slot TEXT, items_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER);
+
+-- Open Food Facts results and the owner's own barcodes ('user' = typed in after a miss; kept forever).
+CREATE TABLE IF NOT EXISTS food_barcodes (
+  code TEXT PRIMARY KEY, status TEXT NOT NULL CHECK (status IN ('found','missing','user')),
+  item_json TEXT, fetched_at INTEGER NOT NULL) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS food_search_cache (
+  q TEXT NOT NULL, page INTEGER NOT NULL, results_json TEXT NOT NULL, fetched_at INTEGER NOT NULL,
+  PRIMARY KEY (q, page)) WITHOUT ROWID;
 `);
 
-// Additive retention codec marker: all existing HAE and gzip-native payloads keep their original bytes.
-const hasCodec = () => db.prepare("PRAGMA table_info(payloads)").all().some(c => c.name === "codec");
-if (!hasCodec()) {
-  try { db.exec("ALTER TABLE payloads ADD COLUMN codec TEXT NOT NULL DEFAULT 'gzip'"); }
-  catch (e) { if (!hasCodec()) throw e; } // another connection may have added it while this one waited
+/** Additive column; tolerates another connection (the ingest worker) adding it while this one waited. */
+function addColumn(table: string, column: string, ddl: string) {
+  const has = () => db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
+  if (has()) return;
+  try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`); }
+  catch (e) { if (!has()) throw e; }
 }
+// Additive retention codec marker: all existing HAE and gzip-native payloads keep their original bytes.
+addColumn("payloads", "codec", "TEXT NOT NULL DEFAULT 'gzip'");
+addColumn("sleep_nights", "wakeups", "INTEGER");
+addColumn("sessions", "hk_workout_uuid", "TEXT");
+addColumn("sessions", "template", "TEXT");
+addColumn("sessions", "client_source", "TEXT");
+db.exec("CREATE INDEX IF NOT EXISTS sessions_hk ON sessions(hk_workout_uuid) WHERE hk_workout_uuid IS NOT NULL");
 
 // hk_types rows are created once, but the HK_METRICS mapping can change: make the table follow it at every start.
 // Rows already derived under the old mapping need `vitalis reparse --all`.
@@ -245,4 +309,13 @@ export function auditWrite(sql: string, ...params: SQLInputValue[]) {
   if (tryAudit(sql, params)) return;
   auditQueue.push({ sql, params });
   if (!auditTimer) auditTimer = setTimeout(flushAudits, 10).unref();
+}
+
+/** Called inside the writing transaction, so an ETag never names a version whose data isn't committed. */
+export const bumpDataVersion = () => { run("UPDATE meta SET value=value+1 WHERE key='data_version'"); };
+export const bumpTargetsVersion = () => { run("UPDATE meta SET value=value+1 WHERE key='targets_version'"); };
+export function dataVersions(): { data: number; targets: number } {
+  const rows = all<{ key: string; value: number }>("SELECT key,value FROM meta WHERE key IN ('data_version','targets_version')");
+  const get = (k: string) => Number(rows.find((r) => r.key === k)?.value ?? 0);
+  return { data: get("data_version"), targets: get("targets_version") };
 }
