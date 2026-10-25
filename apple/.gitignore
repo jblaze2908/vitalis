@@ -1,6 +1,6 @@
 *.xcodeproj/
 xcuserdata/
-DerivedData/
+DerivedData*/
 Config/Signing.xcconfig
 .build/
 .swiftpm/
