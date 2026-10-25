@@ -3,8 +3,8 @@
 import { z } from "zod";
 import { now } from "./config.js";
 import { all, bumpTargetsVersion, run, tx } from "./db.js";
-import { kcalTargetFor, markAllScoresStale, needFor, tonightFor, trendOn } from "./derived.js";
-import { initialKcal, proteinTarget, stepsTarget } from "./fuel.js";
+import { burnBefore, kcalTargetFor, markAllScoresStale, needFor, tonightFor, trendOn } from "./derived.js";
+import { goalRate, initialKcal, maintenanceKcal, proteinTarget, round50, stepsTarget, type Goal } from "./fuel.js";
 import { freshnessBlock } from "./health.js";
 import { ApiError } from "./http.js";
 import { roundHalfAway } from "./scoring-config.js";
@@ -18,6 +18,7 @@ const FIELDS = {
   steps: int(1000, 50000), kcal_mode: z.enum(["adaptive", "fixed"]), kcal: int(1000, 6000), protein_g: int(30, 400),
   sleep_need_h: z.number().min(5).max(11).refine((v) => Number.isInteger(v * 4), "must be a multiple of 0.25"),
   wake_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be HH:MM"), goal_weight_kg: z.number().min(30).max(300),
+  goal: z.enum(["lose", "maintain", "gain"]),
   exercise_min: int(0, 300), weekly_sets_min: int(0, 60), weekly_sets_max: int(0, 60), rest_s: int(15, 600),
   crown_step_kg: z.number().refine((v) => (CROWN_STEPS as readonly number[]).includes(v), `must be one of ${CROWN_STEPS.join(", ")}`),
 };
@@ -40,7 +41,10 @@ export function effectiveTargets(at = Date.now()) {
   const steps28 = [...daily("steps", addDays(day, -28), addDays(day, -1)).values()];
   const trend = trendOn(day), need = needFor(day), night = tonightFor(day);
   const kcalMode = (v.kcal_mode as string | undefined) ?? "adaptive";
-  const kcal = kcalMode === "fixed" ? (v.kcal as number | undefined) ?? initialKcal(trend) : kcalTargetFor(weekStartOf(day)).kcal;
+  const goalKg = (v.goal_weight_kg as number | undefined) ?? null, goal = (v.goal as Goal | undefined) ?? null;
+  const rate = trend === null ? 0 : goalRate(goalKg, trend, goal);
+  const burn = kcalMode === "fixed" && v.kcal === undefined ? burnBefore(day) : null;
+  const kcal = kcalMode === "fixed" ? (v.kcal as number | undefined) ?? initialKcal(trend, rate, burn) : kcalTargetFor(weekStartOf(day)).kcal;
   return {
     steps: (v.steps as number | undefined) ?? stepsTarget(steps28), kcal, kcal_mode: kcalMode,
     protein_g: (v.protein_g as number | undefined) ?? proteinTarget(trend), sleep_need_h: need.need_h, need_basis: need.basis,
@@ -49,7 +53,7 @@ export function effectiveTargets(at = Date.now()) {
     weekly_sets_min: (v.weekly_sets_min as number | undefined) ?? FIXED_DEFAULTS.weekly_sets_min,
     weekly_sets_max: (v.weekly_sets_max as number | undefined) ?? FIXED_DEFAULTS.weekly_sets_max,
     rest_s: (v.rest_s as number | undefined) ?? FIXED_DEFAULTS.rest_s, crown_step_kg: (v.crown_step_kg as number | undefined) ?? FIXED_DEFAULTS.crown_step_kg,
-    goal_weight_kg: (v.goal_weight_kg as number | undefined) ?? null, trend_kg: trend, steps28,
+    goal_weight_kg: goalKg, goal, rate_kg_week: rate, trend_kg: trend, steps28,
   };
 }
 
@@ -62,15 +66,32 @@ export function getTargets(at = Date.now()) {
     effective: { steps: e.steps, kcal: e.kcal, protein_g: e.protein_g, sleep_need_h: e.sleep_need_h, wake_time: e.wake_time, bed_by: e.bed_by },
     suggested: {
       steps: { value: stepsTarget(e.steps28), basis: e.steps28.length >= 7 ? `YOUR USUAL IS ${fmt(medianOf(e.steps28))}` : "DEFAULT UNTIL 7 DAYS" },
-      kcal: { value: e.kcal_mode === "fixed" ? initialKcal(e.trend_kg) : e.kcal, basis: e.kcal_mode === "fixed" ? "30 KCAL PER KG" : "ADJUSTS WEEKLY FROM WEIGHT" },
+      kcal: { value: e.kcal, basis: e.kcal_mode === "fixed" ? "FIXED" : "ADJUSTS WEEKLY FROM WEIGHT" },
       protein_g: { value: proteinTarget(e.trend_kg), basis: e.trend_kg === null ? "NO WEIGHT YET" : "2.0 G PER KG" },
       sleep_need_h: { value: computedNeed.need_h, basis: computedNeed.basis === "history" ? "FROM YOUR LAST 60 NIGHTS" : "DEFAULT UNTIL 14 NIGHTS" },
       goal_weight_kg: { value: null, basis: e.trend_kg === null ? "NO WEIGHT YET" : `NOW ${roundHalfAway(e.trend_kg, 1).toFixed(1)} KG` },
     },
+    plan: fuelPlan(e, at),
     is_set: Object.fromEntries(TARGET_KEYS.map((k) => [k, v[k] !== undefined])),
     freshness: freshnessBlock(at),
   };
 }
+/**
+ * How the calorie target follows from the goal (11 §8.2), for the goal sheet: direction, pace, maintenance and the
+ * resulting target. `basis`: `adaptive` (from logged food and weight), `watch` (resting + active energy), or `estimate` (30 kcal per kg).
+ */
+function fuelPlan(e: ReturnType<typeof effectiveTargets>, at: number) {
+  const row = kcalTargetFor(weekStartOf(today(at)));
+  const adaptive = row.mode === "adaptive" && row.tdee !== null, measured = row.mode === "initial" && row.tdee !== null;
+  const direction = e.goal ?? (e.rate_kg_week < 0 ? "lose" : e.rate_kg_week > 0 ? "gain" : e.goal_weight_kg === null ? null : "maintain");
+  return {
+    goal: direction, goal_weight_kg: e.goal_weight_kg, trend_kg: e.trend_kg === null ? null : roundHalfAway(e.trend_kg, 1),
+    rate_kg_week: roundHalfAway(e.rate_kg_week, 2), maintenance_kcal: adaptive || measured ? round50(row.tdee!) : maintenanceKcal(e.trend_kg),
+    kcal: e.kcal, kcal_mode: e.kcal_mode, basis: adaptive ? "adaptive" : measured ? "watch" : "estimate",
+    reached: e.goal_weight_kg !== null && e.goal !== "maintain" && e.rate_kg_week === 0 && e.trend_kg !== null,
+  };
+}
+
 const medianOf = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b), i = (s.length - 1) / 2;
   return (s[Math.floor(i)] + s[Math.ceil(i)]) / 2;
@@ -90,6 +111,6 @@ export function putTargets(input: Partial<Record<TargetKey, unknown>>, at = Date
     }
     bumpTargetsVersion();
     markAllScoresStale();
-    if (["goal_weight_kg", "kcal_mode", "kcal"].some((k) => k in input)) kcalTargetFor(weekStartOf(today(at)), true);
+    if (["goal", "goal_weight_kg", "kcal_mode", "kcal"].some((k) => k in input)) kcalTargetFor(weekStartOf(today(at)), true);
   });
 }

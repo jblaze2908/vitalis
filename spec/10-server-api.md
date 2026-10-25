@@ -119,7 +119,7 @@ Existing response (`syncStatus()` in `app/src/v2.ts`, documented in `docs/native
 ```json
 {
   "values": { "steps": 9000, "kcal_mode": "adaptive", "kcal": null, "protein_g": 160, "sleep_need_h": 8.0, "wake_time": "07:00",
-              "goal_weight_kg": 74.0, "exercise_min": 30, "weekly_sets_min": 10, "weekly_sets_max": 20, "rest_s": 120, "crown_step_kg": 2.5 },
+              "goal_weight_kg": 74.0, "goal": "lose", "exercise_min": 30, "weekly_sets_min": 10, "weekly_sets_max": 20, "rest_s": 120, "crown_step_kg": 2.5 },
   "effective": { "steps": 9000, "kcal": 2300, "protein_g": 160, "sleep_need_h": 8.0, "wake_time": "07:00", "bed_by": "23:00" },
   "suggested": {
     "steps": { "value": 8500, "basis": "YOUR USUAL IS 8,600" },
@@ -128,12 +128,14 @@ Existing response (`syncStatus()` in `app/src/v2.ts`, documented in `docs/native
     "sleep_need_h": { "value": 8.0, "basis": "FROM YOUR LAST 60 NIGHTS" },
     "goal_weight_kg": { "value": null, "basis": "NOW 76.4 KG" }
   },
-  "is_set": { "steps": true, "protein_g": true, "sleep_need_h": false, "goal_weight_kg": true },
+  "plan": { "goal": "lose", "goal_weight_kg": 74.0, "trend_kg": 76.4, "rate_kg_week": -0.38, "maintenance_kcal": 2450,
+            "kcal": 2030, "kcal_mode": "adaptive", "basis": "watch", "reached": false },
+  "is_set": { "steps": true, "protein_g": true, "sleep_need_h": false, "goal_weight_kg": true, "goal": true },
   "freshness": { "…": "…" }
 }
 ```
 
-`values` = what the owner stored (null when unset). `effective` = what scoring uses now (stored or computed default, [11 §8](11-scoring.md#8-fuel), and this week's `kcal_targets` row for adaptive kcal). `suggested` feeds the Targets setup screen (`spec/design/23-setup-targets.png`).
+`values` = what the owner stored (null when unset). `effective` = what scoring uses now (stored or computed default, [11 §8](11-scoring.md#8-fuel), and this week's `kcal_targets` row for adaptive kcal). `suggested` feeds the Targets setup screen (`spec/design/23-setup-targets.png`). `plan` explains the calorie target for the goal sheet ([11 §8.2](11-scoring.md#82-calorie-target)): `goal` is the stored goal, else the direction the goal weight implies (`null` with neither); `basis` is `adaptive` (logged food and weight), `watch` (resting + active energy) or `estimate` (30 kcal/kg); `reached` = a goal weight is set and the trend is within 0.5 kg of it or past it.
 
 ### PUT /v2/targets — write
 
@@ -143,7 +145,7 @@ Partial update; only keys present change. `null` clears a key back to its comput
 { "steps": 9000, "protein_g": 160, "goal_weight_kg": 74.0, "kcal_mode": "adaptive" }
 ```
 
-Validation: steps 1000–50000; kcal 1000–6000; protein_g 30–400; sleep_need_h 5–11 (step 0.25); wake_time `HH:MM`; goal_weight_kg 30–300; exercise_min 0–300; weekly_sets 0–60 with min ≤ max; rest_s 15–600; crown_step_kg one of 0.5, 1, 1.25, 2, 2.5, 5. Unknown key → 422. Response: the `GET /v2/targets` body. Effects: bump `targets_version`, mark all scores stale ([12 §3](12-data-model.md#3-how-computation-runs)); changing `goal_weight_kg` or `kcal_mode` recomputes this week's `kcal_targets` row.
+Validation: steps 1000–50000; kcal 1000–6000; protein_g 30–400; sleep_need_h 5–11 (step 0.25); wake_time `HH:MM`; goal_weight_kg 30–300; goal `lose` | `maintain` | `gain`; exercise_min 0–300; weekly_sets 0–60 with min ≤ max; rest_s 15–600; crown_step_kg one of 0.5, 1, 1.25, 2, 2.5, 5. Unknown key → 422. Response: the `GET /v2/targets` body. Effects: bump `targets_version`, mark all scores stale ([12 §3](12-data-model.md#3-how-computation-runs)); changing `goal`, `goal_weight_kg`, `kcal_mode` or `kcal` recomputes this week's `kcal_targets` row.
 
 ---
 

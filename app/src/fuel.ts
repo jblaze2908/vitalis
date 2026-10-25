@@ -37,9 +37,21 @@ export function monthChange(trendToday: number | null, trend30dAgo: number | nul
   return isNum(trendToday) && isNum(trend30dAgo) ? roundHalfAway(trendToday - trend30dAgo, 1) : null;
 }
 
-/** Initial / fixed default: no BMR formula, since the exporter sends no age, sex or height. */
-export const initialKcal = (trendKg: number | null) => (isNum(trendKg) ? round50(trendKg * FUEL.initial_kcal_per_kg) : FUEL.default_kcal);
-
+/**
+ * Starting / fixed target (11 §8.2): maintenance plus the goal's rate from day one, not after the adaptive window.
+ * Maintenance = measured resting + active energy when the Watch has enough days, else 30 kcal per kg.
+ */
+export const maintenanceKcal = (trendKg: number | null, burn: number | null = null) =>
+  isNum(burn) ? round50(burn) : isNum(trendKg) ? round50(trendKg * FUEL.initial_kcal_per_kg) : FUEL.default_kcal;
+export const initialKcal = (trendKg: number | null, rateKgWeek = 0, burn: number | null = null) => {
+  const base = isNum(burn) ? burn : isNum(trendKg) ? trendKg * FUEL.initial_kcal_per_kg : null;
+  return base === null ? FUEL.default_kcal : Math.max(round50(base + (rateKgWeek * FUEL.kcal_per_kg_body) / 7), FUEL.kcal_floor);
+};
+/** Mean daily resting + active kcal over days that have both; null under `burn_min_days`. */
+export function measuredBurn(resting: Map<string, number>, active: Map<string, number>): number | null {
+  const days = [...resting.keys()].filter((d) => active.has(d));
+  return days.length < FUEL.burn_min_days ? null : days.reduce((t, d) => t + resting.get(d)! + active.get(d)!, 0) / days.length;
+}
 export const proteinTarget = (trendKg: number | null) => (isNum(trendKg) ? round5(trendKg * FUEL.protein_g_per_kg) : FUEL.default_protein_g);
 
 /** Default steps target from the daily step totals of the last 28 days. */
@@ -49,15 +61,23 @@ export function stepsTarget(dailySteps28: number[]): number {
 }
 
 /** Goal rate in kg/week (negative = lose); 0 inside the deadband or without a goal. */
-export function goalRate(goal: number | null, trendKg: number): number {
-  if (!isNum(goal)) return 0;
-  const diff = goal - trendKg;
-  if (Math.abs(diff) <= FUEL.goal_deadband_kg) return 0;
-  return diff < 0 ? -Math.min(FUEL.lose_rate_per_kg * trendKg, FUEL.lose_rate_max_kg_week)
+export type Goal = "lose" | "maintain" | "gain";
+
+/**
+ * kg/week toward the goal (11 §8.2 step 5). An explicit goal sets the direction; without one the goal weight does.
+ * Within 0.5 kg of the goal weight, or past it, the rate is 0.
+ */
+export function goalRate(goalKg: number | null, trendKg: number, goal: Goal | null = null): number {
+  if (goal === "maintain") return 0;
+  const diff = isNum(goalKg) ? goalKg - trendKg : null;
+  const dir = goal ?? (diff === null || Math.abs(diff) <= FUEL.goal_deadband_kg ? null : diff < 0 ? "lose" : "gain");
+  if (dir === null) return 0;
+  if (diff !== null && (Math.abs(diff) <= FUEL.goal_deadband_kg || (dir === "lose") !== (diff < 0))) return 0;
+  return dir === "lose" ? -Math.min(FUEL.lose_rate_per_kg * trendKg, FUEL.lose_rate_max_kg_week)
     : Math.min(FUEL.gain_rate_per_kg * trendKg, FUEL.gain_rate_max_kg_week);
 }
 
-export type AdaptiveInput = { intakes: (number | null)[]; weights: (number | null)[]; seed: number | null; prev: number; goal: number | null };
+export type AdaptiveInput = { intakes: (number | null)[]; weights: (number | null)[]; seed: number | null; prev: number; goal: number | null; direction?: Goal | null };
 /** One `kcal_targets` row minus week_start / computed_at, plus the unclamped `raw` for display. */
 export type AdaptiveKcal = {
   kcal: number; mode: "adaptive" | "kept"; tdee: number | null; intake_mean: number | null; slope_kg_day: number | null;
@@ -65,7 +85,7 @@ export type AdaptiveKcal = {
 };
 
 /** Weekly target from the 21 days ending yesterday (intakes and weights aligned by day). Kept rows reuse `prev`. */
-export function adaptiveKcal({ intakes, weights, seed, prev, goal }: AdaptiveInput): AdaptiveKcal {
+export function adaptiveKcal({ intakes, weights, seed, prev, goal, direction = null }: AdaptiveInput): AdaptiveKcal {
   if (intakes.length !== weights.length || weights.length < 2) throw new RangeError("intakes and weights must be the same window of ≥ 2 days");
   const eaten = intakes.filter((v): v is number => isNum(v) && v >= FUEL.min_intake_day_kcal);
   const weighIns = weights.filter(isNum).length;
@@ -79,7 +99,7 @@ export function adaptiveKcal({ intakes, weights, seed, prev, goal }: AdaptiveInp
   const slope = (tLast - tFirst) / (trend.length - 1);
   const intakeMean = eaten.reduce((a, b) => a + b, 0) / eaten.length;
   const tdee = intakeMean - slope * FUEL.kcal_per_kg_body;
-  const rate = goalRate(goal, tLast);
+  const rate = goalRate(goal, tLast, direction);
   const raw = tdee + (rate * FUEL.kcal_per_kg_body) / 7;
   const clamped = Math.min(Math.max(raw, prev - FUEL.adapt_clamp_kcal), prev + FUEL.adapt_clamp_kcal);
   return {

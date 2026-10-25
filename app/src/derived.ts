@@ -4,12 +4,12 @@
 import { curveFromSamples } from "./activity.js";
 import { getExercise } from "./exercises.js";
 import { all, bumpDataVersion, dataVersions, db, one, run } from "./db.js";
-import { adaptiveKcal, initialKcal, weightTrend } from "./fuel.js";
+import { adaptiveKcal, goalRate, initialKcal, measuredBurn, weightTrend, type Goal } from "./fuel.js";
 import { bedHours, hrvPart, recoveryScore, rhrPart, sleepNeed, sleepParts, sleepScore, tonight } from "./scoring.js";
 import { BASELINE_DAYS, MIN_SCORE_DAYS, daily, nights, type Night } from "./stats.js";
 import { addDays, DAY_RE, eveningMinutes, localDay, ownerOffsetMin, today as todayOf } from "./time.js";
 import { freshLabel, freshness, loadedLabel, sessionMuscles, SLUGS, splitStates, type SplitCandidate, type TrainingSet } from "./training-analytics.js";
-import { TRAINING } from "./scoring-config.js";
+import { FUEL, roundHalfAway, TRAINING } from "./scoring-config.js";
 
 const HOUR = 3_600_000;
 
@@ -200,25 +200,39 @@ export function intakeByDay(from: string, to: string) {
  * This week's calorie target row, computed lazily on the first read of the week (or when `inTx`, a targets write, forces it).
  * An `initial` row follows the weight trend until a later week adapts, so a target read before the first weigh-in isn't frozen.
  */
+/** Watch-measured daily burn over the `burn_window_days` before `day` (11 §8.2), or null. Two daily reads. */
+export function burnBefore(day: string): number | null {
+  const from = addDays(day, -FUEL.burn_window_days), to = addDays(day, -1);
+  return measuredBurn(daily("resting_kcal", from, to), daily("active_kcal", from, to));
+}
+
 export function kcalTargetFor(weekStart: string, inTx = false): KcalRow {
   const existing = one<KcalRow>("SELECT * FROM kcal_targets WHERE week_start=?", weekStart);
+  // Initial rows are re-derived on read: weight and goal changes move them until the first adaptive week.
   if (existing && !inTx && existing.mode !== "initial") return existing;
   const yesterday = addDays(weekStart, -1);
   const trend = trendOn(yesterday);
   const mode = storedTarget<string>("kcal_mode") ?? "adaptive";
-  let row: Omit<KcalRow, "week_start" | "computed_at">;
+  let row: Omit<KcalRow, "week_start" | "computed_at"> = { kcal: 0, mode: "initial", tdee: null, intake_mean: null, slope_kg_day: null, rate_kg_week: null, intake_days: null, weigh_ins: null, reason: null };
   const blank = { tdee: null, intake_mean: null, slope_kg_day: null, rate_kg_week: null, intake_days: null, weigh_ins: null, reason: null };
   const prev = one<KcalRow>("SELECT * FROM kcal_targets WHERE week_start<? ORDER BY week_start DESC LIMIT 1", weekStart);
-  if (mode === "fixed") row = { ...blank, kcal: storedTarget<number>("kcal") ?? initialKcal(trend), mode: "fixed" };
-  else if (!prev) row = { ...blank, kcal: initialKcal(trend), mode: "initial" };
-  else {
+  const goalKg = storedTarget<number>("goal_weight_kg"), direction = storedTarget<Goal>("goal");
+  const rate = trend === null ? 0 : goalRate(goalKg, trend, direction), burn = burnBefore(weekStart);
+  if (mode === "fixed") row = { ...blank, kcal: storedTarget<number>("kcal") ?? initialKcal(trend, rate, burn), mode: "fixed" };
+  else if (prev) {
     const winStart = addDays(yesterday, -20), intake = intakeByDay(winStart, yesterday), w = daily("weight_kg", winStart, yesterday);
     const days = Array.from({ length: 21 }, (_, i) => addDays(winStart, i));
     const a = adaptiveKcal({ intakes: days.map((d) => intake.get(d) ?? null), weights: days.map((d) => w.get(d) ?? null),
-      seed: trendOn(addDays(winStart, -1)), prev: prev.kcal, goal: storedTarget<number>("goal_weight_kg") });
+      seed: trendOn(addDays(winStart, -1)), prev: prev.kcal, goal: goalKg, direction });
     row = { kcal: a.kcal, mode: a.mode, tdee: a.tdee, intake_mean: a.intake_mean, slope_kg_day: a.slope_kg_day, rate_kg_week: a.rate_kg_week,
       intake_days: a.intake_days, weigh_ins: a.weigh_ins, reason: a.reason };
   }
+  // Until one week has really adapted, the goal-aware estimate stands, so a goal change shows up at once.
+  const adapted = mode !== "fixed" && (row.mode === "adaptive" || !!one("SELECT 1 FROM kcal_targets WHERE week_start<? AND mode='adaptive'", weekStart));
+  if (mode !== "fixed" && !adapted)
+    row = { ...blank, kcal: initialKcal(trend, rate, burn), mode: "initial", rate_kg_week: roundHalfAway(rate, 3),
+      tdee: burn === null ? null : roundHalfAway(burn),
+      intake_days: row.intake_days, weigh_ins: row.weigh_ins, reason: prev ? row.reason : null };
   if (existing && !inTx && existing.mode === row.mode && existing.kcal === row.kcal) return existing;
   const full: KcalRow = { week_start: weekStart, ...row, computed_at: Date.now() };
   const write = () => run(`INSERT INTO kcal_targets(week_start,kcal,mode,tdee,intake_mean,slope_kg_day,rate_kg_week,intake_days,weigh_ins,reason,computed_at)

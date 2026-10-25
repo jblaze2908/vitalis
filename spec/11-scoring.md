@@ -219,13 +219,15 @@ Exponentially weighted moving average, α = **0.1** per weigh-in day: `T = T + 0
 
 `targets.kcal_mode` is `adaptive` (default) or `fixed`.
 
-- **Initial / fixed default**: `round50(trend_kg × 30)` (2,300 for 76.4 kg), or 2,200 without any weight. Design decision: the exporter does not send age, sex or height (`apple/README.md` → Deliberately excluded types), so no BMR formula is possible.
+- **Goal**: the owner is asked a goal (`targets.goal`: `lose` | `maintain` | `gain`) and a target weight (`goal_weight_kg`). An explicit goal sets the direction; without one the goal weight's side of the trend does. `maintain`, within 0.5 kg of the goal weight, or past it → rate 0.
+- **Maintenance**: mean daily resting + active energy (`resting_kcal` + `active_kcal`) over the 28 days before the week, needing ≥ 14 days with both. Apple's resting estimate already uses the Health profile's age, sex, height and weight, so Vitalis asks none of them. Without enough Watch days: `trend_kg × 30`, or 2,200 without any weight. (Owner, 25 Oct: 2,156 resting + 382 active = 2,538 over 30 days, where 30 kcal/kg said 2,750.)
+- **Starting / fixed default** = `max(round50(maintenance + rate × 7700 / 7), 1,400)` with the goal rate from step 5 below, from day one. It is re-derived on every read (mode `initial`) until a week has really adapted, so goal and weight changes show at once; `reason: "not_enough_data"` says why it is not adapting yet.
 - **Adaptive** (recomputed once per Monday-start week, lazily on the first read of the week, stored in `kcal_targets`):
   1. Window = the 21 days ending yesterday.
-  2. Intake days = days with logged food ≥ 1,000 kcal. Need ≥ 14 intake days and ≥ 8 weigh-ins, else keep last week's target (`reason: "not_enough_data"`).
+  2. Intake days = days with logged food ≥ 1,000 kcal. Need ≥ 14 intake days and ≥ 8 weigh-ins, else keep last week's target (`reason: "not_enough_data"`); before any week has adapted, that is the starting target above.
   3. Trend over the window (§8.1); `slope = (T_last − T_first) / 20` kg/day.
   4. `tdee = mean(intake) − slope × 7700` (7,700 kcal per kg, design default).
-  5. Goal rate: `diff = goal_weight_kg − T_last`. |diff| ≤ 0.5 → 0; diff < 0 → `−min(0.005 × T_last, 0.75)` kg/week; diff > 0 → `+min(0.0025 × T_last, 0.35)` kg/week. No goal set → 0.
+  5. Goal rate: lose → `−min(0.005 × T_last, 0.75)` kg/week; gain → `+min(0.0025 × T_last, 0.35)` kg/week; direction from `goal`, else from `diff = goal_weight_kg − T_last` (|diff| ≤ 0.5 → 0). No goal and no goal weight → 0.
   6. `raw = tdee + rate × 7700 / 7`.
   7. New target = `round10(clamp(raw, prev − 150, prev + 150))`, floor 1,400.
 - `kcal_left = target − eaten` (may be negative; the app shows `OVER BY 120`).

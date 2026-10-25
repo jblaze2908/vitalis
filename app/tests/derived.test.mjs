@@ -84,7 +84,17 @@ test("calorie target: the first week is the initial rule, later weeks adapt or k
   assert.equal(w1.kcal, 2400); // trend 80 kg × 30
   assert.equal(kcalTargetFor("2026-05-11").computed_at, w1.computed_at, "stored, not recomputed");
   const w2 = kcalTargetFor("2026-05-18");
-  assert.equal(w2.mode, "kept"); assert.equal(w2.reason, "not_enough_data"); assert.equal(w2.kcal, 2400);
+  // No week has adapted yet, so the goal-aware estimate stands (11 §8.2); the reason says why it isn't adapting.
+  assert.equal(w2.mode, "initial"); assert.equal(w2.reason, "not_enough_data"); assert.equal(w2.kcal, 2400);
+  const put = (k, v) => run("INSERT INTO targets(key,value_json,updated_at) VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json", k, JSON.stringify(v));
+  put("goal_weight_kg", 75);
+  const lose = kcalTargetFor("2026-05-18", true);
+  assert.equal(lose.rate_kg_week, -0.4); assert.equal(lose.kcal, 1950, "80 × 30 − 0.4 kg/week × 7700 / 7, to 50");
+  put("goal", "maintain");
+  assert.equal(kcalTargetFor("2026-05-18", true).kcal, 2400, "an explicit maintain overrides the goal weight");
+  put("goal", "gain"); run("DELETE FROM targets WHERE key='goal_weight_kg'");
+  assert.equal(kcalTargetFor("2026-05-18", true).kcal, 2600, "gain without a goal weight: +0.2 kg/week, 2,620 to 50");
+  run("DELETE FROM targets WHERE key='goal'"); kcalTargetFor("2026-05-18", true);
 });
 
 test("training state: heat for all 17 muscles, splits from Settings and history, labels", () => {

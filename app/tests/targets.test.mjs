@@ -44,13 +44,19 @@ test("PUT stores a partial update, null clears a key, and versions move", async 
   r = await http("PUT", "/v2/targets", { token: write, json: { steps: null } });
   assert.equal(r.json.values.steps, null); assert.equal(r.json.effective.steps, 8500);
   assert.equal(r.json.values.protein_g, 160, "keys not sent stay");
+  // Goal weight 74 below a 76.4 trend: lose 0.38 kg/week from the start, not after the adaptive window.
+  assert.deepEqual(r.json.plan, { goal: "lose", goal_weight_kg: 74, trend_kg: 76.4, rate_kg_week: -0.38, maintenance_kcal: 2300,
+    kcal: 1850, kcal_mode: "adaptive", basis: "estimate", reached: false });
+  r = await http("PUT", "/v2/targets", { token: write, json: { goal: "maintain" } });
+  assert.equal(r.json.plan.goal, "maintain"); assert.equal(r.json.effective.kcal, 2300);
+  r = await http("PUT", "/v2/targets", { token: write, json: { goal: null } });
   r = await http("PUT", "/v2/targets", { token: write, json: { kcal_mode: "fixed", kcal: 2500 } });
   assert.equal(r.json.effective.kcal, 2500);
 });
 
 test("invalid values are 422 naming the field; scopes are enforced", async () => {
   for (const [json, field] of [[{ steps: 500 }, "steps"], [{ sleep_need_h: 7.3 }, "sleep_need_h"], [{ wake_time: "7am" }, "wake_time"],
-    [{ crown_step_kg: 3 }, "crown_step_kg"], [{ colour: "red" }, ""], [{ weekly_sets_min: 30, weekly_sets_max: 20 }, "weekly_sets_min"]]) {
+    [{ crown_step_kg: 3 }, "crown_step_kg"], [{ goal: "bulk" }, "goal"], [{ colour: "red" }, ""], [{ weekly_sets_min: 30, weekly_sets_max: 20 }, "weekly_sets_min"]]) {
     const r = await http("PUT", "/v2/targets", { token: write, json });
     assert.equal(r.status, 422, JSON.stringify(json)); assert.equal(r.json.code, "invalid");
     if (field) assert.match(r.json.error, new RegExp(`^${field}`));

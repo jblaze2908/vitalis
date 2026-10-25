@@ -98,6 +98,9 @@ export const FUEL = {
   seed_lookback_days: 120,
   month_change_days: 30,
   initial_kcal_per_kg: 30,
+  // Maintenance from the Watch: resting + active energy (Apple's resting estimate uses the Health profile's age, sex, height).
+  burn_window_days: 28,
+  burn_min_days: 14,
   default_kcal: 2200,
   kcal_per_kg_body: 7700,
   adapt_window_days: 21,

@@ -1,7 +1,7 @@
 // 11 §10.6 vectors; fuel.ts is pure, so no database harness.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-const { weightTrend, monthChange, adaptiveKcal, initialKcal, proteinTarget, stepsTarget, round5, round10, round50, round500 } =
+const { weightTrend, monthChange, adaptiveKcal, goalRate, initialKcal, measuredBurn, proteinTarget, stepsTarget, round5, round10, round50, round500 } =
   await import("../dist/src/fuel.js");
 
 const WEIGHTS = [76.8, null, 76.6, 76.9, null, 76.5, 76.4, 76.7, null, 76.3, 76.2, null, 76.4, 76.1, 76.0, null, 76.2, 75.9, null, 76.0, 75.8];
@@ -55,6 +55,12 @@ test("initial target for trend 76.4 kg: 2300 kcal, 155 g protein; defaults witho
   assert.equal(initialKcal(76.4), 2300);
   assert.equal(proteinTarget(76.4), 155);
   assert.equal(initialKcal(null), 2200);
+  assert.equal(initialKcal(91.9, goalRate(80, 91.9)), 2250, "the owner's case: lose 0.46 kg/week from day one");
+  assert.equal(initialKcal(50, -0.75), 1400, "floor");
+  assert.equal(initialKcal(91.9, goalRate(80, 91.9), 2538), 2050, "measured Watch burn replaces 30 kcal per kg");
+  const days = (n, v) => new Map(Array.from({ length: n }, (_, i) => [`2026-10-${String(i + 1).padStart(2, "0")}`, v]));
+  assert.equal(measuredBurn(days(14, 2100), days(14, 400)), 2500);
+  assert.equal(measuredBurn(days(13, 2100), days(13, 400)), null, "under 14 days");
   assert.equal(proteinTarget(null), 140);
 });
 
@@ -67,4 +73,15 @@ test("steps target: median of 28 days rounded to 500, 8000 under 7 days", () => 
 
 test("round helpers", () => {
   assert.deepEqual([round5(152.8), round10(2145), round50(2292), round500(8249), round500(8250)], [155, 2150, 2300, 8000, 8500]);
+});
+
+test("goalRate: explicit goal sets direction, goal weight stops it, deadband and overshoot give 0", () => {
+  assert.equal(goalRate(80, 91.9), -0.4595);
+  assert.equal(goalRate(null, 91.9, "lose"), -0.4595);
+  assert.equal(goalRate(80, 91.9, "maintain"), 0);
+  assert.equal(goalRate(80, 80.4, "lose"), 0, "within 0.5 kg");
+  assert.equal(goalRate(85, 80, "lose"), 0, "already below the goal weight");
+  assert.equal(goalRate(null, 70, "gain").toFixed(3), "0.175");
+  assert.equal(goalRate(90, 70).toFixed(3), "0.175");
+  assert.equal(goalRate(null, 70), 0);
 });
