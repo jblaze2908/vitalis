@@ -195,7 +195,9 @@ struct TodayScreen: View {
         return tap({ router.tab = .eat }) {
             VCard {
                 VStack(alignment: .leading, spacing: 0) {
-                    CardHeader("Calories", status: target == nil ? nil : (over ? ("Over", .watch) : ("On track", .good)))
+                    // No intake pace exists to judge "on track", so under target only says what's left.
+                    CardHeader("Calories", status: target == nil ? nil : over ? ("Over", .watch)
+                               : ("\(TodayFormat.number(f?.kcalLeft) ?? "–") left", .quiet))
                     Meter(fraction: target.map { eaten / max($0, 1) } ?? 0, fill: over ? VColor.watch : VColor.bone).padding(.top, 25)
                     Figure(TodayFormat.number(f?.kcalEaten) ?? "–", unit: target.map { "/\(TodayFormat.number($0) ?? "")" }).padding(.top, 25)
                 }
