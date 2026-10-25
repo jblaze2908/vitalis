@@ -168,6 +168,13 @@ test("sleep stages across midnight derive the wake-day hours and edges; deletion
   assert.equal(one("SELECT asleep_h FROM sleep_nights WHERE day='2026-10-10' AND source='Native Watch'").asleep_h, 1);
 });
 
+test("a category sample with a null label is stored, not rejected", async () => {
+  const s = { ...sleep(3, "2026-10-12", "01:00", "02:00"), value_label: null };
+  const r = await post(batch([s]));
+  assert.equal(r.json.counts.rejected, 0, JSON.stringify(r.json.rejected));
+  assert.equal(one("SELECT asleep_h FROM sleep_nights WHERE day='2026-10-12' AND source='Native Watch'").asleep_h, 1);
+});
+
 test("deleting all sleep removes the derived night; overlapping unspecified and staged sleep does not double count", async () => {
   const s = sleep(3, "2026-10-11", "01:00", "02:00"), generic = { ...s, uuid: randomUUID(), value: 1, value_label: "asleepUnspecified" };
   await post(batch([s, generic])); assert.equal(one("SELECT asleep_h FROM sleep_nights WHERE day='2026-10-11'").asleep_h, 1);

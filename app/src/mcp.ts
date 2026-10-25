@@ -157,7 +157,7 @@ export function buildServer(token: Token) {
   if (token.scope !== "write") return s;
 
   s.registerTool("log_sets", { title: "Log strength sets", annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, outputSchema: Out,
-    description: "Log one or more strength-training sets. Sets join the open session whose last set was within 3 hours, else start a new one; pass session_id to choose (a new id starts a session with that id). Give each set your own id so a retry can't double-log. An unclear exercise name logs nothing and returns candidates to choose from.",
+    description: "Log one or more strength-training sets. Sets join the open session whose last set was within 3 hours, else start a new one; pass session_id to choose (a new id starts a session with that id). Give each set your own id so a retry can't double-log. An unclear exercise name logs nothing and returns candidates to choose from. The reply's next_sets gives, per exercise, today's target (from last session) and what the next set should be.",
     inputSchema: z.object({ sets: z.array(SetIn).min(1).max(100), session_id: z.string().min(1).max(64).optional(), title: z.string().max(80).optional().describe("session title, e.g. 'Push'") }) },
   wrap(ctx, "log_sets", (a: { sets: z.infer<typeof SetIn>[]; session_id?: string; title?: string }) => logSets(a, `mcp:${token.name}`),
     (r) => `${(r as { logged: unknown[] }).logged.length} sets`));

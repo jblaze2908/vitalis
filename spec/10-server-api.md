@@ -649,6 +649,7 @@ Agents must read the same numbers as the app (`app/src/mcp.ts`). Changes:
 | `get_brief` | Keeps every existing field. Adds `scores: { sleep: {score, band, parts}, recovery: {score, band, status, parts} }` and `plan: { headline, action }` from the same functions as `/v2/today`. `verdict.call` keeps its enum, now derived from the recovery band ([11 §5](11-scoring.md#5-verdict-headline--one-action)); `verdict.rule` text updated to describe the new rule. Existing `mcp.test.mjs` cases that break because of the 60-day window or the new rule are updated deliberately, each with a comment saying why. |
 | `get_metrics`, `get_sleep` | Baselines now 60 days (text in descriptions and `INSTRUCTIONS` updated from "30 days"). `get_sleep` nights gain `score` and `wakeups`. |
 | `get_training_summary` | Adds `heat` (17 muscles), `splits`, `weekly_sets` status. |
+| `log_sets` | Sets join the open session whose last set was within 3 h (a phone or Watch workout in progress counts, since its uploads leave `ended_at` null). The reply adds `next_sets`: per exercise logged, `working_sets_today`, `today_target` (last session's double-progression suggestion, 11 §7.6) and `next` (`Set 2 of 3: 62.5 kg × 8`), so an agent can answer "and my next set?" without a second call. |
 | **new** `get_today` (read) | Returns the `GET /v2/today` body. |
 | **new** `get_scores` (read) | `{from, to}` (≤ 90 days): per day `sleep` and `recovery` score objects. |
 | **new** `get_food_day` (read) | Returns the `GET /v2/food/day` body. |

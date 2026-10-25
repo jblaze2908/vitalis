@@ -97,6 +97,8 @@ test("log_sets: names resolve, retries are no-ops, gaps start new sessions, warm
   const a = await call(writeTok, "log_sets", { sets, title: "Push" });
   assert.equal(a.isError, false, a.text);
   assert.equal(a.data.logged.length, 4);
+  assert.deepEqual(a.data.next_sets[0], { exercise: { id: "barbell-bench-press-medium-grip", name: "Barbell Bench Press - Medium Grip" }, working_sets_today: 3,
+    today_target: null, next: "No earlier session to set a target from; today's sets become next time's baseline." });
   const again = await call(writeTok, "log_sets", { sets });
   assert.equal(again.data.logged.length, 0);
   assert.equal(again.data.already_logged.length, 4);
@@ -178,4 +180,14 @@ test("food and targets over MCP; training summary carries heat, splits and weekl
   assert.ok(t.data.effective.kcal > 0);
   const sum = await call(readTok, "get_training_summary", { from: "2026-10-01", to: "2026-10-07" });
   assert.equal(Object.keys(sum.data.heat).length, 17); assert.ok(Array.isArray(sum.data.splits)); assert.equal(Object.keys(sum.data.weekly_sets.status).length, 17);
+});
+
+test("log_sets: next_sets carries today's target from last session and the next set", async () => {
+  const t = (d, hm) => `2026-10-${d}T${hm}:00+05:30`;
+  const r = await call(writeTok, "log_sets", { sets: [{ id: "ns-1", exercise: "bench", weight_kg: 62.5, reps: 8, performed_at: t("09", "19:10") }] });
+  assert.equal(r.isError, false, r.text);
+  const n = r.data.next_sets[0];
+  assert.equal(n.today_target, "62.5 kg × 8 for 3 sets", "60 kg × 8 × 3 hit last time: add 2.5 kg");
+  assert.equal(n.working_sets_today, 1);
+  assert.equal(n.next, "Set 2 of 3: 62.5 kg × 8");
 });

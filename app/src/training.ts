@@ -62,7 +62,7 @@ export function logSets(input: { session_id?: string; title?: string; sets: SetI
     run("UPDATE sessions SET updated_at=? WHERE id=?", now(), session.id);
     markDirty([localDay(first.ms, first.offsetMin)]);
     return { session: { id: session.id, title: session.title, started: isoAt(session.started_at, session.tz_offset_min), created: session.created },
-      logged, already_logged: already };
+      logged, already_logged: already, next_sets: nextSets(session.id, [...new Set(resolved.map((r) => r!.id))]) };
   });
 }
 
@@ -232,6 +232,24 @@ export function exerciseRecord(nameOrId: string, limit = 5) {
     records: record ? { best_e1rm_kg_estimate: record.e1rm_kg_estimate, best_set: record.best_set, on: record.day, heaviest_kg: heaviest } : null,
     next: perfs[0] ? suggest(ex, perfs[0]) : { rule: "no history", suggestion: "No sets logged for this exercise yet.", weight_kg: null, reps: null, sets: null },
     perfs };
+}
+
+/**
+ * What to do next for each exercise just logged, so an agent can answer "and my next set?" in the same call.
+ * Today's target is last session's double-progression suggestion; one history read per exercise, per log_sets call.
+ */
+function nextSets(sessionId: string, exerciseIds: string[]) {
+  return exerciseIds.map((id) => {
+    const r = exerciseRecord(id, 1), ex = resolveExercise(id);
+    const today = r.perfs.find((p) => p.session_id === sessionId), prev = r.perfs.find((p) => p.session_id !== sessionId);
+    const done = (today?.sets ?? []).filter((x) => x.kind !== "warmup").length;
+    const plan = prev && "exercise" in ex ? suggest(ex.exercise, prev) : null;
+    let next: string;
+    if (!plan || plan.weight_kg === null || plan.reps === null || plan.sets === null) next = "No earlier session to set a target from; today's sets become next time's baseline.";
+    else if (done < plan.sets) next = `Set ${done + 1} of ${plan.sets}: ${plan.weight_kg} kg × ${plan.reps}`;
+    else next = `${done} of ${plan.sets} target sets done; extra sets are optional.`;
+    return { exercise: { id, name: r.exercise.name }, working_sets_today: done, today_target: plan?.suggestion ?? null, next };
+  });
 }
 
 /** Double progression: when every working set hit its target reps, add one load step; otherwise repeat the weight. */

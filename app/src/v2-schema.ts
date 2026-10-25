@@ -24,7 +24,8 @@ const event = z.object({ type: z.union([z.string(), z.int()]), ...interval, meta
 const stat = z.object({ sum: z.number().nullish(), min: z.number().nullish(), avg: z.number().nullish(), max: z.number().nullish(), unit: text }).passthrough();
 export const sampleSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("quantity"), value: z.number(), unit: text, series: z.array(point).optional() }).passthrough(),
-  z.object({ ...base, kind: z.literal("category"), value: z.int(), value_label: text }).passthrough(),
+  // HealthKit values newer than the exporter's label table arrive with a null label; the int value is what counts.
+  z.object({ ...base, kind: z.literal("category"), value: z.int(), value_label: text.nullable() }).passthrough(),
   z.object({ ...base, kind: z.literal("workout"), activity_type: z.int(), activity_name: text, duration_s: z.number().nonnegative(),
     events: z.array(event), activities: z.array(z.object({ uuid: text, activity_type: z.int(), activity_name: text, ...interval,
       metadata: object.nullish(), statistics: z.record(z.string(), stat) }).passthrough().refine(ordered, "Activity end precedes start")),
