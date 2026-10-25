@@ -64,7 +64,8 @@ final class BodyStore {
     }
 
     /// Spec 20 §4 Log weight: (1) Health sample when asked, (2) queue `POST /v2/weight`, (3) show the server's block.
-    func saveWeight(tenths: Int, at date: Date, alsoHealth: Bool) async {
+    /// `settles: false` returns once the POST is queued (Siri can't wait for delivery; the outbox persists it).
+    func saveWeight(tenths: Int, at date: Date, alsoHealth: Bool, settles: Bool = true) async {
         let kg = Double(tenths) / 10
         var hkUUID: UUID?
         var healthFailed = false
@@ -77,7 +78,7 @@ final class BodyStore {
         guard let request = try? APIRequest.postWeight(entry) else { return }
         let outboxID = await writes.send(request)
         lastSaved = SavedWeight(outboxID: outboxID, entryID: entryID, hkUUID: hkUUID, kg: kg, healthFailed: healthFailed)
-        await settle(outboxID)
+        if settles { await settle(outboxID) }
     }
 
     /// Removes both copies: drops the queued POST if unsent, else queues the DELETE; deletes the Health sample either way.
