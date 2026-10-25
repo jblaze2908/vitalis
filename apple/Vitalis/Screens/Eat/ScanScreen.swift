@@ -14,6 +14,8 @@ struct ScanScreen: View {
     @State private var photo: LabelImage?
     @State private var reading = false
     @State private var typedCode = ""
+    /// Share of the pack (or serving) eaten, set before adding: half a bag of chips is ½.
+    @State private var amount: Double = 1
 
     init(store: EatStore, slot: String, barcode: BarcodeStore = .live(), onDescribe: @escaping (String) -> Void, onDone: @escaping () -> Void) {
         self.store = store; self.slot = slot; self.onDescribe = onDescribe; self.onDone = onDone
@@ -150,26 +152,24 @@ struct ScanScreen: View {
     }
 
     private func foundPanel(_ r: BarcodeResponse, _ item: BarcodeResponse.Item) -> some View {
-        sheetPanel {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let label = r.label { MonoLabel(label) }
-                    HeadlineLines(HeadlineLines.split(item.name, maxChars: 16), size: 30)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(FoodFormat.kcal(item.serving.kcal)).vNumber(40)
-                    MonoLabel("Kcal")
-                }
+        let portion = ScanPortion(item: item, factor: amount)
+        return sheetPanel {
+            VStack(alignment: .leading, spacing: 8) {
+                if let label = r.label { MonoLabel(label) }
+                HeadlineLines(HeadlineLines.split(item.name, maxChars: 18), size: 28)
             }
-            Rule().padding(.vertical, 16)
-            MacroColumns(protein: item.serving.proteinG, carbs: item.serving.carbsG, fat: item.serving.fatG)
-            PrimaryButton("Add to \(slot.slotTitle)") {
-                let draft = FoodDraft(name: item.name, serving: item.serving)
+            AmountControl(factor: $amount, baseGrams: portion.baseGrams, baseName: portion.baseName, kcal: portion.nutrients.kcal,
+                          maxFactor: portion.isPack ? 1 : 3)
+                .padding(.top, 16)
+            MacroColumns(protein: portion.nutrients.proteinG, carbs: portion.nutrients.carbsG, fat: portion.nutrients.fatG).padding(.top, 14)
+            PrimaryButton("Add to \(slot.slotTitle) · \(FoodFormat.kcal(portion.nutrients.kcal)) kcal") {
+                let n = portion.nutrients
+                let draft = FoodDraft(name: item.name, portionText: portion.label, grams: portion.grams, kcal: n.kcal,
+                                      proteinG: n.proteinG, carbsG: n.carbsG, fatG: n.fatG)
                 Task { await store.log([draft], slot: slot, source: "barcode", sourceRef: r.code) }
                 onDone()
             }
-            .padding(.top, 22)
+            .padding(.top, 18)
         }
     }
 
@@ -254,3 +254,33 @@ private struct Brackets: Shape {
         .onAppear { VFont.register() }
 }
 #endif
+
+/// What a scanned product's amount means: a share of the whole pack when its size is known, else of one serving.
+/// Nutrients come from per-100 g values when the server has them, so ½ of a 52 g pack is exactly 26 g.
+struct ScanPortion {
+    let baseGrams: Double?
+    let baseName: String
+    let isPack: Bool
+    let grams: Double?
+    let label: String
+    let nutrients: Nutrients
+
+    init(item: BarcodeResponse.Item, factor: Double) {
+        if let pack = item.packageG, pack > 0 { baseGrams = pack; baseName = "pack"; isPack = true }
+        else { baseGrams = item.serving.grams; baseName = "serving"; isPack = false }
+        let g = baseGrams.map { $0 * factor }
+        grams = g.map { ($0 * 10).rounded() / 10 }
+        let share = AmountControl.factorText(factor)
+        label = isPack ? (factor == 1 ? "1 pack" : "\(share) pack") + (g.map { " · \(AmountControl.grams($0)) g" } ?? "")
+            : factor == 1 ? item.serving.label.lowercased() : "\(share) × \(item.serving.label.lowercased())"
+        if let per = item.per100g, let g {
+            let f = g / 100
+            nutrients = Nutrients(kcal: (per.kcal * f).rounded(), proteinG: per.proteinG.map { ($0 * f * 10).rounded() / 10 },
+                                  carbsG: per.carbsG.map { ($0 * f * 10).rounded() / 10 }, fatG: per.fatG.map { ($0 * f * 10).rounded() / 10 })
+        } else {
+            let s = item.serving
+            nutrients = Nutrients(kcal: (s.kcal * factor).rounded(), proteinG: s.proteinG.map { $0 * factor },
+                                  carbsG: s.carbsG.map { $0 * factor }, fatG: s.fatG.map { $0 * factor })
+        }
+    }
+}

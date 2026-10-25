@@ -65,30 +65,20 @@ struct TodayScreen: View {
     var body: some View {
         let status = store.status(now: store.now())
         let stale = status.isStale && store.today.value != nil
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    TodayTop(label: statusLabel(status), tint: status.isStale ? .watch : .steel, pulse: store.today.value?.pulse)
-                    Group {
-                        if stale, case .stale(_, let section, let cause) = status.status {
-                            staleBody(section: section, cause: cause)
-                        } else {
-                            homeBody
-                        }
-                    }
-                    .padding(.horizontal, VSpace.gutter)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                TabHeader("Today") { headerTrailing(status) }
+                    .padding(.horizontal, 20).padding(.top, 2)
+                if stale, case .stale(_, let section, let cause) = status.status {
+                    staleBody(section: section, cause: cause).padding(.horizontal, VSpace.gutter)
+                } else {
+                    homeBody
                 }
-                .padding(.bottom, VSpace.gutter)
             }
-            .refreshable { if live { await AppModel.shared.syncNow(); await store.refresh() } }
-            if !stale, store.phase != .loading, let label = store.actionLabel {
-                PrimaryButton(label) { store.apply(store.intent, router: router) }
-                    .padding(.horizontal, VSpace.gutter)
-                    .padding(.top, 8)
-                    .padding(.bottom, VSpace.buttonBottomAboveTabs)
-            }
+            .padding(.bottom, VSpace.gutter)
         }
-        // Below the system status bar, like the other tabs: its icons would cover the SYNCED label.
+        .refreshable { if live { await AppModel.shared.syncNow(); await store.refresh() } }
+        // Below the system status bar, like the other tabs: its icons would cover the header.
         .task(id: scenePhase) {
             guard live, scenePhase == .active else { return }
             store.observeExporter(AppModel.shared.$snapshot)
@@ -103,174 +93,146 @@ struct TodayScreen: View {
         .onChange(of: live ? Services.shared.writesVersion : 0) { Task { await store.refresh() } }
     }
 
-    private func statusLabel(_ status: StaleState) -> String {
-        guard store.phase != .loading else { return "" }
-        if store.phase == .failed { return "OFFLINE" }
-        switch status.status {
-        case .synced(let label), .offline(let label): return label
-        case .stale(let label, _, _): return label
-        }
-    }
-
-    // MARK: Home (frame 03)
-
-    @ViewBuilder private var homeBody: some View {
-        let t = store.today.value
-        VStack(alignment: .leading, spacing: 0) {
-            nowBlock(t)
-            if store.phase == .failed {
-                Text("Connect to your server to see today.").vBody().padding(.top, 12)
-                SecondaryButton("Try again") { Task { await store.refresh() } }.padding(.top, 12)
-            }
-            recovery(t?.recovery).padding(.top, 3)
-            VSection { fuelActivity(t) }
-            VSection(top: 15) { training(t) }
-        }
-    }
-
-    private func nowBlock(_ t: TodayResponse?) -> some View {
-        let label = ["Now", t?.verdict.label].compactMap { $0 }.joined(separator: " · ")
-        let lines = t.map { HeadlineLines.split($0.verdict.headline) } ?? ["–"]
-        return VStack(alignment: .leading, spacing: 0) {
-            MonoLabel(label, tint: .pulse)
-            HeadlineLines(lines, size: 46, colors: t == nil ? [VColor.steel] : []).padding(.top, TodayLayout.labelToHeadline)
-        }
-        .padding(.top, TodayLayout.afterPulse)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(["Now" + (t?.verdict.label.map { ", \($0.lowercased())" } ?? ""), t?.verdict.headline].compactMap { $0 }.joined(separator: ". "))
-        .overlay(alignment: .topTrailing) {
-            // The Settings gear now sits on every tab (RootView); the date reads as a link to the digest.
-            HStack(alignment: .firstTextBaseline, spacing: 14) { dateButton(t?.day) }
-                .padding(.top, TodayLayout.afterPulse)
-        }
-    }
-
-    @ViewBuilder private func dateButton(_ day: String?) -> some View {
-        if let label = TodayFormat.dateLabel(day: day) {
-            // Reopens today's digest without touching the dismissed flag.
-            Button { router.showsDigest = true } label: { MonoLabel("\(label) ›", tint: .bone).hitSlop() }
+    /// The date opens the digest; when the phone can't reach the server it says so instead.
+    @ViewBuilder private func headerTrailing(_ status: StaleState) -> some View {
+        if store.phase == .failed {
+            MonoLabel("Offline", tint: .watch)
+        } else if let label = TodayFormat.dateLabel(day: store.today.value?.day) {
+            Button { router.showsDigest = true } label: { MonoLabel(label, tint: .steel).hitSlop() }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(label). Morning digest")
         }
     }
 
-    @ViewBuilder private func recovery(_ r: TodayResponse.Recovery?) -> some View {
-        if let r, r.status != "ok" {
-            NoScoreBlock(reason: r.reason).padding(.top, 16)
-        } else {
-            let score = TodayFormat.number(r?.score)
-            HStack(alignment: .bottom, spacing: TodayLayout.columnGap) {
-                // Recovery is HRV and resting HR against your range plus sleep: Body's vitals show those parts.
-                Button { router.showBody(.vitals) } label: {
-                    VStack(alignment: .leading, spacing: -2.4) {
-                        Text(score ?? "–").vNumber(92, color: score == nil ? VColor.steel : nil).lineLimit(1).fixedSize()
-                        MonoLabel("Recovery ›")
+    // MARK: Home (2e Today)
+
+    @ViewBuilder private var homeBody: some View {
+        let t = store.today.value
+        VStack(alignment: .leading, spacing: 0) {
+            HeadlineLines(t.map { TodayCopy.headline($0) } ?? ["–"], size: 36, colors: t == nil ? [VColor.steel] : [])
+                .padding(.top, 9).padding(.horizontal, 20)
+            if store.phase == .failed {
+                Text("Connect to your server to see today.").vBody().padding(.top, 12).padding(.horizontal, 20)
+                SecondaryButton("Try again") { Task { await store.refresh() } }.padding(.top, 12).padding(.horizontal, 20)
+            }
+            VStack(spacing: 10) {
+                recoveryCard(t?.recovery)
+                // Cards in a row share the taller one's height.
+                HStack(spacing: 10) {
+                    vitalCard("HRV", t?.recovery.parts?.hrv, unit: "ms")
+                    vitalCard("Resting HR", t?.recovery.parts?.restingHr, unit: "bpm")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    sleepCard(t?.sleep)
+                    caloriesCard(t?.fuel)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                stepsCard(t?.activity)
+                musclesCard(t?.training)
+            }
+            .padding(.horizontal, 16).padding(.top, 14)
+        }
+    }
+
+    private func tap<V: View>(_ action: @escaping () -> Void, @ViewBuilder _ label: () -> V) -> some View {
+        Button(action: action) { label().contentShape(Rectangle()) }.buttonStyle(.plain)
+    }
+
+    // Recovery is HRV and resting HR against your range plus sleep: Body's vitals show those parts.
+    @ViewBuilder private func recoveryCard(_ r: TodayResponse.Recovery?) -> some View {
+        let ok = r?.status == "ok"
+        tap({ router.showBody(.vitals) }) {
+            VCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    CardHeader("Recovery", status: TodayCopy.recoveryStatus(r))
+                    if ok || r == nil {
+                        Figure(TodayFormat.number(r?.score) ?? "–", unit: "/100", size: 42, color: r?.score == nil ? VColor.steel : nil)
+                        BandScale(score: r?.score, ease: r?.bands?.ease ?? 45, steady: r?.bands?.steady ?? 60, ready: r?.bands?.ready ?? 75)
+                    } else {
+                        Figure("–", size: 42, color: VColor.steel)
+                        if let reason = r?.reason { Text(reason).vUI(13, weight: 400, color: VColor.muted).fixedSize(horizontal: false, vertical: true) }
                     }
                 }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(["Recovery \(score ?? "not available")", r?.band].compactMap { $0 }.joined(separator: ", "))
-                .accessibilityAddTraits(.isButton)
-                VStack(spacing: 0) {
-                    Button { router.tab = .sleep } label: { row("Sleep ›", TodayFormat.number(r?.parts?.sleep?.score), tint: nil, arrow: nil) }
-                    Button { router.showBody(.vitals) } label: { vital("HRV ›", r?.parts?.hrv) }
-                    Button { router.showBody(.vitals) } label: { vital("Resting ›", r?.parts?.restingHr, showsRule: false) }
-                }
-                .buttonStyle(.plain)
             }
         }
-    }
-
-    private func vital(_ key: String, _ part: TodayResponse.VitalPart?, showsRule: Bool = true) -> some View {
-        row(key, TodayFormat.number(part?.value), tint: part?.tint, arrow: TodayFormat.arrow(part?.arrow), showsRule: showsRule)
-    }
-
-    private func row(_ key: String, _ value: String?, tint: String?, arrow: VArrow?, showsRule: Bool = true) -> some View {
-        ReadingRow(key, value: value ?? "–", tint: value == nil ? .steel : VTint.server(tint, else: .bone),
-                   arrow: value == nil ? nil : arrow, showsRule: showsRule)
-    }
-
-    private func fuelActivity(_ t: TodayResponse?) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            fuel(t?.fuel).frame(maxWidth: .infinity, alignment: .leading)
-            activity(t?.activity).frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private func fuel(_ f: TodayResponse.Fuel?) -> some View {
-        let left = f?.kcalLeft
-        let over = (left ?? 0) < 0
-        let value = TodayFormat.number(left?.magnitude)
-        return VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-            Button { router.tab = .eat } label: {
-                VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-                    MonoLabel(over ? "Over by ›" : "Fuel left ›", tint: over ? .watch : .steel)
-                    Text(value ?? "–").vNumber(32, color: value == nil ? VColor.steel : over ? VColor.watch : nil).lineLimit(1)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
-            if let next = f?.nextLabel {
-                Button { router.sheet = .quickAdd(slot: f?.nextSlot) } label: { MonoLabel("+ \(next)", tint: .bone).hitSlop() }
-                    .buttonStyle(.plain)
-            } else {
-                MonoLabel("–")
-            }
-        }
-    }
-
-    private func activity(_ a: TodayResponse.Activity?) -> some View {
-        let steps = TodayFormat.number(a?.steps)
-        let target = ["OF \(TodayFormat.number(a?.stepsTarget) ?? "–")", TodayFormat.pace(a?.stepsPace)].compactMap { $0 }.joined(separator: " · ")
-        // Decided in brief 01: active energy rides as a second line so Activity shows both pillars.
-        let active = ["\(TodayFormat.number(a?.activeKcal) ?? "–") ACTIVE KCAL", TodayFormat.pace(a?.activeKcalPace)].compactMap { $0 }.joined(separator: " · ")
-        return Button { router.showBody(.activity) } label: {
-            VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-                MonoLabel("Steps ›")
-                Text(steps ?? "–").vNumber(32, color: steps == nil ? VColor.steel : nil).lineLimit(1)
-                VStack(alignment: .leading, spacing: 4) {
-                    MonoLabel(target)
-                    MonoLabel(active)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(["Recovery", TodayFormat.number(r?.score) ?? "not available", r?.band].compactMap { $0 }.joined(separator: ", "))
     }
 
-    @ViewBuilder private func training(_ t: TodayResponse?) -> some View {
-        let tr = t?.training
-        // Heat 0 everywhere = no working set in 30 days; a "Push fresh" label over a blank body would mislead.
-        let empty = tr.map { $0.heat.values.allSatisfy { $0 == 0 } } ?? false
-        let lines: [(String, Color)] = empty ? [("No workouts yet", VColor.bone)]
-            : [tr?.freshLabel.map { ($0, VColor.bone) }, tr?.loadedLabel.map { ($0, VColor.steel) }].compactMap { $0 }
-        HStack(alignment: .center, spacing: TodayLayout.mapGap) {
-            Button { router.tab = .train } label: {
-                MuscleMap(heat: tr?.heat ?? [:], view: .both).frame(width: TodayLayout.mapWidth)
+    private func vitalCard(_ title: String, _ part: TodayResponse.VitalPart?, unit: String) -> some View {
+        let tone = VTone.server(part?.tint)
+        let usual = part?.usualRange.flatMap { $0.count == 2 ? $0[0]...$0[1] : nil }
+        return tap({ router.showBody(.vitals) }) {
+            VCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    CardHeader(title, status: part?.value == nil ? nil : (TodayCopy.vitalWord(part), tone))
+                    Sparkline(part?.week ?? [], usual: usual, tone: tone).frame(height: 26).padding(.top, 12)
+                    Figure(TodayFormat.number(part?.value) ?? "–", unit: unit, color: part?.value == nil ? VColor.steel : nil).padding(.top, 12)
+                }
             }
-            .buttonStyle(.plain)
-            VStack(alignment: .leading, spacing: 12) {
-                Button { router.tab = .train } label: {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                            Text(line.0).vHeadline(22, color: line.1).lineLimit(1).minimumScaleFactor(0.6)
-                                .frame(height: TodayLayout.trainingLine, alignment: .bottom)
+        }
+    }
+
+    private func sleepCard(_ sl: TodayResponse.SleepSummary?) -> some View {
+        let asleep = sl?.asleepH, need = sl?.needH
+        return tap({ router.tab = .sleep }) {
+            VCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    CardHeader("Sleep", status: TodayCopy.sleepStatus(sl))
+                    Meter(fraction: (asleep ?? 0) / max(need ?? 8, 1) * 0.88, marker: need == nil ? nil : 0.88,
+                          caption: need.map { "Need \(TodayCopy.hm($0))" }, leading: asleep.map(TodayCopy.hm))
+                        .padding(.top, 10)
+                    Figure(TodayFormat.number(sl?.score) ?? "–", unit: "score", color: sl?.score == nil ? VColor.steel : nil).padding(.top, 12)
+                }
+            }
+        }
+    }
+
+    private func caloriesCard(_ f: TodayResponse.Fuel?) -> some View {
+        let eaten = f?.kcalEaten ?? 0, target = f?.kcalTarget
+        let over = (f?.kcalLeft ?? 0) < 0
+        return tap({ router.tab = .eat }) {
+            VCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    CardHeader("Calories", status: target == nil ? nil : (over ? ("Over", .watch) : ("On track", .good)))
+                    Meter(fraction: target.map { eaten / max($0, 1) } ?? 0, fill: over ? VColor.watch : VColor.bone).padding(.top, 25)
+                    Figure(TodayFormat.number(f?.kcalEaten) ?? "–", unit: target.map { "/\(TodayFormat.number($0) ?? "")" }).padding(.top, 25)
+                }
+            }
+        }
+    }
+
+    private func stepsCard(_ a: TodayResponse.Activity?) -> some View {
+        let target = Double(a?.stepsTarget ?? 0), steps = Double(a?.steps ?? 0), expected = a?.stepsExpectedNow.map(Double.init)
+        return tap({ router.showBody(.activity) }) {
+            VCard {
+                HStack(alignment: .bottom, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 10) {
+                            Text("Steps").vUI(14, weight: 600)
+                            if let s = TodayCopy.paceStatus(a?.stepsPace) { StatusWord(s.0, tone: s.1) }
                         }
+                        Figure(TodayFormat.number(a?.steps) ?? "–", unit: a?.stepsTarget.map { "/\(TodayFormat.number($0) ?? "")" },
+                               color: a?.steps == nil ? VColor.steel : nil)
                     }
-                    .accessibilityElement(children: .combine)
-                }
-                .buttonStyle(.plain)
-                // Empty training offers a start as a secondary unless the verdict's primary already does.
-                if empty, t?.verdict.action?.kind != "start_workout" {
-                    SecondaryButton(store.startLabel) { router.sheet = .workoutStart }
+                    .fixedSize()
+                    Meter(fraction: target > 0 ? steps / target : 0, marker: target > 0 ? expected.map { $0 / target } : nil,
+                          caption: expected.map { "Usual by now \(TodayFormat.number($0) ?? "")" })
+                        .padding(.bottom, 6)
                 }
             }
-            .padding(.top, 3)
-            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder private func musclesCard(_ tr: TodayResponse.Training?) -> some View {
+        tap({ router.tab = .train }) {
+            VCard {
+                VStack(spacing: 6) {
+                    CardHeader("Muscles", status: TodayCopy.muscleStatus(tr))
+                    MuscleMap(heat: tr?.heat ?? [:], view: .both, seam: VColor.card).frame(width: 168, height: 136)
+                }
+            }
         }
     }
 
@@ -279,11 +241,6 @@ struct TodayScreen: View {
     private func staleBody(section: String, cause: String) -> some View {
         let t = store.today.value
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Spacer(minLength: 8)
-                dateButton(t?.day)
-            }
-            .padding(.top, TodayLayout.afterPulse)
             VStack(alignment: .leading, spacing: 0) {
                 Rectangle().fill(VColor.watch).frame(height: 1.5)
                 MonoLabel(section, tint: .watch).padding(.top, VSpace.sectionPad)
@@ -292,25 +249,64 @@ struct TodayScreen: View {
                 PrimaryButton("Fix sync") { router.open(.settingsSync) }.padding(.top, 19)
             }
             .padding(.top, 15)
-            VSection(top: 32) { recovery(t?.recovery).padding(.top, 4) }
-            if let t, let action = t.verdict.action {
-                VSection(top: 31) { staleAction(t, action).padding(.top, 4) }
-            }
+            recoveryCard(t?.recovery).padding(.top, 24)
+        }
+    }
+}
+
+/// Today's words: headline lines, status words and h:mm, kept apart from layout so tests can pin them.
+enum TodayCopy {
+    /// "Steady day." over the server headline; an unknown band shows the headline alone.
+    static func headline(_ t: TodayResponse) -> [String] {
+        let lead: String? = switch t.recovery.band { case "ready": "Ready day."; case "steady": "Steady day."; case "ease": "Easy day."; case "rest": "Rest day."; default: nil }
+        let head = t.verdict.headline.hasSuffix(".") ? t.verdict.headline : t.verdict.headline + "."
+        return lead.map { [$0, head] } ?? HeadlineLines.split(head)
+    }
+
+    static func recoveryStatus(_ r: TodayResponse.Recovery?) -> (String, VTone)? {
+        guard let r else { return nil }
+        if r.status == "calibrating" { return ("Calibrating", .quiet) }
+        if r.status != "ok" { return ("Missing", .quiet) }
+        switch r.band {
+        case "ready": return ("Ready", .good)
+        case "steady": return ("Steady", .usual)
+        case "ease": return ("Ease", .watch)
+        case "rest": return ("Rest", .watch)
+        default: return nil
         }
     }
 
-    /// The verdict's action, demoted to a secondary button while sync is broken.
-    private func staleAction(_ t: TodayResponse, _ action: TodayResponse.Action) -> some View {
-        let training = action.kind == "start_workout"
-        return HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 0) {
-                MonoLabel(training ? "Training" : "Now")
-                HeadlineLines(HeadlineLines.split(t.verdict.headline, maxChars: 22), size: 26)
-                    .padding(.top, 9)
-            }
-            Spacer(minLength: 0)
-            SecondaryButton(training ? "Start" : (store.actionLabel ?? action.label)) { store.apply(store.intent, router: router) }
+    /// The word follows the server's flag (tint + arrow) so it never disagrees with the dot; unflagged reads Usual.
+    static func vitalWord(_ p: TodayResponse.VitalPart?) -> String {
+        guard let p, p.tint != nil else { return "Usual" }
+        switch p.arrow { case "up": return "High"; case "down": return "Low"; default: return "Off usual" }
+    }
+
+    static func sleepStatus(_ s: TodayResponse.SleepSummary?) -> (String, VTone)? {
+        guard let a = s?.asleepH, let n = s?.needH else { return nil }
+        return a + 0.25 < n ? ("Short", .watch) : a >= n ? ("Good", .good) : ("OK", .usual)
+    }
+
+    static func paceStatus(_ raw: String?) -> (String, VTone)? {
+        switch raw {
+        case "ahead": ("Ahead", .good)
+        case "on_pace": ("On pace", .good)
+        case "behind": ("Behind", .watch)
+        default: nil
         }
+    }
+
+    /// The loaded muscle in red, else Clear; a body that has never trained says so.
+    static func muscleStatus(_ tr: TodayResponse.Training?) -> (String, VTone)? {
+        guard let tr else { return nil }
+        if tr.heat.values.allSatisfy({ $0 == 0 }) { return ("No workouts yet", .quiet) }
+        if let loaded = tr.loadedLabel { return (loaded.prefix(1).uppercased() + loaded.dropFirst().lowercased(), .load) }
+        return ("Clear", .good)
+    }
+
+    static func hm(_ hours: Double) -> String {
+        let m = Int((hours * 60).rounded())
+        return "\(m / 60):" + String(format: "%02d", m % 60)
     }
 }
 

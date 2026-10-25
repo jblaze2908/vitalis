@@ -11,12 +11,26 @@ public extension Color {
 /// Vital line colours (spec 30). LOCKED values first; derived greys only for the roles named.
 public enum VColor {
     public static let ground = Color(hex: 0x000000)
-    public static let pulse = Color(hex: 0xFF5233)
-    public static let bone = Color(hex: 0xF4F1EC)
+    public static let pulse = Color(hex: 0xFF4538)
+    public static let bone = Color(hex: 0xF2EEE6)
     public static let steel = Color(hex: 0x8C8C8C)
     public static let rule = Color(hex: 0x1E1E1E)
-    public static let good = Color(hex: 0x5FD4B0)
-    public static let watch = Color(hex: 0xF2B33D)
+    public static let good = Color(hex: 0x6FCF97)
+    public static let watch = Color(hex: 0xE9B949)
+
+    // 2e cards (Draft canvas SgbW4nfdaw): every card is a title, a dot-and-word status, a visual, then the number.
+    public static let card = Color(hex: 0x161616)
+    public static let cardRaised = Color(hex: 0x1E1E1E)
+    public static let muted = Color(hex: 0xA8A8A8)
+    public static let usual = Color(hex: 0xCFC9BF)
+    public static let meterTrack = Color(hex: 0x2E2E2E)
+    public static let hairline = Color(hex: 0x262626)
+    /// One chart colour per tab, so each tab's centrepiece reads as its own; status dots keep good/watch everywhere.
+    public static let sleepDeep = Color(hex: 0x5D63A8)
+    public static let sleepCore = Color(hex: 0x6F8FC2)
+    public static let sleepREM = Color(hex: 0x8DBFCB)
+    public static let eat = Color(hex: 0xFF8A3D)
+    public static let body = Color(hex: 0xA78BFA)
 
     public static let future = Color(hex: 0x333333)
     public static let track = Color(hex: 0x262626)
@@ -26,17 +40,16 @@ public enum VColor {
     public static let disabled = Color(hex: 0x555555)
     public static let rawDot = Color(hex: 0x4A4A4A)
     public static let camera = Color(hex: 0x141414)
-    public static let muscleBase = Color(hex: 0x151515)
+    public static let muscleBase = Color(hex: 0x272727)
     public static let tickMajor = Color(hex: 0x666666)
 
-    /// Muscle heat 0–4 (spec 30 → MuscleMap).
+    /// Muscle heat 0–4 as load: grey for none, red as load rises. Server 1 is "recovered" (load < 0.5), so it shares 0's grey.
     public static func heat(_ level: Int) -> Color {
         switch level {
-        case 1: return Color(hex: 0xF4F1EC)
-        case 2: return Color(hex: 0x8C8C8C)
-        case 3: return Color(hex: 0xFF7A5E)
-        case 4: return Color(hex: 0xFF5233)
-        default: return Color(hex: 0x222222)
+        case 2: return Color(hex: 0x8F352E)
+        case 3: return Color(hex: 0xC63E34)
+        case 4: return Color(hex: 0xFF4538)
+        default: return Color(hex: 0x363636)
         }
     }
 }

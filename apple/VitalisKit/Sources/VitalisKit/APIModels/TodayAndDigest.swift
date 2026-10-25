@@ -26,6 +26,21 @@ public struct TodayResponse: Codable, Sendable, Equatable {
         public let score: Int?
         public let arrow: String?
         public let tint: String?
+        /// Seven daily values ending today, oldest first (Today's sparkline); nil from older servers.
+        public let week: [Double?]?
+    }
+    /// Band floors (`ready ≥ 75`, `steady ≥ 60`, `ease ≥ 45`, else rest), so the band bar never keeps its own copy.
+    public struct Bands: Codable, Sendable, Equatable {
+        public let ready: Int
+        public let steady: Int
+        public let ease: Int
+    }
+    /// Last night for Today's Sleep card: hours asleep (naps excluded), need after any nap credit, score.
+    public struct SleepSummary: Codable, Sendable, Equatable {
+        public let asleepH: Double?
+        public let needH: Double?
+        public let score: Int?
+        public let band: String?
     }
     public struct RecoveryParts: Codable, Sendable, Equatable {
         public let sleep: ScoreBand?
@@ -41,6 +56,7 @@ public struct TodayResponse: Codable, Sendable, Equatable {
         public let nightsOfHistory: Int?
         public let nightsNeeded: Int?
         public let parts: RecoveryParts?
+        public let bands: Bands?
     }
     public struct Fuel: Codable, Sendable, Equatable {
         public let kcalTarget: Double?
@@ -76,6 +92,7 @@ public struct TodayResponse: Codable, Sendable, Equatable {
     public let generatedAt: String?
     public let verdict: Verdict
     public let recovery: Recovery
+    public let sleep: SleepSummary?
     public let fuel: Fuel
     public let activity: Activity
     public let training: Training

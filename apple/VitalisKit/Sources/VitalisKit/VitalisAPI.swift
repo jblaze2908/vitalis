@@ -127,6 +127,11 @@ public struct VitalisAPI: OutboxTransport {
     public func sleepWeek(end: String? = nil) async throws -> APIResponse<SleepWeekResponse> {
         try await get(SleepWeekResponse.self, "v2/sleep/week", query: Self.query(["end": end]))
     }
+
+    /// `month` = `YYYY-MM`; nil = this month.
+    public func sleepMonth(month: String? = nil) async throws -> APIResponse<SleepMonthResponse> {
+        try await get(SleepMonthResponse.self, "v2/sleep/month", query: Self.query(["month": month]))
+    }
     public func body(date: String? = nil) async throws -> APIResponse<BodyResponse> {
         try await get(BodyResponse.self, "v2/body", query: Self.query(["date": date]))
     }

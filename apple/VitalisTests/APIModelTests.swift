@@ -8,7 +8,7 @@ import VitalisKit
     static var models: [String: any Decodable.Type] { [
         "sync-status": SyncStatus.self, "targets": TargetsResponse.self, "targets-put": TargetsResponse.self,
         "today": TodayResponse.self, "digest": DigestResponse.self, "sleep": SleepResponse.self,
-        "sleep-week": SleepWeekResponse.self, "body": BodyResponse.self, "weight-post": WeightPostResponse.self,
+        "sleep-week": SleepWeekResponse.self, "sleep-month": SleepMonthResponse.self, "body": BodyResponse.self, "weight-post": WeightPostResponse.self,
         "weight-delete": WeightDeleteResponse.self, "training": TrainingResponse.self, "training-sessions": SessionsPage.self,
         "training-session": SessionDetail.self, "training-session-cardio": SessionDetail.self,
         "exercises-search": ExerciseList.self, "exercise": ExerciseDetail.self, "exercise-created": ExerciseCreated.self,

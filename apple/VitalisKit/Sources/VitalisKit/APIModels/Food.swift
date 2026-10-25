@@ -25,6 +25,11 @@ public struct FoodDayEntry: Codable, Sendable, Equatable {
     public let fatG: Double?
     public let estimate: Bool
     public let source: String
+    /// Sent back unchanged when an edit re-posts the entry under the same id; nil from older servers.
+    public let slot: String?
+    public let eatenAt: String?
+    public let sourceRef: String?
+    public let hkUuid: String?
 }
 
 public struct UsualMeal: Codable, Sendable, Equatable {
@@ -177,10 +182,12 @@ public struct BarcodeResponse: Codable, Sendable, Equatable {
         public let name: String
         public let brand: String?
         public let quantityLabel: String?
+        /// Whole-pack size in g (or ml), so a scan can log ½ or ¼ of the pack; nil when Open Food Facts doesn't know.
+        public let packageG: Double?
         public let per100g: Nutrients?
         public let serving: Serving
         // convertFromSnakeCase capitalises after a digit: `per_100g` arrives as `per100G`.
-        private enum CodingKeys: String, CodingKey { case name, brand, quantityLabel, per100g = "per100G", serving }
+        private enum CodingKeys: String, CodingKey { case name, brand, quantityLabel, packageG, per100g = "per100G", serving }
     }
     public let code: String
     public let found: Bool

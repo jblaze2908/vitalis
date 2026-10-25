@@ -11,6 +11,20 @@ public struct SleepResponse: Codable, Sendable, Equatable {
         public let asleepH: Double?
         public let asleepLabel: String?
         public let source: String?
+        /// Stages in time order (`deep` `core` `rem` `awake` `asleep`); nil for summarised nights or older servers.
+        public let segments: [Segment]?
+    }
+    public struct Segment: Codable, Sendable, Equatable {
+        public let stage: String
+        public let start: String
+        public let end: String
+    }
+    /// Sleep on the same day outside the night (sleep-split.ts): listed, never scored.
+    public struct Nap: Codable, Sendable, Equatable {
+        public let start: String
+        public let end: String
+        public let asleepH: Double
+        public let asleepLabel: String?
     }
     public struct Duration: Codable, Sendable, Equatable {
         public let asleepLabel: String?
@@ -19,6 +33,8 @@ public struct SleepResponse: Codable, Sendable, Equatable {
         public let needH: Double?
         public let needLabel: String?
         public let needBasis: String?
+        /// Hours a nap before this night took off its need.
+        public let napCreditH: Double?
     }
     public struct Part: Codable, Sendable, Equatable {
         public let key: String
@@ -52,21 +68,51 @@ public struct SleepResponse: Codable, Sendable, Equatable {
     public let stages: Stages?
     public let tonight: Tonight?
     public let freshness: Freshness?
+    public let naps: [Nap]?
+    public let totalH: Double?
 }
 
-// MARK: GET /v2/sleep/week (10 §5)
+// MARK: GET /v2/sleep/week and /v2/sleep/month (10 §5)
+
+/// One night in the week or month list; bed and wake are ISO with offset.
+public struct SleepNightRow: Codable, Sendable, Equatable {
+    public let day: String
+    public let score: Int?
+    public let asleepH: Double?
+    public let sleepStart: String?
+    public let sleepEnd: String?
+    public let napH: Double?
+}
+
+public struct SleepAverages: Codable, Sendable, Equatable {
+    public let asleepH: Double?
+    public let score: Int?
+    public let bedtime: String?
+    public let wake: String?
+    public let napH: Double?
+    public let nights: Int
+    public let missing: Int
+}
 
 public struct SleepWeekResponse: Codable, Sendable, Equatable {
-    public struct Night: Codable, Sendable, Equatable {
-        public let day: String
-        public let score: Int?
-        public let asleepH: Double?
-    }
+    public typealias Night = SleepNightRow
     public let end: String
     public let nights: [Night]
     public let avgScore: Int?
     public let bedtimeSpreadMin: Int?
     public let label: String?
+    public let freshness: Freshness?
+    public let avg: SleepAverages?
+    public let prevAvgScore: Int?
+}
+
+public struct SleepMonthResponse: Codable, Sendable, Equatable {
+    public let month: String
+    public let days: [SleepNightRow]
+    public let avg: SleepAverages?
+    public let prevAvgScore: Int?
+    public let prevMonth: String?
+    public let nextMonth: String?
     public let freshness: Freshness?
 }
 

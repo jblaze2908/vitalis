@@ -38,6 +38,8 @@ final class EatStore {
     struct Toast: Equatable {
         let mealID: String
         let text: String
+        /// Set when the toast follows a delete: Undo posts this entry back under its id (the server revives it).
+        var restore: FoodDayEntry? = nil
     }
 
     /// An entry still in the outbox, shown under its meal with `WAITING TO SYNC`.
@@ -57,6 +59,8 @@ final class EatStore {
     private(set) var pending: [PendingEntry] = []
     /// Meals whose Undo DELETE hasn't reached the server; hidden until it has.
     private(set) var deleting: Set<String> = []
+    /// Single entries deleted from Eat, hidden until the server's day stops listing them.
+    private(set) var deletedEntries: Set<String> = []
     private(set) var toast: Toast?
     private(set) var todayPulse: Pulse?
     private(set) var healthError: String?
@@ -165,11 +169,49 @@ final class EatStore {
         await queue.send(request)
     }
 
+    // MARK: Edit and delete
+
+    /// A changed amount, meal or time: the entry is re-posted under its id (the server updates it) and its Health sample
+    /// is replaced, since a HealthKit sample can't be edited. `factor` scales calories and macros from the logged numbers.
+    func update(_ e: FoodDayEntry, factor: Double, grams: Double?, portion: String?, slot: String, eatenAt: String?) async {
+        await repost(e, kcalFactor: factor, grams: grams, portion: portion, slot: slot, eatenAt: eatenAt)
+    }
+
+    func delete(_ e: FoodDayEntry) async {
+        deletedEntries.insert(e.id)
+        await queue.send(.deleteFoodEntry(id: e.id))
+        if let id = e.hkUuid.flatMap(UUID.init(uuidString:)) { try? await health.delete(uuids: [id]) }
+        showToast(Toast(mealID: e.mealId, text: "REMOVED \(e.name.uppercased())", restore: e))
+        await settle()
+    }
+
+    private func repost(_ e: FoodDayEntry, kcalFactor f: Double, grams: Double?, portion: String?, slot: String, eatenAt: String?) async {
+        let at = eatenAt ?? Self.iso(self.eatenAt(slot: slot), calendar: calendar)
+        let scale = { (v: Double?) in v.map { ($0 * f * 10).rounded() / 10 } }
+        var entry = FoodEntry(id: e.id, mealId: e.mealId, slot: slot, eatenAt: at, name: e.name, portionText: portion, grams: grams,
+                              kcal: (e.kcal * f).rounded(), proteinG: scale(e.proteinG), carbsG: scale(e.carbsG), fatG: scale(e.fatG),
+                              source: e.source, sourceRef: e.sourceRef, estimate: e.estimate)
+        if let old = e.hkUuid.flatMap(UUID.init(uuidString:)) { try? await health.delete(uuids: [old]) }
+        if let date = APIDate.parse(at),
+           let ids = try? await health.saveFood([FoodItemSample(entryID: e.id, name: e.name, eatenAt: date, kcal: entry.kcal,
+                                                                proteinG: entry.proteinG, carbsG: entry.carbsG, fatG: entry.fatG)]) {
+            entry.hkUuid = ids.first?.uuidString
+        }
+        guard let request = try? APIRequest.postFoodEntries([entry]) else { return }
+        await queue.send(request)
+        await settle()
+    }
+
     // MARK: Undo
 
     func undo() async {
         guard let toast else { return }
         dismissToast()
+        if let e = toast.restore {
+            deletedEntries.remove(e.id)
+            await repost(e, kcalFactor: 1, grams: e.grams, portion: e.portionText, slot: e.slot ?? defaultSlot, eatenAt: e.eatenAt)
+            return
+        }
         let record = adds.removeValue(forKey: toast.mealID)
         if let id = record?.outboxID, await queue.drop(id) {
             await refreshPending()
@@ -192,7 +234,9 @@ final class EatStore {
     var meals: [FoodDay.Meal] { (day.value?.meals ?? []).filter { !entries($0).isEmpty } }
 
     /// A meal's entries minus adds whose Undo hasn't reached the server (a slot can hold several adds).
-    func entries(_ meal: FoodDay.Meal) -> [FoodDayEntry] { meal.entries.filter { !deleting.contains($0.mealId) } }
+    func entries(_ meal: FoodDay.Meal) -> [FoodDayEntry] {
+        meal.entries.filter { !deleting.contains($0.mealId) && !deletedEntries.contains($0.id) }
+    }
 
     /// Unsent entries for the day on screen, by slot.
     func pendingEntries(slot: String) -> [FoodEntry] {

@@ -12,26 +12,29 @@ struct EatScreen: View {
     /// Asked once until answered: the calorie target starts from the goal (11 §8.2).
     @State private var needsGoal = false
     @State private var settingGoal = false
+    @State private var editing: EditTarget?
+
+    struct EditTarget: Identifiable { let entry: FoodDayEntry; let slot: String; let time: String?; let day: String; var id: String { entry.id } }
 
     init(store: EatStore = .shared) { self.store = store }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            EatChrome(status: status.label, tint: status.tint, pulse: store.todayPulse) {
-                ScrollView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    TabHeader("Eat") { addPill }.padding(.horizontal, 20).padding(.top, 2)
                     Group {
-                        if needsGoal { goalPrompt }
+                        if needsGoal { goalPrompt.padding(.horizontal, 20) }
                         if let day = store.day.value {
-                            if day.empty && !store.pending.contains(where: { $0.day == day.day }) { EmptyEat(day: day, store: store, open: open) }
-                            else { loaded(day) }
-                        } else { placeholder }
+                            if day.empty && !store.pending.contains(where: { $0.day == day.day }) {
+                                EmptyEat(day: day, store: store, open: open).padding(.horizontal, VSpace.gutter).padding(.top, 8)
+                            } else { loaded(day) }
+                        } else { placeholder.padding(.horizontal, VSpace.gutter) }
                     }
-                    .padding(.horizontal, VSpace.gutter)
-                    .padding(.top, 8)
                     .padding(.bottom, store.toast == nil ? 24 : 96)
                 }
-                .scrollIndicators(.hidden)
             }
+            .scrollIndicators(.hidden)
             if let toast = store.toast {
                 Toast(toast.text) { Task { await store.undo() } }
                     .padding(.bottom, 16)
@@ -43,6 +46,7 @@ struct EatScreen: View {
         .task { await store.load() }
         .task(id: Services.shared.writesVersion) { await checkGoal() }
         .sheet(isPresented: $settingGoal) { GoalSheet() }
+        .sheet(item: $editing) { t in FoodEditSheet(entry: t.entry, day: t.day, slot: t.slot, mealTime: t.time, store: store) }
         .onChange(of: Services.shared.writesVersion) { Task { await store.writesDelivered() } }
         .fullScreenCover(isPresented: $scanning, onDismiss: {
             guard let code = describeCode else { return }
@@ -97,33 +101,111 @@ struct EatScreen: View {
 
     // MARK: Loaded
 
-    /// While the Undo toast shows, frame 18: the just-added meal open, other meals collapsed, no quick actions.
-    @ViewBuilder private func loaded(_ day: FoodDay) -> some View {
-        let focus = store.toast != nil && store.meals.contains(where: \.justAdded)
-        VStack(alignment: .leading, spacing: 0) {
-            ScreenHeader(context: day.dateLabel ?? day.day, title: "Eat") { dayNav(day) }
-            hero(day)
-            if !focus {
-                VSection(top: 30) {
-                    HStack(spacing: 0) {
-                        ForEach(FoodTile.Kind.allCases.filter { $0 != .describe || store.describeAvailable }, id: \.self) { kind in
-                            FoodTile(kind: kind, style: .square) { open(kind) }
-                        }
-                    }
-                    .padding(.bottom, 14)
-                }
-            }
-            ForEach(store.meals, id: \.slot) { meal in mealSection(meal, day: day, focus: focus) }
-            ForEach(waitingOnlySlots(day), id: \.self) { slot in pendingSection(slot: slot, day: day) }
-            if !focus, let next = day.nextSlot, !store.meals.contains(where: { $0.slot == next }), !waitingOnlySlots(day).contains(next) {
-                VSection(top: 22) {
-                    slotHeader(title: next, detail: nil, kcal: nil, day: day, slot: next)
-                    usualButton(day)
-                }
-            }
-            if !focus, let note = day.targetNote { MonoLabel(note, size: .small).padding(.top, 22).fixedSize(horizontal: false, vertical: true) }
-            errorLine
+    private var addPill: some View {
+        Button { open(.usual) } label: {
+            Text("+ Add").vUI(14, weight: 700, color: Color(hex: 0x1A0C02)).padding(.horizontal, 13).frame(height: 30)
+                .background(VColor.eat, in: Capsule())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add food")
+    }
+
+    /// 2e Eat: the day as a curve on the clock, macros as readouts, then every food (tap to edit, swipe to delete).
+    @ViewBuilder private func loaded(_ day: FoodDay) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                HeadlineLines(EatCopy.headline(day), size: 36)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20).padding(.top, 9)
+            if day.nextDay != nil || day.prevDay != nil {
+                PeriodStepper(day.nextDay == nil ? "Today" : (day.dateLabel ?? day.day).capitalized,
+                              back: day.prevDay == nil ? nil : { Task { await store.goBack() } },
+                              forward: day.nextDay == nil ? nil : { Task { await store.goForward() } })
+                    .padding(.horizontal, 12)
+            }
+            HStack(alignment: .lastTextBaseline) {
+                Figure(FoodFormat.kcal(day.kcalEaten), unit: "kcal", size: 52, color: day.over ? VColor.watch : nil)
+                Spacer()
+                if let t = day.kcalTarget {
+                    VStack(alignment: .trailing, spacing: 4) { Text(FoodFormat.kcal(t)).vFigure(20); Text("Target").vLabel() }
+                }
+            }
+            .padding(.horizontal, 16).padding(.top, 16)
+            DayCurve(meals: store.meals, target: day.kcalTarget, eaten: day.kcalEaten, isToday: day.nextDay == nil, nextSlot: day.nextSlot)
+                .frame(height: 140).padding(.horizontal, 16).padding(.top, 12)
+            ReadoutRow(EatCopy.macros(day)).padding(.horizontal, 16).padding(.top, 18)
+            Text(day.nextDay == nil ? "Logged today" : "Logged").vLabel().padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 8)
+            VCard(padding: EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)) {
+                VStack(spacing: 0) {
+                    let rows = store.meals.flatMap { m in store.entries(m).map { (m, $0) } }
+                    ForEach(Array(rows.enumerated()), id: \.element.1.id) { i, row in
+                        SwipeRow(onDelete: { Task { await store.delete(row.1) } }, onEdit: { edit(row.1, row.0, day) }) {
+                            entryRow(row.1, meal: row.0)
+                        }
+                        if i < rows.count - 1 || nextSlotOpen(day) { Rectangle().fill(Color(hex: 0x232323)).frame(height: 1).padding(.leading, 14) }
+                    }
+                    ForEach(store.pending.filter { $0.day == day.day }) { p in pendingRow(p.entry) }
+                    if nextSlotOpen(day), let next = day.nextSlot { nextRow(next, day) }
+                }
+            }
+            .padding(.horizontal, 16)
+            if let note = day.targetNote { MonoLabel(note, size: .small).padding(.top, 18).padding(.horizontal, 20).fixedSize(horizontal: false, vertical: true) }
+            errorLine.padding(.horizontal, 20)
+        }
+    }
+
+    private func nextSlotOpen(_ day: FoodDay) -> Bool {
+        guard day.nextDay == nil, let next = day.nextSlot else { return false }
+        return !store.meals.contains { $0.slot == next }
+    }
+
+    private func edit(_ e: FoodDayEntry, _ meal: FoodDay.Meal, _ day: FoodDay) { editing = EditTarget(entry: e, slot: meal.slot, time: meal.time, day: day.day) }
+
+    private func entryRow(_ e: FoodDayEntry, meal: FoodDay.Meal) -> some View {
+        HStack(spacing: 12) {
+            Text(e.eatenAt.flatMap(APIDate.clockText) ?? meal.time ?? "").vUI(12, weight: 600, color: VColor.muted).lineLimit(1).fixedSize().frame(width: 40, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(e.name).vUI(15, weight: 500).lineLimit(1)
+                Text([meal.slot.capitalized, e.portionText].compactMap { $0 }.joined(separator: " · ")).vUI(13, weight: 400, color: VColor.muted).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(FoodFormat.kcal(e.kcal)).vFigure(16)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 11)
+        .contentShape(Rectangle())
+        .onTapGesture { if let day = store.day.value { edit(e, meal, day) } }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens to change the amount, meal or time")
+    }
+
+    private func pendingRow(_ e: FoodEntry) -> some View {
+        HStack(spacing: 12) {
+            Text("…").vLabel().frame(width: 40, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(e.name).vUI(15, weight: 500).lineLimit(1)
+                Text("Waiting to sync").vUI(13, weight: 400, color: VColor.watch)
+            }
+            Spacer(minLength: 8)
+            Text(FoodFormat.kcal(e.kcal)).vFigure(16)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 11).opacity(0.7)
+    }
+
+    private func nextRow(_ next: String, _ day: FoodDay) -> some View {
+        Button { open(.usual) } label: {
+            HStack(spacing: 12) {
+                Text("").frame(width: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(next.capitalized).vUI(15, weight: 500, color: VColor.muted)
+                    Text(day.usualNext.map { "Usually \($0.name.lowercased())" } ?? "Nothing yet").vUI(13, weight: 400, color: VColor.muted).lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "plus").font(.system(size: 18, weight: .regular)).foregroundStyle(VColor.eat)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 11).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func dayNav(_ day: FoodDay) -> some View {

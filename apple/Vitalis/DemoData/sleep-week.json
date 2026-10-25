@@ -1,55 +1,74 @@
 {
-  "end": "2026-10-24",
-  "nights": [
-    {
-      "day": "2026-10-18",
-      "score": 93,
-      "asleep_h": 7
-    },
-    {
-      "day": "2026-10-19",
-      "score": 93,
-      "asleep_h": 7
-    },
-    {
-      "day": "2026-10-20",
-      "score": 93,
-      "asleep_h": 7
-    },
-    {
-      "day": "2026-10-21",
-      "score": 93,
-      "asleep_h": 7
-    },
-    {
-      "day": "2026-10-22",
-      "score": 93,
-      "asleep_h": 7
-    },
-    {
-      "day": "2026-10-23",
-      "score": 93,
-      "asleep_h": 7
-    },
-    {
-      "day": "2026-10-24",
-      "score": 93,
-      "asleep_h": 7
-    }
-  ],
-  "avg_score": 93,
-  "bedtime_spread_min": 0,
-  "label": "AVG 93 · BED ± 0M",
-  "freshness": {
-    "last_sync": "2026-10-24T21:44:13+05:30",
-    "data_through": {
-      "sleep": "2026-10-24",
-      "heart": "2026-10-24",
-      "activity": "2026-10-24",
-      "weight": "2026-10-24",
-      "food": "2026-10-24",
-      "training": "2026-10-24"
-    },
-    "today": "2026-10-24"
+ "end": "2026-10-25",
+ "nights": [
+  {
+   "day": "2026-10-19",
+   "score": 62,
+   "asleep_h": 6.33,
+   "sleep_start": "2026-10-19T00:50:00+05:30",
+   "sleep_end": "2026-10-19T07:40:00+05:30",
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-20",
+   "score": 68,
+   "asleep_h": 6.87,
+   "sleep_start": "2026-10-20T00:35:00+05:30",
+   "sleep_end": "2026-10-20T07:55:00+05:30",
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-21",
+   "score": null,
+   "asleep_h": null,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-22",
+   "score": 88,
+   "asleep_h": 7.52,
+   "sleep_start": "2026-10-21T23:55:00+05:30",
+   "sleep_end": "2026-10-22T07:50:00+05:30",
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-23",
+   "score": 45,
+   "asleep_h": 5.47,
+   "sleep_start": "2026-10-23T01:40:00+05:30",
+   "sleep_end": "2026-10-23T07:35:00+05:30",
+   "nap_h": 1.95
+  },
+  {
+   "day": "2026-10-24",
+   "score": 90,
+   "asleep_h": 7.73,
+   "sleep_start": "2026-10-24T00:20:00+05:30",
+   "sleep_end": "2026-10-24T08:30:00+05:30",
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-25",
+   "score": 80,
+   "asleep_h": 6.47,
+   "sleep_start": "2026-10-25T01:41:00+05:30",
+   "sleep_end": "2026-10-25T08:29:00+05:30",
+   "nap_h": 1.22
   }
+ ],
+ "avg_score": 72,
+ "bedtime_spread_min": 30,
+ "label": "AVG 72 \u00b7 BED \u00b1 30M",
+ "avg": {
+  "asleep_h": 6.73,
+  "score": 72,
+  "bedtime": "00:50",
+  "wake": "08:00",
+  "nap_h": 3.17,
+  "nights": 6,
+  "missing": 1
+ },
+ "prev_avg_score": 76
 }

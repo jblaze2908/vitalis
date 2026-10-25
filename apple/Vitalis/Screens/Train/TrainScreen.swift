@@ -39,60 +39,85 @@ struct TrainWeekView: View {
 
     var body: some View {
         let t = store.week.value
-        VStack(spacing: 0) {
-            TrainTopBar(status: status(t).0, tint: status(t).1, pulse: store.pulse)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let t, t.empty { TrainEmptyBody(heat: t.heat, start: start) } else { week(t) }
-                }
-                .padding(.horizontal, VSpace.gutter)
-                .padding(.bottom, VSpace.gutter)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                TabHeader("Train") { if let e = t?.weekEnd { Text(SleepCopy.weekTitle(end: e)).vUI(13, weight: 600, color: VColor.muted) } }.padding(.horizontal, 20).padding(.top, 2)
+                if let t, t.empty { TrainEmptyBody(heat: t.heat, start: start).padding(.horizontal, VSpace.gutter) } else { week(t) }
             }
-            .scrollIndicators(.hidden)
+            .padding(.bottom, VSpace.gutter)
         }
+        .scrollIndicators(.hidden)
         .vScreen()
     }
 
-    private func status(_ t: TrainingResponse?) -> (String, VTint) {
-        if let t, t.empty { return ("\(TrainFormat.int(t.stats?.workingSets)) sets this week", .steel) }
-        return trainStatus(t?.freshness, fetchedAt: store.week.fetchedAt, failed: store.week.error != nil)
+    @ViewBuilder private func week(_ t: TrainingResponse?) -> some View {
+        HeadlineLines(TrainCopy.headline(t), size: 36, colors: t == nil ? [VColor.steel] : []).padding(.horizontal, 20).padding(.top, 9)
+        MuscleMap(heat: t?.heat ?? [:], view: .both).frame(maxWidth: 330).frame(maxWidth: .infinity).padding(.top, 14)
+        let loaded = TrainCopy.loaded(t)
+        if !loaded.isEmpty {
+            HStack(spacing: 14) {
+                ForEach(loaded, id: \.0) { name, word in
+                    (Text(name).font(VFont.archivo(13, width: 100, weight: 600)).foregroundStyle(VColor.bone)
+                     + Text(" \(word)").font(VFont.archivo(13, width: 100, weight: 400)).foregroundStyle(VColor.muted))
+                }
+            }
+            .frame(maxWidth: .infinity).padding(.top, 8)
+        }
+        TrainLoadError(error: store.week.error, hasValue: t != nil) { Task { await store.load() } }.padding(.horizontal, 20).padding(.top, 8)
+        Button(action: start) {
+            HStack(spacing: 10) {
+                Image(systemName: "dumbbell").font(.system(size: 17, weight: .semibold))
+                Text(live.map { "Resume \($0.title)" } ?? "Start workout").vUI(17, weight: 700, color: Color(hex: 0x1A0503))
+            }
+            .foregroundStyle(Color(hex: 0x1A0503))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(VColor.pulse, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain).padding(.horizontal, 16).padding(.top, 16)
+        HStack {
+            Text("This week").vLabel()
+            Spacer()
+            if let st = t?.stats { Text("\(st.sessions) sessions · \(st.workingSets) sets").vLabel() }
+        }
+        .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 8)
+        WeekTiles(weekStart: t?.weekStart, sessions: store.sessions).padding(.horizontal, 16)
+        if let t, let weekly = t.weeklySets, !t.muscles.isEmpty {
+            HStack { Text("Sets per muscle").vLabel(); Spacer(); Text("Aim \(weekly.min)–\(weekly.max)").vLabel() }
+                .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 10)
+            SetsBars(muscles: t.muscles, weekly: weekly).padding(.horizontal, 20)
+        }
+        if t != nil { sessionsCard }
     }
 
-    @ViewBuilder private func week(_ t: TrainingResponse?) -> some View {
-        ScreenHeader(context: t?.label ?? "This week", title: "Train")
-            .padding(.top, VSpace.sectionTop)
-        VStack(spacing: 16) {
-            MuscleMap(heat: t?.heat ?? [:], view: .both).frame(width: 220)
-            HeatLegend()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, VSpace.sectionTop)
-
-        TrainLoadError(error: store.week.error, hasValue: t != nil) { Task { await store.load() } }
-            .padding(.top, VSpace.sectionPad)
-
-        if let live {
-            VSection { PrimaryButton("Resume \(live.title)", action: start) }
-        } else if t != nil {
-            VSection {
-                if let splits = t?.splits, !splits.isEmpty {
-                    MonoLabel(Self.readyLine(splits))
+    @ViewBuilder private var sessionsCard: some View {
+        Text("Sessions").vLabel().padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 8)
+        VCard(padding: EdgeInsets(top: 2, leading: 14, bottom: 2, trailing: 14)) {
+            VStack(spacing: 0) {
+                ForEach(Array(store.sessions.enumerated()), id: \.element.id) { i, row in
+                    if i > 0 { Rectangle().fill(Color(hex: 0x232323)).frame(height: 1) }
+                    NavigationLink(value: TrainRoute.session(id: row.id)) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(row.title ?? "Workout").vUI(15, weight: 500)
+                                Text(TrainCopy.sessionLine(row)).vUI(13, weight: 400, color: VColor.muted)
+                            }
+                            Spacer()
+                            Figure(row.workingSets.map(String.init) ?? "–", unit: "sets", size: 17)
+                        }
+                        .padding(.vertical, 12).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                PrimaryButton("Start workout", action: start).padding(.top, t?.splits?.isEmpty ?? true ? 0 : 14)
+                if store.hasMore {
+                    Button { Task { await store.loadMore() } } label: {
+                        Text(store.isPaging ? "Loading…" : "Earlier sessions").vUI(14, weight: 600, color: VColor.muted).frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain).disabled(store.isPaging)
+                }
             }
         }
-
-        VSection {
-            HStack(alignment: .top) {
-                StatColumn(value: TrainFormat.int(t?.stats?.sessions), label: "Sessions")
-                StatColumn(value: TrainFormat.int(t?.stats?.workingSets), label: "Working sets")
-                StatColumn(value: TrainFormat.int(t?.stats?.musclesHit),
-                           suffix: t?.stats.map { "/\($0.musclesTotal)" }, label: "Muscles hit")
-            }
-        }
-
-        if t != nil { sessions }
-        if let t, let weekly = t.weeklySets, !t.muscles.isEmpty { WeeklySetsSection(muscles: t.muscles, weekly: weekly) }
+        .padding(.horizontal, 16)
+        if let error = store.pageError as? APIError { MonoLabel(error.statusLine, tint: .watch).padding(.horizontal, 20) }
     }
 
     /// "Fresh · Push · Lower" or "All splits loaded"; the start sheet is where one gets picked.
@@ -243,3 +268,75 @@ struct TrainEmptyBody: View {
     TrainScreen(store: TrainStore(api: { nil }), live: TrainPreviewData.idleLive).environment(Router()).onAppear { VFont.register() }
 }
 #endif
+
+
+/// Monday to Sunday as tiles; a day with a session shows its name in a red ring.
+private struct WeekTiles: View {
+    let weekStart: String?
+    let sessions: [SessionRow]
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<7, id: \.self) { i in
+                let day = weekStart.flatMap { SleepStore.addDays($0, i) }
+                let s = sessions.first { $0.day == day }
+                VStack(spacing: 6) {
+                    Text(s.map { String(($0.title ?? "Done").prefix(5)).uppercased() } ?? "")
+                        .font(VFont.archivo(10.5, width: 100, weight: 700)).foregroundStyle(VColor.bone).lineLimit(1).minimumScaleFactor(0.7)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(s == nil ? Color(hex: 0x141414) : Color(hex: 0x2B1412)))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(s == nil ? .clear : VColor.pulse, lineWidth: 1.5))
+                    Text(["M", "T", "W", "T", "F", "S", "S"][i]).vUI(11, weight: 600, color: Color(hex: 0x7A7A7A))
+                }
+            }
+        }
+    }
+}
+
+/// Weekly sets per muscle against the aim band; under the band reads amber.
+private struct SetsBars: View {
+    let muscles: [TrainingResponse.Muscle]
+    let weekly: TrainingResponse.WeeklySets
+    var body: some View {
+        let rows = muscles.filter { ($0.weekSets ?? 0) > 0 }.sorted { ($0.weekSets ?? 0) > ($1.weekSets ?? 0) }.prefix(8)
+        let top = Double(max(weekly.max + 4, rows.map { $0.weekSets ?? 0 }.max() ?? 0))
+        VStack(spacing: 10) {
+            ForEach(Array(rows), id: \.slug) { m in
+                let n = m.weekSets ?? 0
+                HStack(spacing: 10) {
+                    Text(TrainCopy.name(m.slug)).vUI(14, weight: 500).frame(width: 84, alignment: .leading).lineLimit(1)
+                    GeometryReader { g in
+                        let w = g.size.width
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color(hex: 0x1A1A1A))
+                            Rectangle().fill(Color(hex: 0x2A2A2A)).frame(width: w * Double(weekly.max - weekly.min) / top).offset(x: w * Double(weekly.min) / top)
+                            Capsule().fill(n < weekly.min ? Color(hex: 0x8F352E) : VColor.pulse).frame(width: max(6, w * Double(n) / top))
+                        }
+                    }
+                    .frame(height: 6)
+                    Text("\(n)").vLabel().frame(width: 26, alignment: .trailing)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+}
+
+enum TrainCopy {
+    static func name(_ slug: String) -> String { slug.replacingOccurrences(of: "-", with: " ").capitalized }
+
+    /// Muscles carrying load, hottest first: heat 4 "just trained", 3 "loaded", 2 "easing".
+    static func loaded(_ t: TrainingResponse?) -> [(String, String)] {
+        (t?.muscles ?? []).filter { $0.heat >= 2 }.sorted { ($0.heat, $0.load ?? 0) > ($1.heat, $1.load ?? 0) }.prefix(3)
+            .map { (name($0.slug), $0.heat >= 4 ? "just trained" : $0.heat == 3 ? "loaded" : "easing") }
+    }
+
+    static func headline(_ t: TrainingResponse?) -> [String] {
+        guard let t else { return ["–"] }
+        let first = loaded(t).first.map { "\($0.0) loaded." } ?? "All clear."
+        return [first, "\(t.stats?.workingSets ?? 0) sets this week."]
+    }
+
+    static func sessionLine(_ r: SessionRow) -> String {
+        [SleepCopy.dayTitle(r.day), r.start.flatMap(APIDate.clockText), r.durationMin.map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
+    }
+}

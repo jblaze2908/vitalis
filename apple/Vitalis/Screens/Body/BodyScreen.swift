@@ -22,21 +22,27 @@ struct BodyScreen: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                TabTopChrome(status: TabTopChrome.status(store.body, freshness: v?.freshness))
-                VStack(alignment: .leading, spacing: 0) {
-                    ScreenHeader(context: v.map { SleepBodyFormat.dayTitle($0.day) } ?? "Today", title: "Body") {
-                        SecondaryButton("+ Log weight") { showsLogWeight = true }
+                TabHeader("Body") {
+                    Button { showsLogWeight = true } label: {
+                        Text("+ Weight").vUI(14, weight: 700, color: Color(hex: 0x140A2E)).padding(.horizontal, 13).frame(height: 30)
+                            .background(VColor.body, in: Capsule())
                     }
-                    .padding(.top, 2)
+                    .buttonStyle(.plain).accessibilityLabel("Log weight")
+                }
+                .padding(.top, 2).padding(.horizontal, 4)
+                VStack(alignment: .leading, spacing: 0) {
                     if v == nil, store.body.error != nil, !store.body.isLoading {
                         unreachable
                     } else {
-                        weight.padding(.top, 22).id(BodySection.weight)
-                        activity.id(BodySection.activity)
-                        vitals.id(BodySection.vitals)
+                        HeadlineLines(BodyCopy.headline(v?.weight), size: 36, colors: v == nil ? [VColor.steel] : []).padding(.top, 9)
+                        weightHero.id(BodySection.weight)
+                        Text("Vitals vs usual").vLabel().padding(.top, 22).padding(.bottom, 8).id(BodySection.vitals)
+                        vitalsCard
+                        Text("Activity · today").vLabel().padding(.top, 22).padding(.bottom, 4).id(BodySection.activity)
+                        ReadoutRow(BodyCopy.activity(v?.activity))
                     }
                 }
-                .padding(.horizontal, VSpace.gutter)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 32)
             }
         }
@@ -55,6 +61,44 @@ struct BodyScreen: View {
         .onChange(of: services?.writesVersion) { if live { Task { await store.load() } } }
         .task(id: store.waitingID) { await pollWaiting() }
         .sheet(isPresented: $showsLogWeight) { LogWeightSheet(store: store) }
+    }
+
+    // MARK: 2e Body
+
+    private var weightHero: some View {
+        let w = v?.weight
+        return VStack(alignment: .leading, spacing: 12) {
+            Figure(SleepBodyFormat.kg(w?.trendKg), unit: "kg trend", size: 52, color: w?.trendKg == nil ? VColor.steel : nil).padding(.top, 16)
+            WeightTrendChart(series: w?.series ?? [], goal: w?.goalKg).frame(height: 160)
+            ReadoutRow([
+                Readout("30 days", SleepBodyFormat.signedKg(w?.monthChangeKg),
+                        status: w?.monthChangeKg == nil ? nil : w?.towardGoal == true ? ("Toward goal", .good) : ("Away from goal", .watch)),
+                Readout("Goal", w?.goalKg.map { "\(SleepBodyFormat.kg($0)) kg" } ?? "–"),
+                Readout("Latest", w?.latest.map { "\(SleepBodyFormat.kg($0.kg))" } ?? "–", status: w?.latest?.at.flatMap { APIDate.clockText($0) }.map { ($0, .quiet) }),
+            ])
+        }
+    }
+
+    private var vitalsCard: some View {
+        VCard(padding: EdgeInsets(top: 2, leading: 14, bottom: 2, trailing: 14)) {
+            VStack(spacing: 0) {
+                let rows = v?.vitals ?? []
+                ForEach(Array(rows.enumerated()), id: \.element.key) { i, vital in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(BodyCopy.label(vital)).vUI(15, weight: 500).lineLimit(1)
+                            Text([SleepBodyFormat.vital(vital.value), vital.unit].compactMap { $0 }.joined(separator: " ")).vUI(13, weight: 400, color: VColor.muted)
+                        }
+                        Spacer(minLength: 8)
+                        RangeDot(value: vital.value, range: vital.usualRange, tone: BodyCopy.tone(vital)).frame(width: 96, height: 12)
+                        StatusWord(BodyCopy.word(vital), tone: BodyCopy.tone(vital)).frame(width: 66, alignment: .trailing)
+                    }
+                    .padding(.vertical, 12)
+                    .accessibilityElement(children: .combine)
+                    if i < rows.count - 1 { Rectangle().fill(Color(hex: 0x232323)).frame(height: 1) }
+                }
+            }
+        }
     }
 
     // MARK: Weight
@@ -309,4 +353,88 @@ struct BodyPreviewWrites: BodyStore.Writes {
 
 #Preview("Body · log weight sheet") {
     BodyScreen(store: previewStore(SleepBodyPreviewData.body), showsLogWeight: true).vScreen().onAppear { VFont.register() }
+}
+
+
+/// Daily weigh-ins as faint dots, the trend as a violet line, the latest trend as a dot.
+private struct WeightTrendChart: View {
+    let series: [WeightBlock.Point]
+    let goal: Double?
+    var body: some View {
+        Canvas { ctx, size in
+            let raws = series.compactMap(\.rawKg), trends = series.compactMap(\.trendKg)
+            let all = raws + trends
+            guard let lo0 = all.min(), let hi0 = all.max(), series.count > 1 else { return }
+            let pad = max((hi0 - lo0) * 0.15, 0.5), lo = lo0 - pad, hi = hi0 + pad
+            let h = size.height - 18, w = size.width - 24
+            let x = { (i: Int) in CGFloat(i) / CGFloat(series.count - 1) * w }
+            let y = { (kg: Double) in h * CGFloat(1 - (kg - lo) / (hi - lo)) }
+            for t in stride(from: (lo / 2).rounded(.up) * 2, through: hi, by: 2) {
+                var p = Path(); p.move(to: CGPoint(x: 0, y: y(t))); p.addLine(to: CGPoint(x: w, y: y(t)))
+                ctx.stroke(p, with: .color(Color(hex: 0x1C1C1C)), lineWidth: 1)
+                ctx.draw(Text(String(Int(t))).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x6E6E6E)), at: CGPoint(x: size.width, y: y(t)), anchor: .trailing)
+            }
+            for (i, p) in series.enumerated() { if let r = p.rawKg { ctx.fill(Path(ellipseIn: CGRect(x: x(i) - 2, y: y(r) - 2, width: 4, height: 4)), with: .color(Color(hex: 0x4B3F75))) } }
+            var line = Path(), started = false, last: CGPoint?
+            for (i, p) in series.enumerated() {
+                guard let t = p.trendKg else { continue }
+                let pt = CGPoint(x: x(i), y: y(t))
+                if started { line.addLine(to: pt) } else { line.move(to: pt); started = true }
+                last = pt
+            }
+            ctx.stroke(line, with: .color(VColor.body), style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+            if let last { ctx.fill(Path(ellipseIn: CGRect(x: last.x - 5, y: last.y - 5, width: 10, height: 10)), with: .color(VColor.body)) }
+            let first = series.first?.day ?? "", end = series.last?.day ?? ""
+            ctx.draw(Text(BodyCopy.short(first)).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x7A7A7A)), at: CGPoint(x: 0, y: size.height - 4), anchor: .leading)
+            ctx.draw(Text(BodyCopy.short(end)).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x7A7A7A)), at: CGPoint(x: w, y: size.height - 4), anchor: .trailing)
+        }
+        .accessibilityLabel("Weight trend")
+    }
+}
+
+/// Where today's value sits against your usual range: a band and a dot.
+private struct RangeDot: View {
+    let value: Double?
+    let range: [Double]?
+    let tone: VTone
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color(hex: 0x2A2A2A)).frame(height: 2)
+                if let r = range, r.count == 2 {
+                    let span = max(r[1] - r[0], 0.0001), lo = r[0] - span, hi = r[1] + span
+                    let pos = { (v: Double) in CGFloat(min(max((v - lo) / (hi - lo), 0), 1)) * w }
+                    Capsule().fill(Color(hex: 0x3B3359)).frame(width: max(pos(r[1]) - pos(r[0]), 6), height: 6).offset(x: pos(r[0]))
+                    if let v = value { Circle().fill(tone == .usual ? VColor.body : tone.color).frame(width: 9, height: 9).offset(x: pos(v) - 4.5) }
+                }
+            }
+            .frame(height: g.size.height)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+enum BodyCopy {
+    static func headline(_ w: WeightBlock?) -> [String] {
+        guard let c = w?.monthChangeKg else { return [w?.trendKg.map { "\(SleepBodyFormat.kg($0)) kg." } ?? "–"] }
+        let first = abs(c) < 0.05 ? "Holding steady." : "\(c < 0 ? "Down" : "Up") \(SleepBodyFormat.kg(abs(c))) kg."
+        return [first, w?.goalKg.map { "Goal \(SleepBodyFormat.kg($0))." } ?? "This month."]
+    }
+    static func label(_ v: BodyResponse.Vital) -> String {
+        ["hrv": "HRV", "resting_hr": "Resting HR", "spo2": "Blood oxygen", "respiratory_rate": "Breathing", "wrist_temp": "Wrist temp", "vo2max": "VO₂ max"][v.key]
+            ?? v.label.capitalized
+    }
+    static func word(_ v: BodyResponse.Vital) -> String { v.flag == "high" ? "High" : v.flag == "low" ? "Low" : v.value == nil ? "–" : "Usual" }
+    static func tone(_ v: BodyResponse.Vital) -> VTone { v.flag == nil ? .usual : .watch }
+    static func activity(_ a: BodyResponse.Activity?) -> [Readout] {
+        [Readout("Steps", SleepBodyFormat.grouped(a?.steps), status: a?.stepsTarget.map { ("of \(SleepBodyFormat.grouped($0))", .quiet) }),
+         Readout("Active", a?.activeKcal.map { "\(Int($0.rounded()))" } ?? "–", status: ("kcal", .quiet)),
+         Readout("Exercise", a?.exerciseMin.map(String.init) ?? "–", status: a?.exerciseTargetMin.map { ("of \($0) min", .quiet) })]
+    }
+    static func short(_ day: String) -> String {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: day) else { return day }
+        f.dateFormat = "d MMM"; return f.string(from: d).uppercased()
+    }
 }

@@ -35,13 +35,15 @@ struct RootView: View {
 
     /// Settings from every tab, level with each tab's status row (Today used to be the only way in).
     private var settingsButton: some View {
+        // A 28 pt card-coloured disc inside a 44 pt target, sitting in the slot every TabHeader leaves at its leading edge.
         Button { router.open(.settings) } label: {
-            Image(systemName: "gearshape").vLabel().frame(width: 44, height: 44)
-                .background(VColor.ground.opacity(0.85), in: Circle())
+            Image(systemName: "gearshape").font(.system(size: 14, weight: .medium)).foregroundStyle(VColor.bone)
+                .frame(width: 28, height: 28).background(VColor.card, in: Circle())
+                .frame(width: 44, height: 44).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.leading, VSpace.statusSide - 12)
-        .padding(.top, VSpace.statusTop - 14)
+        .padding(.leading, 8)
+        .padding(.top, 2)
         .accessibilityLabel("Settings")
     }
 

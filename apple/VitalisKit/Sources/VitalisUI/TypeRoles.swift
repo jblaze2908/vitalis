@@ -16,9 +16,13 @@ public enum VRole: Sendable {
     case body(CGFloat)
     /// Archivo wdth 100, wght 600.
     case statusTime(CGFloat)
+    /// 2e card figures: Archivo expanded (wdth 125) at weight 600, so numbers read at a glance instead of as a poster.
+    case figure(CGFloat)
+    /// 2e card titles and list text: Archivo wdth 100 at a chosen weight.
+    case ui(CGFloat, CGFloat)
 
     var size: CGFloat {
-        switch self { case .headline(let s), .action(let s), .number(let s), .label(let s), .reading(let s), .body(let s), .statusTime(let s): s }
+        switch self { case .headline(let s), .action(let s), .number(let s), .label(let s), .reading(let s), .body(let s), .statusTime(let s), .figure(let s), .ui(let s, _): s }
     }
 
     func font(scale: CGFloat) -> Font {
@@ -30,6 +34,8 @@ public enum VRole: Sendable {
         case .reading: return VFont.mono(s, weight: 400)
         case .body: return VFont.archivo(s, width: 100, weight: 400)
         case .statusTime: return VFont.archivo(s, width: 100, weight: 600)
+        case .figure: return VFont.archivo(s, width: 125, weight: 600)
+        case .ui(_, let w): return VFont.archivo(s, width: 100, weight: w)
         }
     }
 
@@ -37,6 +43,7 @@ public enum VRole: Sendable {
         let s = size * scale
         switch self {
         case .number: return s * (size >= 72 ? -0.05 : -0.04)
+        case .figure: return s * -0.01
         case .label: return s * 0.12
         case .reading: return s * 0.06
         default: return 0
@@ -45,7 +52,7 @@ public enum VRole: Sendable {
 
     /// Hero headlines and numbers stop growing at accessibility1; mono labels may grow without limit.
     var cap: DynamicTypeSize? {
-        switch self { case .headline, .number, .action: .accessibility1; default: nil }
+        switch self { case .headline, .number, .action, .figure: .accessibility1; default: nil }
     }
 
     var uppercased: Bool {
@@ -83,6 +90,8 @@ public extension View {
     func vReading(_ size: CGFloat = 12.5, tint: VTint = .bone) -> some View { vRole(.reading(size), color: tint.color) }
     func vBody(_ size: CGFloat = 14, color: Color? = nil) -> some View { vRole(.body(size), color: color) }
     func vStatusTime(_ size: CGFloat = 16) -> some View { vRole(.statusTime(size)) }
+    func vFigure(_ size: CGFloat, color: Color? = nil) -> some View { vRole(.figure(size), color: color) }
+    func vUI(_ size: CGFloat, weight: CGFloat = 500, color: Color? = nil) -> some View { vRole(.ui(size, weight), color: color) }
 }
 
 public enum VLabelSize: Sendable {

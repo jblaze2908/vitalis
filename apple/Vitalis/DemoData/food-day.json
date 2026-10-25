@@ -1,126 +1,129 @@
 {
-  "day": "2026-10-24",
-  "date_label": "TODAY · SAT 24 OCT",
-  "prev_day": "2026-10-23",
-  "next_day": null,
-  "kcal_target": 2300,
-  "kcal_eaten": 2190,
-  "kcal_left": 110,
-  "over": false,
-  "macros": {
-    "protein": {
-      "g": 105,
-      "target_g": 150
-    },
-    "carbs": {
-      "g": 0,
-      "target_g": null
-    },
-    "fat": {
-      "g": 0,
-      "target_g": null
-    }
+ "day": "2026-10-24",
+ "date_label": "TODAY · SAT 24 OCT",
+ "prev_day": "2026-10-23",
+ "next_day": null,
+ "kcal_target": 2050,
+ "kcal_eaten": 1185,
+ "kcal_left": 865,
+ "over": false,
+ "macros": {
+  "protein": {
+   "g": 55,
+   "target_g": 185
   },
-  "target_note": "TARGET 2,300 KCAL ADJUSTS WEEKLY FROM YOUR WEIGHT TREND",
-  "meals": [
+  "carbs": {
+   "g": 118,
+   "target_g": null
+  },
+  "fat": {
+   "g": 54,
+   "target_g": null
+  }
+ },
+ "target_note": "TARGET 2,300 KCAL ADJUSTS WEEKLY FROM YOUR WEIGHT TREND",
+ "meals": [
+  {
+   "slot": "breakfast",
+   "label": "BREAKFAST",
+   "time": "08:40",
+   "kcal": 520,
+   "just_added": false,
+   "entries": [
     {
-      "slot": "breakfast",
-      "label": "BREAKFAST",
-      "time": "08:10",
-      "kcal": 530,
-      "just_added": false,
-      "entries": [
-        {
-          "id": "f-2026-10-24-0",
-          "meal_id": "m-2026-10-24-0",
-          "name": "Meal 0",
-          "portion_text": null,
-          "grams": null,
-          "kcal": 530,
-          "protein_g": 35,
-          "carbs_g": null,
-          "fat_g": null,
-          "estimate": false,
-          "source": "manual"
-        }
-      ]
-    },
-    {
-      "slot": "lunch",
-      "label": "LUNCH",
-      "time": "13:05",
-      "kcal": 780,
-      "just_added": false,
-      "entries": [
-        {
-          "id": "f-2026-10-24-1",
-          "meal_id": "m-2026-10-24-1",
-          "name": "Meal 1",
-          "portion_text": null,
-          "grams": null,
-          "kcal": 780,
-          "protein_g": 35,
-          "carbs_g": null,
-          "fat_g": null,
-          "estimate": false,
-          "source": "manual"
-        }
-      ]
-    },
-    {
-      "slot": "dinner",
-      "label": "DINNER",
-      "time": "20:30",
-      "kcal": 880,
-      "just_added": false,
-      "entries": [
-        {
-          "id": "f-2026-10-24-2",
-          "meal_id": "m-2026-10-24-2",
-          "name": "Meal 2",
-          "portion_text": null,
-          "grams": null,
-          "kcal": 880,
-          "protein_g": 35,
-          "carbs_g": null,
-          "fat_g": null,
-          "estimate": false,
-          "source": "manual"
-        }
-      ]
+     "id": "f-1",
+     "meal_id": "m1",
+     "name": "Masala omelette, toast",
+     "portion_text": "3 eggs, 2 slices",
+     "grams": null,
+     "kcal": 520,
+     "protein_g": 34,
+     "carbs_g": 38,
+     "fat_g": 26,
+     "estimate": false,
+     "source": "recent",
+     "slot": "breakfast",
+     "eaten_at": "2026-10-24T08:40:00+05:30",
+     "source_ref": null,
+     "hk_uuid": null
     }
-  ],
-  "next_slot": "breakfast",
-  "usual_next": {
+   ]
+  },
+  {
+   "slot": "lunch",
+   "label": "LUNCH",
+   "time": "13:35",
+   "kcal": 665,
+   "just_added": false,
+   "entries": [
+    {
+     "id": "f-2",
+     "meal_id": "m2",
+     "name": "Dal makhani",
+     "portion_text": "1 bowl",
+     "grams": 200,
+     "kcal": 425,
+     "protein_g": 14,
+     "carbs_g": 36,
+     "fat_g": 24,
+     "estimate": false,
+     "source": "describe",
+     "slot": "lunch",
+     "eaten_at": "2026-10-24T13:35:00+05:30",
+     "source_ref": null,
+     "hk_uuid": null
+    },
+    {
+     "id": "f-3",
+     "meal_id": "m2",
+     "name": "Roti",
+     "portion_text": "2 pieces",
+     "grams": 80,
+     "kcal": 240,
+     "protein_g": 7,
+     "carbs_g": 44,
+     "fat_g": 4,
+     "estimate": false,
+     "source": "describe",
+     "slot": "lunch",
+     "eaten_at": "2026-10-24T13:35:00+05:30",
+     "source_ref": null,
+     "hk_uuid": null
+    }
+   ]
+  }
+ ],
+ "next_slot": "snack",
+ "usual_next": {
+  "name": "Protein lassi",
+  "kcal": 530,
+  "protein_g": 35,
+  "carbs_g": 0,
+  "fat_g": 0,
+  "items": [
+   {
     "name": "Meal 0",
+    "portion_text": null,
+    "grams": null,
     "kcal": 530,
     "protein_g": 35,
-    "carbs_g": 0,
-    "fat_g": 0,
-    "items": [
-      {
-        "name": "Meal 0",
-        "portion_text": null,
-        "grams": null,
-        "kcal": 530,
-        "protein_g": 35,
-        "carbs_g": null,
-        "fat_g": null
-      }
-    ],
-    "meal_signature": "meal 0"
+    "carbs_g": null,
+    "fat_g": null
+   }
+  ],
+  "meal_signature": "meal 0"
+ },
+ "empty": false,
+ "freshness": {
+  "last_sync": "2026-10-24T21:44:13+05:30",
+  "data_through": {
+   "sleep": "2026-10-24",
+   "heart": "2026-10-24",
+   "activity": "2026-10-24",
+   "weight": "2026-10-24",
+   "food": "2026-10-24",
+   "training": "2026-10-24"
   },
-  "empty": false,
-  "freshness": {
-    "last_sync": "2026-10-24T21:44:13+05:30",
-    "data_through": {
-      "sleep": "2026-10-24",
-      "heart": "2026-10-24",
-      "activity": "2026-10-24",
-      "weight": "2026-10-24",
-      "food": "2026-10-24",
-      "training": "2026-10-24"
-    },
-    "today": "2026-10-24"
-  }
+  "today": "2026-10-24"
+ }
 }

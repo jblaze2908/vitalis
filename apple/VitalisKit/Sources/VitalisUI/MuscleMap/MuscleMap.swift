@@ -23,22 +23,24 @@ public struct MuscleMap: SwiftUI.View {
     }
 
     /// Spoken names for heat 0…4, matching the Train legend.
-    nonisolated public static let levelNames = ["Not trained", "Fresh", "Recovering", "Partly loaded", "Loaded"]
+    nonisolated public static let levelNames = ["No load", "Recovered", "Easing", "Loaded", "Just trained"]
 
     let heat: [Muscle: Int]
     let view: View
     let strokeWidth: CGFloat
+    let seam: Color
 
-    /// `strokeWidth` is in viewBox units (3 default, 4 on the Watch summary).
-    public init(heat: [Muscle: Int], view: View = .both, strokeWidth: CGFloat = 3) {
+    /// `strokeWidth` is in viewBox units (3 default, 4 on the Watch summary). `seam` matches what the map sits on (a card or the ground).
+    public init(heat: [Muscle: Int], view: View = .both, strokeWidth: CGFloat = 3, seam: Color = VColor.ground) {
         self.heat = heat
         self.view = view
         self.strokeWidth = strokeWidth
+        self.seam = seam
     }
 
     /// Server heat object keyed by slug; unknown keys are ignored and missing muscles are 0.
-    public init(heat: [String: Int], view: View = .both, strokeWidth: CGFloat = 3) {
-        self.init(heat: Self.heat(slugs: heat), view: view, strokeWidth: strokeWidth)
+    public init(heat: [String: Int], view: View = .both, strokeWidth: CGFloat = 3, seam: Color = VColor.ground) {
+        self.init(heat: Self.heat(slugs: heat), view: view, strokeWidth: strokeWidth, seam: seam)
     }
 
     nonisolated static func heat(slugs: [String: Int]) -> [Muscle: Int] {
@@ -82,7 +84,7 @@ public struct MuscleMap: SwiftUI.View {
             context.fill(p, with: .color(VColor.heat(Self.level(heat[muscle]))))
             outline.addPath(p)
         }
-        context.stroke(outline, with: .color(VColor.ground),
+        context.stroke(outline, with: .color(seam),
                        style: StrokeStyle(lineWidth: max(strokeWidth * scale, 0.5), lineJoin: .round))
     }
 

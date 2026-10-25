@@ -1,0 +1,217 @@
+{
+ "month": "2026-10",
+ "days": [
+  {
+   "day": "2026-10-01",
+   "score": null,
+   "asleep_h": 7.08,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-02",
+   "score": null,
+   "asleep_h": 6.67,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 1
+  },
+  {
+   "day": "2026-10-03",
+   "score": null,
+   "asleep_h": 7.33,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-04",
+   "score": null,
+   "asleep_h": 7.83,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-05",
+   "score": null,
+   "asleep_h": 6.5,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 1
+  },
+  {
+   "day": "2026-10-06",
+   "score": null,
+   "asleep_h": 6.75,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-07",
+   "score": null,
+   "asleep_h": 5.83,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-08",
+   "score": null,
+   "asleep_h": 6.92,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-09",
+   "score": null,
+   "asleep_h": 7.17,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-10",
+   "score": null,
+   "asleep_h": 7.67,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-11",
+   "score": null,
+   "asleep_h": 7.42,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-12",
+   "score": null,
+   "asleep_h": 6.58,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-13",
+   "score": null,
+   "asleep_h": 6.83,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-14",
+   "score": null,
+   "asleep_h": 7.25,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-15",
+   "score": null,
+   "asleep_h": 6.17,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-16",
+   "score": null,
+   "asleep_h": 5.67,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-17",
+   "score": null,
+   "asleep_h": 7.5,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 1.8
+  },
+  {
+   "day": "2026-10-18",
+   "score": null,
+   "asleep_h": 7.08,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 2.8
+  },
+  {
+   "day": "2026-10-19",
+   "score": null,
+   "asleep_h": 6.33,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-20",
+   "score": null,
+   "asleep_h": 6.87,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-21",
+   "score": null,
+   "asleep_h": null,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-22",
+   "score": null,
+   "asleep_h": 7.52,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-23",
+   "score": null,
+   "asleep_h": 5.47,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 1.95
+  },
+  {
+   "day": "2026-10-24",
+   "score": null,
+   "asleep_h": 7.73,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 0
+  },
+  {
+   "day": "2026-10-25",
+   "score": null,
+   "asleep_h": 6.47,
+   "sleep_start": null,
+   "sleep_end": null,
+   "nap_h": 1.22
+  }
+ ],
+ "avg": {
+  "asleep_h": 6.87,
+  "score": 74,
+  "bedtime": "00:44",
+  "wake": "08:02",
+  "nap_h": 9.57,
+  "nights": 24,
+  "missing": 1
+ },
+ "prev_avg_score": 71,
+ "prev_month": "2026-09",
+ "next_month": null
+}

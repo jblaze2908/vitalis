@@ -144,7 +144,7 @@ extension APIError {
 final class DemoURLProtocol: URLProtocol, @unchecked Sendable {
     static let routes: [(prefix: String, file: String)] = [
         ("/v2/sync/status", "sync-status"), ("/v2/targets", "targets"), ("/v2/today", "today"), ("/v2/digest", "digest"),
-        ("/v2/sleep/week", "sleep-week"), ("/v2/sleep", "sleep"), ("/v2/body", "body"), ("/v2/training/sessions/", "training-session"),
+        ("/v2/sleep/week", "sleep-week"), ("/v2/sleep/month", "sleep-month"), ("/v2/sleep", "sleep"), ("/v2/body", "body"), ("/v2/training/sessions/", "training-session"),
         ("/v2/training/sessions", "training-sessions"), ("/v2/training", "training"), ("/v2/exercises/", "exercise"),
         ("/v2/exercises", "exercises-search"), ("/v2/food/day", "food-day"), ("/v2/food/entries", "food-entries-post"), ("/v2/food/meals/", "food-meal-delete"), ("/v2/food/quick", "food-quick"),
         ("/v2/food/search", "food-search"), ("/v2/food/barcode/00000000", "barcode-not-found"), ("/v2/food/barcode/", "barcode"),
@@ -155,7 +155,13 @@ final class DemoURLProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         let path = request.url?.path ?? ""
         let file = Self.routes.first { path.hasPrefix($0.prefix) }?.file
-        let data = file.flatMap { Bundle.main.url(forResource: $0, withExtension: "json") }.flatMap { try? Data(contentsOf: $0) }
+        var data = file.flatMap { Bundle.main.url(forResource: $0, withExtension: "json") }.flatMap { try? Data(contentsOf: $0) }
+        // Fixtures are recorded once; stamping last_sync with now keeps the demo out of the stale state on any later day.
+        if let d = data, var text = String(data: d, encoding: .utf8),
+           let r = text.range(of: #""last_sync": ?"[^"]*""#, options: .regularExpression) {
+            text.replaceSubrange(r, with: "\"last_sync\": \"\(ISO8601DateFormatter().string(from: Date()))\"")
+            data = Data(text.utf8)
+        }
         let status = data == nil ? 404 : 200
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

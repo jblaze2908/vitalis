@@ -40,6 +40,15 @@ final class SleepStore {
     private(set) var requestedDay: String?
     private(set) var weeks: [String: SleepWeekResponse] = [:]
     private(set) var weekError: Error?
+
+    enum Range: String, CaseIterable { case night = "Night", week = "Week", month = "Month" }
+    var range: Range = .night
+    /// Last day of the week on show; nil follows the shown night.
+    private(set) var weekEnd: String?
+    /// `YYYY-MM` on show; nil = this month until the first answer names it.
+    private(set) var monthKey: String?
+    private(set) var months: [String: SleepMonthResponse] = [:]
+    private(set) var monthError: Error?
     private(set) var reminder: Reminder = .idle
 
     private let api: @MainActor () -> VitalisAPI?
@@ -56,6 +65,48 @@ final class SleepStore {
     var canGoForward: Bool { value?.nextDay != nil }
     /// The week for the shown day, once fetched.
     var week: SleepWeekResponse? { value.flatMap { weeks[$0.day] } }
+    /// The week the Week view steps through.
+    var shownWeek: SleepWeekResponse? { (weekEnd ?? value?.day).flatMap { weeks[$0] } }
+    var shownMonth: SleepMonthResponse? { monthKey.flatMap { months[$0] } }
+    /// The latest week is the one ending on the latest night; later weeks don't exist yet.
+    var canStepWeekForward: Bool { guard let end = weekEnd ?? value?.day, let latest = latestDay else { return false }; return end < latest }
+    private var latestDay: String? { value?.nextDay == nil ? value?.day : nil ?? lastLatest }
+    private var lastLatest: String?
+
+    func select(_ r: Range) async {
+        range = r
+        switch r {
+        case .night: return
+        case .week:
+            if weekEnd == nil { weekEnd = value?.day }
+            if let end = weekEnd { await loadWeek(end: end, force: false) }
+        case .month: await loadMonth(monthKey)
+        }
+    }
+
+    func stepWeek(_ direction: Int) async {
+        guard let end = weekEnd ?? value?.day, let next = Self.addDays(end, 7 * direction) else { return }
+        if direction > 0, let latest = latestDay, next > latest { weekEnd = latest } else { weekEnd = next }
+        await loadWeek(end: weekEnd!, force: false)
+    }
+
+    func stepMonth(_ direction: Int) async {
+        guard let m = shownMonth, let target = direction < 0 ? m.prevMonth : m.nextMonth else { return }
+        await loadMonth(target)
+    }
+
+    private func loadMonth(_ key: String?) async {
+        if let key, months[key] != nil { monthKey = key; return }
+        guard let api = api() else { return }
+        do { let r = try await api.sleepMonth(month: key).value; months[r.month] = r; monthKey = r.month; monthError = nil }
+        catch { monthError = error }
+    }
+
+    nonisolated static func addDays(_ day: String, _ n: Int) -> String? {
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: day), let out = f.calendar.date(byAdding: .day, value: n, to: d) else { return nil }
+        return f.string(from: out)
+    }
 
     /// Loads (or revalidates) the shown day; `force` also refetches its week.
     func load(force: Bool = false) async {
@@ -66,6 +117,7 @@ final class SleepStore {
             try await api.sleep(date: day)
         }
         guard day == requestedDay, let shown = night.value?.day else { return }
+        if night.value?.nextDay == nil { lastLatest = shown }
         await loadWeek(end: shown, force: force)
     }
 

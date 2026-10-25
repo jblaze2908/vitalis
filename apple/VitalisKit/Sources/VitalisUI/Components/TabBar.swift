@@ -4,32 +4,44 @@ public enum VTab: String, CaseIterable, Sendable, Identifiable {
     case today, sleep, body, train, eat
     public var id: String { rawValue }
     public var title: String { rawValue.uppercased() }
+    public var name: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+    var symbol: String {
+        switch self {
+        case .today: "waveform.path.ecg"
+        case .sleep: "moon"
+        case .body: "figure.stand"
+        case .train: "dumbbell"
+        case .eat: "fork.knife"
+        }
+    }
 }
 
-/// Custom five-tab bar: labels only, a 22×2 pulse bar over the active tab. 83 tall including the home-indicator area.
+/// Five tabs: an outline icon over a small label; the active tab's icon turns pulse red and its label bone.
 public struct TabBar: View {
     @Binding var selection: VTab
     public init(selection: Binding<VTab>) { _selection = selection }
 
     public var body: some View {
         VStack(spacing: 0) {
-            Rule()
+            Rectangle().fill(Color(hex: 0x222222)).frame(height: 1)
             HStack(spacing: 0) {
                 ForEach(VTab.allCases) { tab in
+                    let on = selection == tab
                     Button { selection = tab } label: {
-                        VStack(spacing: 14) {
-                            Rectangle().fill(selection == tab ? VColor.pulse : .clear).frame(width: 22, height: 2)
-                            Text(tab.title).vLabel(.small, tint: selection == tab ? .bone : .steel).lineLimit(1).fixedSize()
+                        VStack(spacing: 4) {
+                            Image(systemName: tab.symbol).font(.system(size: 20, weight: .regular))
+                                .foregroundStyle(on ? VColor.pulse : VColor.muted).frame(height: 24)
+                            Text(tab.name).vUI(11, weight: 600, color: on ? VColor.bone : VColor.muted).lineLimit(1).fixedSize()
                         }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .top)
+                        .padding(.top, 8)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(tab.title)
-                    .accessibilityAddTraits(selection == tab ? .isSelected : [])
+                    .accessibilityLabel(tab.name)
+                    .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
-            .offset(y: -1)
             Spacer(minLength: 0)
         }
         .frame(height: VSpace.tabBarHeight)

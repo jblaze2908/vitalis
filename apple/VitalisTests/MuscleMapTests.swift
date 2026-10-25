@@ -34,9 +34,10 @@ import Testing
 
     @Test func accessibilitySummaryGroupsByHeatLevel() {
         let summary = MuscleMap.accessibilitySummary(heat: [.quadriceps: 1, .hamstrings: 1, .chest: 4, .lowerBack: 2, .neck: 0])
-        #expect(summary == "Fresh: hamstrings, quadriceps. Recovering: lower back. Loaded: chest.")
-        #expect(MuscleMap.accessibilitySummary(heat: [:]) == "Not trained.")
-        #expect(MuscleMap.accessibilitySummary(heat: [.calves: 9]) == "Loaded: calves.")
+        // Spoken as load, not freshness (the map shows stress: grey for none, red for just trained).
+        #expect(summary == "Recovered: hamstrings, quadriceps. Easing: lower back. Just trained: chest.")
+        #expect(MuscleMap.accessibilitySummary(heat: [:]) == "No load.")
+        #expect(MuscleMap.accessibilitySummary(heat: [.calves: 9]) == "Just trained: calves.")
     }
 
     @Test func catalogLightingPutsPrimaryAboveSecondary() {
