@@ -137,6 +137,7 @@ All messages are `Codable` enums encoded to `[String: Any]` via JSON, defined on
 | `pack` | phone → watch | `updateApplicationContext(_:)` (latest state wins; [docs](https://developer.apple.com/documentation/watchconnectivity/wcsession/updateapplicationcontext(_:))) | `WatchPack` (below) |
 | `catalog` | phone → watch | `transferFile(_:metadata:)` | full `GET /v2/exercises` JSON when its ETag changes |
 | `plan` | phone → watch | `sendMessage` when reachable, else in `pack` | template, exercise ids, `intensity` from the start-choice sheet |
+| `plan.session_id` | phone → watch | with `plan` | the phone's workout id: the Watch starts its record with it, so both devices log one workout |
 | `phoneSets` | phone → watch | `transferUserInfo` | the phone's own sets in a joined workout, the whole list each time (20 §4). Stored in the record's `phone_sets`, counted in "2/4" and the summary, never in the Watch's upsert, no revision bump |
 | `sessionState` | watch → phone | `sendMessage` when reachable | `live` / `ended` + session id, so the phone can disable iPhone logging (20 §4) |
 | `today` | phone → watch | complication transfer (§3) | `TodaySnapshot` |

@@ -12,11 +12,9 @@ struct SettingsScreen: View {
     private let sync: SyncStore
     @State private var editing: SettingsEdit?
     @State private var replacing = false
-    @State private var choosingStart = false
     @State private var settingGoal = false
     @State private var confirmReset = false
     @State private var message: String?
-    @AppStorage("rememberedStart") private var rememberedStart: String?
 
     init(model: AppModel) { self.init(model: model, targets: nil, sync: .shared) }
 
@@ -44,11 +42,6 @@ struct SettingsScreen: View {
         .sheet(item: $editing) { edit in editSheet(edit) }
         .sheet(isPresented: $replacing) { ReplaceTokenSheet(sync: sync) }
         .sheet(isPresented: $settingGoal) { GoalSheet(targets: targets.value) }
-        .confirmationDialog("Workout start", isPresented: $choosingStart, titleVisibility: .visible) {
-            Button("Ask each time") { rememberedStart = nil }
-            Button("Apple Watch") { rememberedStart = "watch" }
-            Button("iPhone") { rememberedStart = "phone" }
-        }
         .confirmationDialog("Reset export state and backfill again?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("Reset local export state", role: .destructive) {
                 Task {
@@ -101,7 +94,6 @@ struct SettingsScreen: View {
                 row(.restS, t?.values.restS.map(Double.init), key: "Default rest")
                 row(.crownStepKg, t?.values.crownStepKg)
                 SettingsRow(key: "Splits", value: "Edit") { router.settingsPath.append(.splits) }
-                SettingsRow(key: "Workout start", value: startChoice) { choosingStart = true }
             }
 
             SettingsGroup(title: "This phone") {
@@ -161,9 +153,6 @@ struct SettingsScreen: View {
         return parts.isEmpty ? "Set" : parts.joined(separator: " · ")
     }
 
-    private var startChoice: String {
-        switch rememberedStart { case "watch": "Watch"; case "phone": "iPhone"; default: "Ask each time" }
-    }
 
     private var host: String {
         (try? ServerSettings(SettingsStore.baseURL))?.baseURL.host() ?? "–"

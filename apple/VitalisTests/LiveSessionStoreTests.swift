@@ -213,7 +213,7 @@ final class SentRequests {
         await store.check()
         let body = try #require(sent.workouts.last)
         #expect(body.session.clientId == s.id.uuidString && body.session.source == "phone")
-        #expect(body.session.title == nil && body.session.endedAt == nil && body.session.template == nil, "the Watch's to set")
+        #expect(body.session.title == "Push" && body.session.endedAt == nil && body.session.hkWorkoutUuid == nil, "end and Health link are the Watch's")
         #expect(body.sets.map(\.id) == [try #require(store.session?.sets.first?.id).uuidString], "only the phone's own set")
         #expect(shared.last?.sets.map(\.id) == store.session?.sets.map(\.id))
         // The Watch's next record keeps the phone's row and adds its own in time order.
@@ -232,6 +232,17 @@ final class SentRequests {
         store.watchRecord(watchRecord([], ended: true))
         #expect(store.session == nil && !store.watchSessionLive && store.liveWatch == nil)
         #expect(await store.finish() == nil)
+    }
+
+    @Test func aWatchThatNeverStartedLeavesThePhoneOwningTheWorkout() async throws {
+        let sent = SentRequests(), health = FakeHealthWriter()
+        let store = make(file: nil, sent: sent, health: health)
+        store.begin(split: try split([bench]))
+        store.startedWithWatch()
+        await store.check()
+        let id = try #require(store.session?.id)
+        #expect(await store.finish() == id.uuidString, "no Watch copy ever arrived, so the phone finishes it")
+        #expect(sent.workouts.last?.session.endedAt != nil)
     }
 
     @Test func mergedSetsTakeTheOwnCopyAndRunInTimeOrder() {

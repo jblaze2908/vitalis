@@ -97,7 +97,8 @@ import VitalisUI
     func start(_ plan: WatchPlan) {
         guard record?.isLive != true else { return }
         let started = now()
-        let fresh = WorkoutSessionRecord(title: plan.title ?? "Workout", template: plan.template, startedAt: started,
+        // Started from the phone: reuse its workout id, so the phone's sets and these land in one workout.
+        let fresh = WorkoutSessionRecord(id: plan.sessionID ?? UUID(), title: plan.title ?? "Workout", template: plan.template, startedAt: started,
                                          tzOffsetMin: TimeZone.current.secondsFromGMT(for: started) / 60, exerciseIDs: plan.exerciseIDs)
         guard persist(fresh) else { Haptic.play(.failure); return }
         record = fresh

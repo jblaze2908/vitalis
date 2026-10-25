@@ -139,6 +139,13 @@ final class LiveSessionStore {
         if r.isLive { syncWatch(r) } else { session = nil; persist() }
     }
 
+    /// The Watch app opened with this workout's id: it records Health and ends the workout; the phone adds sets.
+    func startedWithWatch() {
+        guard session != nil else { return }
+        session?.joinedWatch = true
+        persist()
+    }
+
     /// Opens the live Watch workout on the phone. Its sets show as Watch rows; the phone's own sets are added beside them.
     func join() {
         guard session == nil, let r = liveWatch else { return }
@@ -373,8 +380,10 @@ final class LiveSessionStore {
     /// Returns the session id (`client_id` = server `sessions.id`), or nil when nothing was logged.
     func finish() async -> String? {
         guard var s = session else { return nil }
-        // Joined: the Watch ends the workout and records it in Health; the phone only leaves.
-        if s.isJoined { await commitEdits(); session = nil; persist(); return nil }
+        // Joined: the Watch ends the workout and records it in Health; the phone only leaves. If the Watch never
+        // sent a copy (it didn't start), the phone owns the workout after all and finishes it itself.
+        if s.isJoined, s.watchSets != nil { await commitEdits(); session = nil; persist(); return nil }
+        s.joinedWatch = nil
         guard !s.sets.isEmpty else { discard(); return nil }
         let end = now()
         s.endedAt = end
@@ -405,10 +414,11 @@ final class LiveSessionStore {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
         iso.timeZone = timeZone
-        // Joined: only the phone's own sets, and no title, template, end or Health link, which are the Watch's to set.
+        // Joined: only the phone's own sets, and no end or Health link, which are the Watch's to set. The title and
+        // template match the Watch's copy (synced from it, and rename is off while joined), so sending them is safe.
         let header = s.isJoined
-            ? WorkoutUpsert.Session(clientId: s.id.uuidString, source: "phone", startedAt: iso.string(from: s.startedAt),
-                                    tzOffsetMin: timeZone.secondsFromGMT(for: s.startedAt) / 60)
+            ? WorkoutUpsert.Session(clientId: s.id.uuidString, title: s.title, template: s.template, source: "phone",
+                                    startedAt: iso.string(from: s.startedAt), tzOffsetMin: timeZone.secondsFromGMT(for: s.startedAt) / 60)
             : WorkoutUpsert.Session(clientId: s.id.uuidString, title: s.title, template: s.template, source: "phone",
                                     startedAt: iso.string(from: s.startedAt), endedAt: s.endedAt.map(iso.string(from:)),
                                     tzOffsetMin: timeZone.secondsFromGMT(for: s.startedAt) / 60, hkWorkoutUuid: s.hkWorkoutUUID)

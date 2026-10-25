@@ -3,8 +3,8 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
-/// Start choice (frame 11, 11 §7.3): the owner's splits as equal choices (none preselected), then Watch or iPhone.
-/// A remembered destination starts as soon as a split is tapped; with no splits it acts on appear.
+/// Start (frame 11, 11 §7.3): the owner's splits as equal choices, then one Start for a workout shared by this iPhone
+/// and the Watch; while a Watch workout is already live, Join it instead.
 struct WorkoutStartSheet: View {
     private let train: TrainStore
     private let live: LiveSessionStore
@@ -12,8 +12,6 @@ struct WorkoutStartSheet: View {
     private let actsOnAppear: Bool
 
     @Environment(Router.self) private var router
-    @AppStorage("rememberedStart") private var rememberedStart = ""
-    @State private var remember = false
     @State private var chosen: String?
     /// Nothing reads as selected until the owner taps a row, Empty workout included.
     @State private var picked = false
@@ -40,36 +38,16 @@ struct WorkoutStartSheet: View {
                     }
                     if !splits.isEmpty { choices.padding(.top, 20) }
 
-                    PrimaryButton("Start on Watch", icon: "applewatch") { Task { await startOnWatch() } }
-                        .disabled(starting)
-                        .padding(.top, 28)
-                    caption(watchError ?? "Log sets from your wrist · phone stays away", tint: watchError == nil ? .steel : .watch)
-
-                    if live.watchSessionLive {
-                        SecondaryButton("Join Watch workout", systemImage: "iphone", size: .full, enabled: live.liveWatch != nil) { joinWatch() }
-                            .padding(.top, 20)
+                    if live.watchSessionLive, live.liveWatch != nil {
+                        // Already running on the Watch: open that same workout here.
+                        PrimaryButton("Join Watch workout", icon: "applewatch") { joinWatch() }.padding(.top, 28)
                         caption("Add sets here too · the Watch keeps recording", tint: .steel)
                     } else {
-                        SecondaryButton("Log on iPhone", systemImage: "iphone", size: .full) { logOnPhone() }
-                            .padding(.top, 20)
-                        caption("Full set table · good for new exercises", tint: .steel)
-                    }
-
-                    VSection(top: 20) {
-                        Button { remember.toggle() } label: {
-                            HStack(spacing: 16) {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous).inset(by: 0.75)
-                                    .stroke(VColor.future, lineWidth: 1.5)
-                                    .frame(width: 18, height: 18)
-                                    .overlay { if remember { Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(VColor.bone) } }
-                                MonoLabel("Remember Watch or iPhone", tint: .bone)
-                                Spacer()
-                            }
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(remember ? .isSelected : [])
+                        PrimaryButton(starting ? "Starting" : "Start workout") { Task { await start() } }
+                            .disabled(starting)
+                            .padding(.top, 28)
+                        caption(watchError ?? "One workout on this iPhone and your Watch · the Watch records heart rate",
+                                tint: watchError == nil ? .steel : .watch)
                     }
                 }
                 .padding(.horizontal, VSpace.gutter)
@@ -77,11 +55,7 @@ struct WorkoutStartSheet: View {
             }
         }
         .presentationDetents([.large])
-        .task {
-            if train.week.value == nil { await train.load() }
-            guard actsOnAppear, splits.isEmpty else { return }
-            await startRemembered()
-        }
+        .task { if train.week.value == nil { await train.load() } }
     }
 
     /// One row per split, in server order; loaded ones stay tappable because the owner decides.
@@ -117,19 +91,7 @@ struct WorkoutStartSheet: View {
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
-    private func pick(_ id: String?) {
-        chosen = id; picked = true
-        guard actsOnAppear else { return }
-        Task { await startRemembered() }
-    }
-
-    private func startRemembered() async {
-        switch rememberedStart {
-        case "watch": await startOnWatch()
-        case "phone": logOnPhone()
-        default: break
-        }
-    }
+    private func pick(_ id: String?) { chosen = id; picked = true }
 
     private func caption(_ text: String, tint: VTint) -> some View {
         MonoLabel(text, size: .small, tint: tint)
@@ -138,25 +100,23 @@ struct WorkoutStartSheet: View {
             .padding(.top, 12)
     }
 
-    /// Plan first, then `startWatchApp`; on failure the error replaces the caption and Log on iPhone stays.
-    private func startOnWatch() async {
-        guard !starting else { return }
+    /// One workout for both devices (20 §4): the phone mints the id, the Watch app opens on it and records Health;
+    /// when the Watch can't be opened the phone owns the workout alone. Either way the phone logger opens.
+    private func start() async {
+        guard !starting, !live.watchSessionLive || live.liveWatch == nil else { return }
         starting = true
         defer { starting = false }
-        WatchBridge.sendPlan(title: split?.name, template: split?.templateID, exerciseIDs: split?.exercises.map(\.id) ?? [])
+        live.begin(split: split)
+        guard let id = live.session?.id, actsOnAppear else { router.startLoggingOnPhone(); return }
+        WatchBridge.sendPlan(title: split?.name, template: split?.templateID, exerciseIDs: split?.exercises.map(\.id) ?? [], sessionID: id)
         let config = HKWorkoutConfiguration()
         config.activityType = .traditionalStrengthTraining
         config.locationType = .indoor
         let opened = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             AppModel.shared.healthStore.startWatchApp(with: config) { ok, _ in cont.resume(returning: ok) }
         }
-        if opened {
-            if remember { rememberedStart = "watch" }
-            watchError = nil
-            router.sheet = nil
-        } else {
-            watchError = "No paired Watch with Vitalis · log on iPhone instead"
-        }
+        if opened { live.startedWithWatch() } else { watchError = "No Watch reachable · logging on this iPhone" }
+        router.startLoggingOnPhone()
     }
 
     /// One workout from both devices: the phone shows the Watch's sets and adds its own (20 §4).
@@ -165,12 +125,6 @@ struct WorkoutStartSheet: View {
         router.startLoggingOnPhone()
     }
 
-    private func logOnPhone() {
-        guard !live.watchSessionLive else { return }
-        if remember { rememberedStart = "phone" }
-        live.begin(split: split)
-        router.startLoggingOnPhone()
-    }
 }
 
 #if DEBUG

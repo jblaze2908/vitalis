@@ -4,8 +4,9 @@ import VitalisKit
 /// Phone → Watch seam for the start-choice sheet and Today; the relay itself is `PhoneSessionDelegate` (spec 21 §6).
 @MainActor enum WatchBridge {
     /// `WatchMessage.plan` via `sendMessage` when reachable, else parked in the pack.
-    static func sendPlan(title: String? = nil, template: String?, exerciseIDs: [String], intensity: String? = nil) {
-        PhoneSessionDelegate.shared.sendPlan(WatchPlan(title: title, template: template, exerciseIDs: exerciseIDs, intensity: intensity))
+    static func sendPlan(title: String? = nil, template: String?, exerciseIDs: [String], intensity: String? = nil, sessionID: UUID? = nil) {
+        PhoneSessionDelegate.shared.sendPlan(WatchPlan(title: title, template: template, exerciseIDs: exerciseIDs, intensity: intensity,
+                                                       sessionID: sessionID))
     }
 
     /// Complications (spec 21 §3) after each new Today snapshot; also a cue to refresh the pack (throttled).

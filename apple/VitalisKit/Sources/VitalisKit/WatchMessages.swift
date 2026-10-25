@@ -289,10 +289,12 @@ public struct WatchPlan: Codable, Sendable, Equatable {
     public var template: String?
     public var exerciseIDs: [String]
     public var intensity: String?
-    public init(title: String? = nil, template: String?, exerciseIDs: [String], intensity: String? = nil) {
-        self.title = title; self.template = template; self.exerciseIDs = exerciseIDs; self.intensity = intensity
+    /// The phone's workout id, so both devices log one workout (20 §4); nil lets the Watch mint its own.
+    public var sessionID: UUID?
+    public init(title: String? = nil, template: String?, exerciseIDs: [String], intensity: String? = nil, sessionID: UUID? = nil) {
+        self.title = title; self.template = template; self.exerciseIDs = exerciseIDs; self.intensity = intensity; self.sessionID = sessionID
     }
-    private enum CodingKeys: String, CodingKey { case title, template, intensity, exerciseIDs = "exercise_ids" }
+    private enum CodingKeys: String, CodingKey { case title, template, intensity, exerciseIDs = "exercise_ids", sessionID = "session_id" }
 }
 
 /// Sent by the phone after its Outbox durably holds `revision` of the session.
