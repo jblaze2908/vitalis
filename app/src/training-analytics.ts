@@ -12,13 +12,13 @@ export type TrainingSet = {
 export type Heat = 0 | 1 | 2 | 3 | 4;
 export type MuscleFreshness = { heat: Heat; load: number; days_since: number | null };
 export type Freshness = Record<string, MuscleFreshness>;
-export type TemplateKey = (typeof TRAINING.templates)[number]["template"];
-export type Due = { template: TemplateKey; name: string; days_since: number | null; exercises: string[] };
+/** A split the owner can start: defined in Settings, or a workout name they have logged. Muscles are slugs. */
+export type SplitCandidate = { id: string; name: string; source: "defined" | "history"; muscles: string[]; exercises: string[] };
+export type SplitState = SplitCandidate & { ready: boolean; days_since: number | null };
 
 export const toSlug = (muscle: string) => muscle.trim().toLowerCase().replace(/\s+/g, "-");
 export const fromSlug = (slug: string) => slug.replace(/-/g, " ");
 export const SLUGS: readonly string[] = MUSCLES.map(toSlug);
-export const TEMPLATES = TRAINING.templates;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -79,24 +79,24 @@ export function freshness(sets: TrainingSet[], now: number, today: string): Fres
 }
 
 /**
- * §7.3: among templates whose muscles all have heat ≤ 1, the one with the largest min(days_since) (null = never = infinite),
- * ties in table order. `lastSessions[template]` = exercise ids of the most recent matching session in set order.
+ * §7.3: a split is ready when all its muscles have heat ≤ 1 (no muscles: always). Order is kept as given; nothing is ranked.
  */
-export function dueTemplate(fresh: Freshness, lastSessions: Partial<Record<TemplateKey, string[]>> = {}): Due | null {
-  let best: { t: (typeof TEMPLATES)[number]; min: number } | null = null;
-  for (const t of TEMPLATES) {
-    if (!t.muscles.every((m) => (fresh[m]?.heat ?? 0) <= 1)) continue;
-    const min = Math.min(...t.muscles.map((m) => fresh[m]?.days_since ?? Infinity));
-    if (!best || min > best.min) best = { t, min };
-  }
-  if (!best) return null;
-  const recent = [...new Set(lastSessions[best.t.template] ?? [])];
-  return { template: best.t.template, name: best.t.name, days_since: Number.isFinite(best.min) ? best.min : null,
-    exercises: recent.length ? recent : [...best.t.exercises] };
+export function splitStates(splits: SplitCandidate[], fresh: Freshness): SplitState[] {
+  return splits.map((sp) => {
+    const min = sp.muscles.length ? Math.min(...sp.muscles.map((m) => fresh[m]?.days_since ?? Infinity)) : Infinity;
+    return { ...sp, ready: sp.muscles.every((m) => (fresh[m]?.heat ?? 0) <= 1), days_since: Number.isFinite(min) ? min : null };
+  });
 }
 
-/** "Legs fresh" from the due template, else null. */
-export const freshLabel = (due: Due | null) => (due ? `${due.name} fresh` : null);
+/** "Push fresh" for one ready split, "3 splits fresh" for more, else null. */
+export const freshLabel = (splits: SplitState[]) => {
+  const ready = splits.filter((s) => s.ready);
+  return ready.length === 0 ? null : ready.length === 1 ? `${ready[0].name} fresh` : `${ready.length} splits fresh`;
+};
+
+/** Muscles a session trained: primary muscles of its working sets, as slugs, in first-seen order. */
+export const sessionMuscles = (sets: TrainingSet[]) =>
+  [...new Set(sets.filter(working).flatMap((s) => s.primary.map(toSlug)).filter((m) => SLUGS.includes(m)))];
 
 /**
  * "<Muscle> loaded" for the hottest muscle with heat ≥ 3, else null. The "group" is the single muscle, display name =

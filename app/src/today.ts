@@ -94,7 +94,7 @@ function assemble(day: string, at: number) {
   const v = verdict({
     recovery: { band: rec.band as Verdict["band"], score: rec.score, reason: rec.reason },
     hints: { hrv: { arrow: rec.parts.hrv.arrow as never, tint: rec.parts.hrv.tint as never }, resting_hr: { arrow: rec.parts.resting_hr.arrow as never, tint: rec.parts.resting_hr.tint as never } },
-    due: training.due, strength_today: last ? { title: last.title ?? "Workout", sets: sessions.reduce((n, s) => n + s.working, 0) } : null,
+    trainable: training.splits.length === 0 || training.splits.some((s) => s.ready), strength_today: last ? { title: last.title ?? "Workout", sets: sessions.reduce((n, s) => n + s.working, 0) } : null,
     kcal_left: kcalLeft, next_slot: slot, now_min: day === todayOf(at) ? nowMin : 12 * 60, bed_by_min: day === todayOf(at) ? night.bed_by_min : null,
   });
   return { off, scores, rec, targets, night, sums, slot, kcalLeft, training, v };
@@ -112,7 +112,7 @@ export function todayBody(day: string, at = Date.now()) {
       protein_target_g: a.targets.protein_g, protein_g: Math.round(a.sums.protein_g), next_slot: a.slot, next_label: `LOG ${a.slot.toUpperCase()}` },
     activity: activity(day, at, a.targets.steps),
     training: { heat: a.training.heat, fresh_label: a.training.fresh_label, loaded_label: a.training.loaded_label,
-      due: a.training.due && { template: a.training.due.template, name: a.training.due.name, days_since: a.training.due.days_since, exercises: a.training.due.exercises },
+      due: null, splits: a.training.splits.map(({ muscles: _m, ...r }) => r),
       trained_today: a.training.trained_today },
     pulse: pulse(day, at, a.night.bed_by_min),
     digest: digestState(day, at),
@@ -135,9 +135,9 @@ export function digestBody(day: string, at = Date.now()) {
   const yw = ys ? null : one<{ id: string; name: string }>("SELECT id,name FROM hk_workouts WHERE day=? ORDER BY start_ms DESC LIMIT 1", yesterday);
   const plan: { kind: string; title: string; reason: string; primary: boolean }[] = [];
   const action = a.v.action;
-  if (action.kind === "start_workout" && a.training.due) {
-    const ds = a.training.due.days_since;
-    plan.push({ kind: "train", title: `Train ${a.training.due.name.toLowerCase()}${action.intensity === "light" ? " light" : ""}`, reason: ds === null ? "NEW" : `${ds} DAYS SINCE`, primary: true });
+  if (action.kind === "start_workout") {
+    const ready = a.training.splits.filter((s) => s.ready).map((s) => s.name.toUpperCase());
+    plan.push({ kind: "train", title: action.intensity === "light" ? "Train light" : "Train", reason: ready.length ? `${ready.join(" · ")} READY` : "PICK AS YOU GO", primary: true });
   } else if (action.kind === "bed_reminder") plan.push({ kind: "sleep", title: `Bed by ${a.night.bed_by}`, reason: a.night.label, primary: true });
   plan.push({ kind: "eat", title: `Eat ${fmt(a.targets.kcal)} kcal`, reason: `${a.targets.protein_g} G PROTEIN`, primary: false });
   const usualSteps = a.targets.steps28.length >= 7 ? stepsTarget(a.targets.steps28) : null;

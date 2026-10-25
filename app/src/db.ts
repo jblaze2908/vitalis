@@ -208,6 +208,10 @@ addColumn("sleep_nights", "wakeups", "INTEGER");
 addColumn("sessions", "hk_workout_uuid", "TEXT");
 addColumn("sessions", "template", "TEXT");
 addColumn("sessions", "client_source", "TEXT");
+// Owner-defined workout splits; `muscles` is a JSON array of slugs. Exercises come from the last session with that split.
+db.exec(`CREATE TABLE IF NOT EXISTS splits (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, muscles TEXT NOT NULL, ord INTEGER NOT NULL,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER) WITHOUT ROWID`);
 db.exec("CREATE INDEX IF NOT EXISTS sessions_hk ON sessions(hk_workout_uuid) WHERE hk_workout_uuid IS NOT NULL");
 
 // hk_types rows are created once, but the HK_METRICS mapping can change: make the table follow it at every start.

@@ -5,6 +5,7 @@ import { addDays, all, body, http, ingest, one, payload, tokens } from "./_env.m
 import { featuresRange, kcalTargetFor, markDirty, scoresFor, trainingState } from "../dist/src/derived.js";
 import { dataVersions, run } from "../dist/src/db.js";
 import { logSets } from "../dist/src/training.js";
+import { deleteSplit, putSplit } from "../dist/src/splits.js";
 
 const ingestToken = tokens.createToken("derived phone", "ingest").token;
 const noonOf = (day) => Date.parse(`${day}T12:00:00+05:30`);
@@ -86,16 +87,26 @@ test("calorie target: the first week is the initial rule, later weeks adapt or k
   assert.equal(w2.mode, "kept"); assert.equal(w2.reason, "not_enough_data"); assert.equal(w2.kcal, 2400);
 });
 
-test("training state: heat for all 17 muscles, a due template and labels", () => {
+test("training state: heat for all 17 muscles, splits from Settings and history, labels", () => {
   const at = noonOf("2026-05-22");
   const s = trainingState(at);
   assert.equal(Object.keys(s.heat).length, 17);
-  assert.equal(s.due.template, "legs"); assert.equal(s.due.days_since, null);
-  assert.equal(s.due.exercises[0].name, "Barbell Squat");
+  assert.deepEqual(s.splits, [], "nothing is predefined");
+  assert.equal(s.fresh_label, null);
   logSets({ title: "Legs", sets: Array.from({ length: 4 }, () => ({ exercise: "barbell-squat", weight_kg: 100, reps: 5, performed_at: "2026-05-22T11:00:00+05:30" })) }, "test");
   const after = trainingState(at);
   assert.equal(after.heat.quadriceps, 4);
   assert.equal(after.trained_today, true);
   assert.equal(after.loaded_label, "Quadriceps loaded");
-  assert.notEqual(after.due?.template, "legs");
+  // A logged name becomes a history split with the muscles it actually trained.
+  assert.deepEqual(after.splits.map((x) => [x.id, x.source, x.ready, x.muscles]), [["history:legs", "history", false, ["quadriceps"]]]);
+  assert.equal(after.splits[0].exercises[0].name, "Barbell Squat");
+  putSplit("push-day", { name: "Push", muscles: ["chest", "shoulders", "triceps"] });
+  putSplit("legs-split", { name: "legs", muscles: ["quadriceps", "hamstrings"] });
+  const both = trainingState(at);
+  assert.deepEqual(both.splits.map((x) => [x.id, x.source, x.ready]), [["push-day", "defined", true], ["legs-split", "defined", false]],
+    "a defined split takes over the history split of the same name");
+  assert.equal(both.splits[1].exercises[0].name, "Barbell Squat", "a defined split's exercises come from its last session by name");
+  assert.equal(both.fresh_label, "Push fresh");
+  deleteSplit("push-day"); deleteSplit("legs-split");
 });

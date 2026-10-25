@@ -180,9 +180,8 @@ test("§10.8 sleep stages are not inputs: changing them leaves sleep and recover
   }
 });
 
-const LEGS = { template: "legs", name: "Legs" };
 const V = { recovery: { band: "ready", score: 82 }, hints: { hrv: { arrow: "up", tint: "good" }, resting_hr: { arrow: "up", tint: "watch" } },
-  due: LEGS, strength_today: null, kcal_left: 1780, next_slot: "lunch", now_min: 9 * 60 + 41, bed_by_min: 23 * 60 };
+  trainable: true, strength_today: null, kcal_left: 1780, next_slot: "lunch", now_min: 9 * 60 + 41, bed_by_min: 23 * 60 };
 
 test("§5 verdict rules 1–9", () => {
   const cases = [
@@ -191,12 +190,12 @@ test("§5 verdict rules 1–9", () => {
     [{ now_min: 22 * 60, bed_by_min: 30 }, 0, null, null],
     [{ strength_today: { title: "Push", sets: 18 }, next_slot: "dinner" }, 2, "Done for today", { kind: "log_meal", label: "Log dinner", slot: "dinner" }],
     [{ strength_today: { title: "Push", sets: 18 }, kcal_left: 300 }, 2, "Done for today", { kind: "bed_reminder", label: "Remind me" }],
-    [{ recovery: { band: null, score: null, reason: "Needs 9 more nights" } }, 3, "Legs is due", { kind: "start_workout", label: "Start legs on Watch", template: "legs", intensity: "normal" }],
-    [{ recovery: { band: null, score: null }, due: null }, 4, "No score yet", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
-    [{}, 5, "Train legs hard today", { kind: "start_workout", label: "Start legs on Watch", template: "legs", intensity: "normal" }],
-    [{ recovery: { band: "steady", score: 70 } }, 6, "Train legs as planned", { kind: "start_workout", label: "Start legs on Watch", template: "legs", intensity: "normal" }],
-    [{ recovery: { band: "ease", score: 50 } }, 7, "Go easy on legs", { kind: "start_workout", label: "Start legs light", template: "legs", intensity: "light" }],
-    [{ due: null }, 8, "Muscles still loaded", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
+    [{ recovery: { band: null, score: null, reason: "Needs 9 more nights" } }, 3, "Fresh to train", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
+    [{ recovery: { band: null, score: null }, trainable: false }, 4, "No score yet", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
+    [{}, 5, "Train hard today", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
+    [{ recovery: { band: "steady", score: 70 } }, 6, "Train as planned", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
+    [{ recovery: { band: "ease", score: 50 } }, 7, "Go easy today", { kind: "start_workout", label: "Start light workout", template: null, intensity: "light" }],
+    [{ trainable: false }, 8, "Muscles still loaded", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
     [{ recovery: { band: "rest", score: 30 } }, 9, "Rest today", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
     [{ recovery: { band: "rest", score: 30 }, kcal_left: -120 }, 9, "Rest today", { kind: "bed_reminder", label: "Remind me" }],
   ];

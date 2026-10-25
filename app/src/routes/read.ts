@@ -3,6 +3,7 @@ import { ApiError, dayParam, handle, routeKey, withEtag } from "../http.js";
 import { catalog, exerciseDetail } from "../exercise-view.js";
 import { sleepDay, sleepWeek } from "../sleep-view.js";
 import { bodyDay } from "../weight.js";
+import { definedSplits } from "../splits.js";
 import { getTargets } from "../targets.js";
 import { digestBody, todayBody } from "../today.js";
 import { sessionDetail, sessionHistory, trainingWeek } from "../training-view.js";
@@ -10,6 +11,7 @@ import { sessionDetail, sessionHistory, trainingWeek } from "../training-view.js
 export const readRoutes = new Hono();
 
 readRoutes.get("/v2/targets", handle("v2/targets", "read", (c) => withEtag(c, routeKey(c), () => getTargets())));
+readRoutes.get("/v2/splits", handle("v2/splits", "read", (c) => withEtag(c, routeKey(c), () => ({ splits: definedSplits() }))));
 readRoutes.get("/v2/today", handle("v2/today", "read", (c) => withEtag(c, routeKey(c), () => todayBody(dayParam(c)), { clock: true })));
 readRoutes.get("/v2/digest", handle("v2/digest", "read", (c) => withEtag(c, routeKey(c), () => digestBody(dayParam(c)), { clock: true })));
 readRoutes.get("/v2/sleep", handle("v2/sleep", "read", (c) => withEtag(c, routeKey(c), () => sleepDay(dayParam(c)))));

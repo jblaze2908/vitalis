@@ -32,13 +32,14 @@ test("after a short late night: recovery is rest and the one action is to log a 
   assert.equal(t.generated_at, "2026-08-31T09:41:00+05:30");
 });
 
-test("a good night with fresh legs: Train legs hard today", () => {
+test("a good night, no splits yet: Train hard today, naming none", () => {
   const t = todayBody(GOOD, at(GOOD, "09:41"));
   assert.equal(t.recovery.band, "ready", JSON.stringify(t.recovery));
-  assert.equal(t.verdict.headline, "Train legs hard today");
-  assert.deepEqual(t.verdict.action, { kind: "start_workout", label: "Start legs on Watch", template: "legs", intensity: "normal" });
-  assert.equal(t.training.due.template, "legs");
-  assert.equal(t.training.fresh_label, "Legs fresh");
+  assert.equal(t.verdict.headline, "Train hard today");
+  assert.deepEqual(t.verdict.action, { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" });
+  assert.equal(t.training.due, null);
+  assert.deepEqual(t.training.splits, []);
+  assert.equal(t.training.fresh_label, null);
   assert.equal(t.training.heat.quadriceps, 0, "no data yet");
 });
 
@@ -61,7 +62,7 @@ test("the digest is available only 30 minutes after the night ended", () => {
   assert.deepEqual(d.sleep.rows.map((r) => r.key), ["duration", "bedtime", "efficiency", "wakeups"]);
   assert.equal(d.sleep.rows[0].value, "7H00");
   assert.equal(d.sleep.rows[1].delta, "ON TIME");
-  assert.equal(d.plan[0].kind, "train"); assert.equal(d.plan[0].title, "Train legs"); assert.equal(d.plan[0].reason, "NEW");
+  assert.equal(d.plan[0].kind, "train"); assert.equal(d.plan[0].title, "Train"); assert.equal(d.plan[0].reason, "PICK AS YOU GO");
   assert.equal(d.plan.length, 3);
   const none = digestBody("2025-01-01", at("2025-01-01", "09:00"));
   assert.equal(none.available, false); assert.equal(none.sleep, null); assert.equal(none.recovery, null);

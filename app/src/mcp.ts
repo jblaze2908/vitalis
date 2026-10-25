@@ -114,11 +114,11 @@ export function buildServer(token: Token) {
     const [from, to] = span(a, 7), state = trainingState(), week = weekStartOf(to), off = ownerOffsetMin();
     const tg = effectiveTargets(), at = (d: string) => Date.parse(`${d}T00:00:00Z`) - off * 60_000;
     const ws = weeklySets(trainingSets(at(week) - 14 * 3_600_000, at(addDays(week, 7)) + 14 * 3_600_000), week, { min: tg.weekly_sets_min, max: tg.weekly_sets_max });
-    return { ...trainingSummary(from, to), heat: state.heat, due: state.due, weekly_sets: { week_start: week, min: ws.min, max: ws.max, by_muscle: ws.by_muscle, status: ws.status } };
+    return { ...trainingSummary(from, to), heat: state.heat, splits: state.splits, weekly_sets: { week_start: week, min: ws.min, max: ws.max, by_muscle: ws.by_muscle, status: ws.status } };
   }));
 
   s.registerTool("get_today", { title: "Today, as the app shows it", annotations: READ, outputSchema: Out,
-    description: "The app's Home screen for a day: the verdict (headline and one action), recovery score with its parts against the 60-day usual, fuel (calories left, protein), activity pace against the usual by now, muscle heat and the training due, and freshness. Quote these numbers; they are what the person sees.",
+    description: "The app's Home screen for a day: the verdict (headline and one action), recovery score with its parts against the 60-day usual, fuel (calories left, protein), activity pace against the usual by now, muscle heat and which of the owner's splits are fresh, and freshness. Quote these numbers; they are what the person sees.",
     inputSchema: z.object({ day: day.optional().describe("default today") }) },
   wrap(ctx, "get_today", (a: { day?: string }) => todayBody(a.day ?? today())));
 

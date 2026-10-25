@@ -88,14 +88,8 @@ export const TRAINING = {
   sessionHeat: { partly: 2, loaded: 4 },
   weeklySets: { min: 10, max: 20 },
   e1rmTrend: { windowDays: 84, changeDays: 56 },
-  templates: [
-    { template: "legs", name: "Legs", muscles: ["quadriceps", "hamstrings", "glutes", "calves"],
-      exercises: ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
-    { template: "push", name: "Push", muscles: ["chest", "shoulders", "triceps"],
-      exercises: ["barbell-bench-press-medium-grip", "standing-military-press", "incline-dumbbell-press", "side-lateral-raise", "triceps-pushdown"] },
-    { template: "pull", name: "Pull", muscles: ["lats", "middle-back", "biceps"],
-      exercises: ["wide-grip-lat-pulldown", "bent-over-barbell-row", "seated-cable-rows", "face-pull", "barbell-curl"] },
-  ],
+  // Splits come from the owner (Settings) and from workout names they have logged; nothing is predefined (25 Oct).
+  splitHistoryDays: 90,
 } as const;
 
 /** 11 §8: weight trend, calorie, protein and steps targets. */

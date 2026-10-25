@@ -159,9 +159,9 @@ Query: `date` (default today). The Home screen (`spec/design/03-home-today.png`)
   "generated_at": "2026-10-24T09:41:02+05:30",
   "verdict": {
     "band": "ready", "label": "READY",
-    "headline": "Train legs hard today",
+    "headline": "Train hard today",
     "reason": "Recovery 82: HRV above your usual, resting heart rate slightly up.",
-    "action": { "kind": "start_workout", "label": "Start legs on Watch", "template": "legs", "intensity": "normal" }
+    "action": { "kind": "start_workout", "label": "Start workout", "template": null, "intensity": "normal" }
   },
   "recovery": {
     "score": 82, "band": "ready", "status": "ok", "reason": null, "nights_of_history": 60, "nights_needed": 0,
@@ -183,9 +183,11 @@ Query: `date` (default today). The Home screen (`spec/design/03-home-today.png`)
   "training": {
     "heat": { "abdominals": 1, "abductors": 0, "adductors": 1, "biceps": 2, "calves": 1, "chest": 4, "forearms": 1, "glutes": 1, "hamstrings": 1,
               "lats": 2, "lower-back": 1, "middle-back": 2, "neck": 0, "quadriceps": 1, "shoulders": 3, "traps": 1, "triceps": 3 },
-    "fresh_label": "Legs fresh", "loaded_label": "Chest loaded",
-    "due": { "template": "legs", "name": "Legs", "days_since": 6,
-             "exercises": [ { "id": "barbell-squat", "name": "Barbell Squat" }, { "id": "romanian-deadlift", "name": "Romanian Deadlift" } ] },
+    "fresh_label": "Lower fresh", "loaded_label": "Chest loaded",
+    "due": null,
+    "splits": [ { "id": "lower", "name": "Lower", "source": "defined", "ready": true, "days_since": 6,
+                  "exercises": [ { "id": "barbell-squat", "name": "Barbell Squat" }, { "id": "romanian-deadlift", "name": "Romanian Deadlift" } ] },
+                { "id": "history:push", "name": "Push", "source": "history", "ready": false, "days_since": 1, "exercises": [ { "id": "barbell-bench-press-medium-grip", "name": "Barbell Bench Press - Medium Grip" } ] } ],
     "trained_today": false
   },
   "pulse": {
@@ -203,7 +205,7 @@ Field rules:
 - `recovery.status`: `ok` | `calibrating` (fewer than 14 nights; `nights_needed` > 0; `reason`: "Needs 9 more nights") | `missing` (`reason`: "No sleep recorded for last night" or "No heart data for last night"). When not `ok`, `score` and `band` are `null` and the part objects still carry whatever exists.
 - `fuel.next_slot`: slot windows (local): breakfast 04:00–10:29, lunch 10:30–14:59, snack 15:00–17:59, dinner 18:00–03:59. Next slot = the current window's slot if it has no entries yet, else the following slot. `next_label` = `LOG <SLOT>` (`LOG SNACK`).
 - `activity.*_pace` values: `ahead | behind | on_pace | early | unknown` ([11 §6](11-scoring.md#6-activity-ahead--behind-usual-by-now)).
-- `training.heat` always has all 17 slugs ([11 §7.1](11-scoring.md#71-muscle-load-and-heat-17-muscles)). `due` may be `null`.
+- `training.heat` always has all 17 slugs ([11 §7.1](11-scoring.md#71-muscle-load-and-heat-17-muscles)). `splits` lists the owner's splits, defined then history, each with `ready` ([11 §7.2–7.3](11-scoring.md#72-splits)); it may be empty. `due` is always `null`; it stays only so older app builds still decode.
 - `pulse` resolves the PulseLine time→x question: `window.start` = today's wake (`sleep_end` of today's night; 06:00 local if none), `window.end` = `bed_by` ([11 §9.2](11-scoring.md#92-tonight)). Events (each draws a dip): `wake`, `weigh_in` (weight entry or HealthKit weight sample time), `meal` (first `eaten_at` of each `meal_id`), `workout` (session `started_at`). Events after `now` are omitted. The app maps `x = (t − start) / (end − start)` clamped to 0…1.
 - `digest.available`: see `GET /v2/digest`.
 
@@ -229,7 +231,7 @@ Query: `date` (default today). Drives `spec/design/02-morning-digest.png`.
                 "hrv": { "value": 62, "arrow": "up", "tint": "good" }, "resting_hr": { "value": 57, "arrow": "up", "tint": "watch" } },
   "yesterday": { "day": "2026-10-23", "steps": 9420, "active_kcal": 640, "workout": { "id": "3d0c…", "title": "Push", "kind": "strength" } },
   "plan": [
-    { "kind": "train", "title": "Train legs", "reason": "6 DAYS SINCE", "primary": true },
+    { "kind": "train", "title": "Train", "reason": "LOWER READY", "primary": true },
     { "kind": "eat", "title": "Eat 2,300 kcal", "reason": "160 G PROTEIN", "primary": false },
     { "kind": "walk", "title": "Walk 9,000", "reason": "YOUR TARGET", "primary": false }
   ],
@@ -344,8 +346,9 @@ Drives `spec/design/05-body-tab.png`.
   "week_start": "2026-10-19", "week_end": "2026-10-25", "label": "THIS WEEK · 19 TO 25 OCT",
   "heat": { "abdominals": 1, "…": 1, "triceps": 3 },
   "muscles": [ { "slug": "quadriceps", "heat": 1, "load": 0.39, "days_since": 6, "week_sets": 0, "status": "under" } ],
-  "due": { "template": "legs", "name": "Legs", "days_since": 6, "exercise_count": 5,
-           "exercises": [ { "id": "barbell-squat", "name": "Barbell Squat", "last": { "weight_kg": 100, "reps": 6, "day": "2026-10-18" } } ] },
+  "due": null,
+  "splits": [ { "id": "lower", "name": "Lower", "source": "defined", "ready": true, "days_since": 6, "muscles": ["quadriceps", "hamstrings", "glutes", "calves"],
+                "exercise_count": 5, "exercises": [ { "id": "barbell-squat", "name": "Barbell Squat", "last": { "weight_kg": 100, "reps": 6, "day": "2026-10-18" } } ] } ],
   "stats": { "sessions": 3, "working_sets": 52, "muscles_hit": 11, "muscles_total": 17 },
   "weekly_sets": { "min": 10, "max": 20, "by_muscle": { "chest": 12, "quadriceps": 0 } },
   "sessions": [
@@ -359,6 +362,18 @@ Drives `spec/design/05-body-tab.png`.
 ```
 
 `sessions` lists the week's strength sessions plus non-strength Watch workouts (existing `listWorkouts()` merge rule: a Watch workout overlapping a strength session is folded into it). `empty: true` when no strength session was ever logged (drives `spec/design/26-state-train-empty.png`).
+
+### GET /v2/splits — read · PUT / DELETE /v2/splits/:id — write
+
+The owner's defined splits ([11 §7.2](11-scoring.md#72-splits)), edited from Settings. History splits are not stored; they appear only in `GET /v2/training` and `/v2/today`.
+
+```json
+{ "splits": [ { "id": "push", "name": "Push", "muscles": ["chest", "shoulders", "triceps"], "ord": 0 } ] }
+```
+
+- `PUT` body: `{ "name": "Push", "muscles": ["chest", "shoulders", "triceps"], "ord": 0 }`. `id` is client-chosen (`[A-Za-z0-9_-]{1,64}`); `ord` defaults to the split's current place, or last for a new one. Muscles are the 17 slugs; unknown → 422. A name another split already has (case-insensitive) → 409. Returns the full list.
+- `DELETE` soft-deletes; unknown id → 404. Returns the full list.
+- `POST /v2/workouts` `session.template` = the split id the workout was started from (any string ≤ 80), or `null`.
 
 ### GET /v2/training/sessions?before=&limit= — read
 
@@ -436,7 +451,7 @@ One session from the Watch or iPhone, idempotent. Supersedes the "Training (phas
 ```json
 {
   "session": {
-    "client_id": "5A0E9C2F-…", "title": "Legs", "template": "legs", "source": "watch",
+    "client_id": "5A0E9C2F-…", "title": "Lower", "template": "lower", "source": "watch",
     "started_at": "2026-10-24T18:40:00+05:30", "ended_at": null, "tz_offset_min": 330,
     "hk_workout_uuid": null, "notes": null
   },
@@ -631,7 +646,7 @@ Agents must read the same numbers as the app (`app/src/mcp.ts`). Changes:
 |---|---|
 | `get_brief` | Keeps every existing field. Adds `scores: { sleep: {score, band, parts}, recovery: {score, band, status, parts} }` and `plan: { headline, action }` from the same functions as `/v2/today`. `verdict.call` keeps its enum, now derived from the recovery band ([11 §5](11-scoring.md#5-verdict-headline--one-action)); `verdict.rule` text updated to describe the new rule. Existing `mcp.test.mjs` cases that break because of the 60-day window or the new rule are updated deliberately, each with a comment saying why. |
 | `get_metrics`, `get_sleep` | Baselines now 60 days (text in descriptions and `INSTRUCTIONS` updated from "30 days"). `get_sleep` nights gain `score` and `wakeups`. |
-| `get_training_summary` | Adds `heat` (17 muscles), `due`, `weekly_sets` status. |
+| `get_training_summary` | Adds `heat` (17 muscles), `splits`, `weekly_sets` status. |
 | **new** `get_today` (read) | Returns the `GET /v2/today` body. |
 | **new** `get_scores` (read) | `{from, to}` (≤ 90 days): per day `sleep` and `recovery` score objects. |
 | **new** `get_food_day` (read) | Returns the `GET /v2/food/day` body. |
@@ -653,6 +668,7 @@ The tool-list assertion in `app/tests/mcp.test.mjs` ("tool lists follow the toke
 | GET | /v2/body | read | §5 |
 | POST / DELETE | /v2/weight, /v2/weight/:id | write | §5 |
 | GET | /v2/training | read | §6 |
+| GET / PUT / DELETE | /v2/splits, /v2/splits/:id | read / write | §6 |
 | GET | /v2/training/sessions | read | §6 |
 | GET | /v2/training/sessions/:id | read | §6 |
 | GET / POST | /v2/exercises | read / write | §6 |

@@ -167,7 +167,7 @@ test("app parity: get_today is the GET /v2/today body; get_brief adds scores and
   assert.equal(typeof sl.data.nights[0].score, "number"); assert.ok("wakeups" in sl.data.nights[0]);
 });
 
-test("food and targets over MCP; training summary carries heat, due and weekly sets", async () => {
+test("food and targets over MCP; training summary carries heat, splits and weekly sets", async () => {
   const entry = { id: "mcp-f1", meal_id: "mcp-m1", slot: "lunch", eaten_at: `${DAY}T13:00:00+05:30`, name: "Dal", kcal: 220, protein_g: 12, source: "describe", estimate: true };
   const r = await call(writeTok, "log_food", { entries: [entry] });
   assert.equal(r.isError, false, r.text); assert.equal(r.data.accepted.inserted, 1);
@@ -177,5 +177,5 @@ test("food and targets over MCP; training summary carries heat, due and weekly s
   const t = await call(readTok, "get_targets");
   assert.ok(t.data.effective.kcal > 0);
   const sum = await call(readTok, "get_training_summary", { from: "2026-10-01", to: "2026-10-07" });
-  assert.equal(Object.keys(sum.data.heat).length, 17); assert.ok("due" in sum.data); assert.equal(Object.keys(sum.data.weekly_sets.status).length, 17);
+  assert.equal(Object.keys(sum.data.heat).length, 17); assert.ok(Array.isArray(sum.data.splits)); assert.equal(Object.keys(sum.data.weekly_sets.status).length, 17);
 });

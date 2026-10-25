@@ -8,7 +8,8 @@ import { adaptiveKcal, initialKcal, weightTrend } from "./fuel.js";
 import { bedHours, hrvPart, recoveryScore, rhrPart, sleepNeed, sleepParts, sleepScore, tonight } from "./scoring.js";
 import { BASELINE_DAYS, MIN_SCORE_DAYS, daily, nights, type Night } from "./stats.js";
 import { addDays, DAY_RE, eveningMinutes, localDay, ownerOffsetMin, today as todayOf } from "./time.js";
-import { dueTemplate, freshLabel, freshness, loadedLabel, SLUGS, TEMPLATES, type TrainingSet } from "./training-analytics.js";
+import { freshLabel, freshness, loadedLabel, sessionMuscles, SLUGS, splitStates, type SplitCandidate, type TrainingSet } from "./training-analytics.js";
+import { TRAINING } from "./scoring-config.js";
 
 const HOUR = 3_600_000;
 
@@ -242,18 +243,37 @@ export function trainingSets(fromMs: number, toMs: number): TrainingSet[] {
     fromMs, toMs).map(withMuscles);
 }
 
-/** Exercise ids, in set order, of the most recent session matching each template by column or title. */
-function lastTemplateSessions() {
-  const out: Partial<Record<(typeof TEMPLATES)[number]["template"], string[]>> = {};
-  for (const t of TEMPLATES) {
-    const s = one<{ id: string }>(`SELECT s.id FROM sessions s WHERE s.deleted_at IS NULL AND (s.template=? OR lower(s.title)=?)
-      AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL) ORDER BY s.started_at DESC LIMIT 1`, t.template, t.name.toLowerCase());
-    if (s) out[t.template] = all<{ exercise_id: string }>("SELECT exercise_id FROM sets WHERE session_id=? AND deleted_at IS NULL ORDER BY ord", s.id).map((r) => r.exercise_id);
-  }
-  return out;
+const sessionExercises = (id: string) =>
+  [...new Set(all<{ exercise_id: string }>("SELECT exercise_id FROM sets WHERE session_id=? AND deleted_at IS NULL ORDER BY ord", id).map((r) => r.exercise_id))];
+const GENERIC = new Set(["", "workout", "strength", "traditional strength training"]);
+
+/**
+ * §7.2 splits: Settings splits in their order, then every other workout name logged in the last 90 days (by name).
+ * A defined split's exercises come from its latest session (by split id or name); a history split's muscles from its latest session.
+ */
+export function splitCandidates(at = Date.now()): SplitCandidate[] {
+  const latest = (where: string, ...args: string[]) => one<{ id: string }>(`SELECT s.id FROM sessions s WHERE s.deleted_at IS NULL AND ${where}
+    AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL AND x.kind!='warmup') AND s.started_at<=? ORDER BY s.started_at DESC LIMIT 1`, ...args, at);
+  const defined: SplitCandidate[] = all<{ id: string; name: string; muscles: string }>("SELECT id,name,muscles FROM splits WHERE deleted_at IS NULL ORDER BY ord, created_at")
+    .map((r) => {
+      const s = latest("(s.template=? OR lower(trim(s.title))=lower(?))", r.id, r.name.trim());
+      return { id: r.id, name: r.name, source: "defined", muscles: JSON.parse(r.muscles), exercises: s ? sessionExercises(s.id) : [] };
+    });
+  const taken = new Set(defined.map((d) => d.name.trim().toLowerCase()));
+  const names = all<{ name: string }>(`SELECT trim(s.title) name FROM sessions s WHERE s.deleted_at IS NULL AND s.title IS NOT NULL AND s.started_at BETWEEN ? AND ?
+    AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL AND x.kind!='warmup')
+    GROUP BY lower(trim(s.title)) ORDER BY lower(trim(s.title))`, at - TRAINING.splitHistoryDays * 24 * HOUR, at);
+  const history: SplitCandidate[] = names.filter((n) => !GENERIC.has(n.name.toLowerCase()) && !taken.has(n.name.toLowerCase())).flatMap((n) => {
+    const s = latest("lower(trim(s.title))=lower(?)", n.name);
+    if (!s) return [];
+    const sets = all<SetRow>(`SELECT t.session_id, t.exercise_id, t.kind, t.performed_at, s.tz_offset_min, t.weight_kg, t.reps FROM sets t
+      JOIN sessions s ON s.id=t.session_id WHERE t.session_id=? AND t.deleted_at IS NULL ORDER BY t.ord`, s.id).map(withMuscles);
+    return [{ id: `history:${n.name.toLowerCase()}`, name: n.name, source: "history" as const, muscles: sessionMuscles(sets), exercises: sessionExercises(s.id) }];
+  });
+  return [...defined, ...history];
 }
 
-/** Freshness, heat, due template and labels as of `at` (11 §7). Not cached: a few hundred rows. */
+/** Freshness, heat, splits and labels as of `at` (11 §7). Not cached: a few hundred rows. */
 export function trainingState(at = Date.now()) {
   const t = localDay(at, ownerOffsetMin(at));
   const recent = trainingSets(at - 30 * 24 * HOUR, at);
@@ -262,10 +282,10 @@ export function trainingState(at = Date.now()) {
     FROM sets t JOIN sessions s ON s.id=t.session_id WHERE t.deleted_at IS NULL AND s.deleted_at IS NULL AND t.kind!='warmup' AND t.performed_at<=?
     GROUP BY t.exercise_id`, at).map(withMuscles);
   const fresh = freshness([...recent, ...latest], at, t);
-  const due = dueTemplate(fresh, lastTemplateSessions());
+  const splits = splitStates(splitCandidates(at), fresh);
   const heat = Object.fromEntries(SLUGS.map((m) => [m, fresh[m].heat]));
   const trainedToday = !!one("SELECT 1 FROM sessions s WHERE s.deleted_at IS NULL AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL) AND s.started_at BETWEEN ? AND ?",
     Date.parse(`${t}T00:00:00Z`) - ownerOffsetMin(at) * 60_000, Date.parse(`${t}T00:00:00Z`) - ownerOffsetMin(at) * 60_000 + 24 * HOUR - 1);
-  return { fresh, heat, due: due && { ...due, exercises: due.exercises.map((id) => ({ id, name: getExercise(id)?.name ?? id })) },
-    fresh_label: freshLabel(due), loaded_label: loadedLabel(fresh), trained_today: trainedToday };
+  return { fresh, heat, splits: splits.map((r) => ({ ...r, exercises: r.exercises.map((id) => ({ id, name: getExercise(id)?.name ?? id })) })),
+    fresh_label: freshLabel(splits), loaded_label: loadedLabel(fresh), trained_today: trainedToday };
 }

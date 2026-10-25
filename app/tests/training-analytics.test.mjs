@@ -86,33 +86,26 @@ test("freshness: 17 keys, load to 2 dp, days_since counts local days from primar
 
 const fresh = (over = {}) => Object.fromEntries(T.SLUGS.map((m) => [m, { heat: 1, load: 0, days_since: 3, ...over[m] }]));
 
-test("dueTemplate: null when nothing fully fresh", () => {
-  assert.equal(T.dueTemplate(fresh({ quadriceps: { heat: 2 }, chest: { heat: 3 }, lats: { heat: 2 } })), null);
+const sp = (id, muscles, source = "defined") => ({ id, name: id, source, muscles, exercises: [] });
+
+test("splitStates: ready when every muscle has heat ≤ 1; order kept, nothing ranked", () => {
+  const splits = [sp("Push", ["chest", "shoulders", "triceps"]), sp("Pull", ["lats", "middle-back", "biceps"]), sp("Lower", ["quadriceps", "glutes"], "history")];
+  const r = T.splitStates(splits, fresh({ chest: { heat: 3 }, lats: { days_since: 9 }, "middle-back": { days_since: 7 }, biceps: { days_since: 8 } }));
+  assert.deepEqual(r.map((x) => [x.id, x.ready, x.days_since]), [["Push", false, 3], ["Pull", true, 7], ["Lower", true, 3]]);
+  assert.equal(T.splitStates([sp("New", ["chest"])], fresh({ chest: { days_since: null } }))[0].days_since, null);
+  assert.deepEqual(T.splitStates([sp("Cardio", [])], fresh({ chest: { heat: 4 } }))[0], { ...sp("Cardio", []), ready: true, days_since: null });
 });
 
-test("dueTemplate: largest min(days_since); null counts as infinite; ties in table order", () => {
-  assert.equal(T.dueTemplate(fresh()).template, "legs");
-  const pull = T.dueTemplate(fresh({ quadriceps: { heat: 2 }, lats: { days_since: 9 }, "middle-back": { days_since: 7 }, biceps: { days_since: 8 } }));
-  assert.deepEqual(pull, { template: "pull", name: "Pull", days_since: 7,
-    exercises: ["wide-grip-lat-pulldown", "bent-over-barbell-row", "seated-cable-rows", "face-pull", "barbell-curl"] });
-  const never = T.dueTemplate(fresh({ chest: { days_since: null }, shoulders: { days_since: null }, triceps: { days_since: null } }));
-  assert.equal(never.template, "push");
-  assert.equal(never.days_since, null);
-  // Push and pull both never trained (legs ready at 3 loses to infinity): push comes first in the table.
-  const tie = T.dueTemplate(fresh({ quadriceps: { heat: 0 }, chest: { days_since: null }, shoulders: { days_since: null }, triceps: { days_since: null },
-    lats: { days_since: null }, "middle-back": { days_since: null }, biceps: { days_since: null } }));
-  assert.equal(tie.template, "push");
-});
-
-test("dueTemplate: last matching session's exercises (deduped, in order) override defaults", () => {
-  const d = T.dueTemplate(fresh(), { legs: ["leg-press", "barbell-squat", "leg-press"] });
-  assert.deepEqual(d.exercises, ["leg-press", "barbell-squat"]);
-  assert.equal(T.dueTemplate(fresh(), { legs: [] }).exercises[0], "barbell-squat");
+test("sessionMuscles: primary muscles of working sets as slugs, first-seen order", () => {
+  const xs = [...sets(2, 1, { primary: ["middle back"], secondary: ["biceps"] }), ...sets(1, 1, { primary: ["chest"], kind: "warmup" }), ...sets(1, 1, { primary: ["lats", "middle back"] })];
+  assert.deepEqual(T.sessionMuscles(xs), ["middle-back", "lats"]);
 });
 
 test("labels", () => {
-  assert.equal(T.freshLabel(T.dueTemplate(fresh())), "Legs fresh");
-  assert.equal(T.freshLabel(null), null);
+  const two = T.splitStates([sp("Push", ["chest"]), sp("Pull", ["lats"])], fresh());
+  assert.equal(T.freshLabel(two), "2 splits fresh");
+  assert.equal(T.freshLabel(T.splitStates([sp("Push", ["chest"]), sp("Pull", ["lats"])], fresh({ chest: { heat: 2 } }))), "Pull fresh");
+  assert.equal(T.freshLabel([]), null);
   assert.equal(T.loadedLabel(fresh()), null);
   assert.equal(T.loadedLabel(fresh({ chest: { heat: 4, load: 5 }, triceps: { heat: 3, load: 3 } })), "Chest loaded");
   assert.equal(T.loadedLabel(fresh({ "lower-back": { heat: 3, load: 2.5 }, triceps: { heat: 3, load: 2.1 } })), "Lower back loaded");
@@ -181,10 +174,3 @@ test("e1rmTrend: 84-day points, 56-day change, null with < 2 points", () => {
   assert.deepEqual(T.e1rmTrend([], TODAY), { current_kg: null, change_8w_kg: null, points: [], estimate: true });
 });
 
-test("templates reference catalog exercises and slug muscles", async () => {
-  const { getExercise } = await import("../dist/src/exercises.js");
-  for (const t of T.TEMPLATES) {
-    for (const id of t.exercises) assert.ok(getExercise(id), id);
-    for (const m of t.muscles) assert.ok(T.SLUGS.includes(m), m);
-  }
-});

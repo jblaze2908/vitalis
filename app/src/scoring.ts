@@ -227,13 +227,14 @@ export function recoveryScore(i: { sleep: number | null; hrv: HeartIn; rhr: Hear
 export type VerdictAction =
   | { kind: "bed_reminder"; label: string }
   | { kind: "log_meal"; label: string; slot: Slot }
-  | { kind: "start_workout"; label: string; template: string; intensity: "normal" | "light" };
+  | { kind: "start_workout"; label: string; template: null; intensity: "normal" | "light" };
 export type Verdict = { band: RecoveryBand | null; label: string | null; headline: string; reason: string; action: VerdictAction; rule: number };
 export type VerdictInput = {
   recovery: { band: RecoveryBand | null; score: number | null; reason?: string | null };
   /** Part hints for the one-line reason; optional. */
   hints?: { hrv?: { arrow: Arrow; tint: Tint } | null; resting_hr?: { arrow: Arrow; tint: Tint } | null };
-  due: { template: string; name: string } | null;
+  /** Some split is ready, or none exist yet (§7.3); the verdict never names one. */
+  trainable: boolean;
   strength_today: { title: string; sets: number } | null;
   kcal_left: number | null;
   next_slot: Slot;
@@ -245,9 +246,8 @@ export type VerdictInput = {
 const sinceDayStart = (min: number) => (((min - VERDICT.DAY_START_MIN) % 1440) + 1440) % 1440;
 const bedReminder = (): VerdictAction => ({ kind: "bed_reminder", label: "Remind me" });
 const logMeal = (slot: Slot): VerdictAction => ({ kind: "log_meal", label: `Log ${slot}`, slot });
-const startWorkout = (due: { template: string; name: string }, light = false): VerdictAction => ({
-  kind: "start_workout", template: due.template, intensity: light ? "light" : "normal",
-  label: light ? `Start ${due.name.toLowerCase()} light` : `Start ${due.name.toLowerCase()} on Watch`,
+const startWorkout = (light = false): VerdictAction => ({
+  kind: "start_workout", template: null, intensity: light ? "light" : "normal", label: light ? "Start light workout" : "Start workout",
 });
 
 function recoveryReason(i: VerdictInput): string {
@@ -271,17 +271,16 @@ export function verdict(i: VerdictInput): Verdict {
   }
   if (band === null) {
     const reason = i.recovery.reason ?? "No recovery score yet.";
-    return i.due ? out(3, `${i.due.name} is due`, reason, startWorkout(i.due)) : out(4, "No score yet", reason, logMeal(i.next_slot));
+    return i.trainable ? out(3, "Fresh to train", reason, startWorkout()) : out(4, "No score yet", reason, logMeal(i.next_slot));
   }
   if (band === "rest") {
     const food = i.kcal_left === null || i.kcal_left > 0;
     return out(9, "Rest today", recoveryReason(i), food ? logMeal(i.next_slot) : bedReminder());
   }
-  if (!i.due) return out(8, "Muscles still loaded", recoveryReason(i), logMeal(i.next_slot));
-  const name = i.due.name.toLowerCase();
-  if (band === "ready") return out(5, `Train ${name} hard today`, recoveryReason(i), startWorkout(i.due));
-  if (band === "steady") return out(6, `Train ${name} as planned`, recoveryReason(i), startWorkout(i.due));
-  return out(7, `Go easy on ${name}`, `${recoveryReason(i)} No records today.`, startWorkout(i.due, true));
+  if (!i.trainable) return out(8, "Muscles still loaded", recoveryReason(i), logMeal(i.next_slot));
+  if (band === "ready") return out(5, "Train hard today", recoveryReason(i), startWorkout());
+  if (band === "steady") return out(6, "Train as planned", recoveryReason(i), startWorkout());
+  return out(7, "Go easy today", `${recoveryReason(i)} No records today.`, startWorkout(true));
 }
 
 /** Legacy MCP `get_brief.verdict.call`, derived from the band. */

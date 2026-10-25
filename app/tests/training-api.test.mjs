@@ -10,12 +10,13 @@ const T = today();
 const iso = (day, hm) => `${day}T${hm}:00+05:30`;
 const bench = (day, kg, n = 3) => Array.from({ length: n }, (_, i) => ({ exercise: "bench", weight_kg: kg, reps: 5, performed_at: iso(day, `18:${String(10 + i).padStart(2, "0")}`) }));
 
-test("a fresh install says empty and still returns 17 muscles and a due template", async () => {
+test("a fresh install says empty and still returns 17 muscles and no splits", async () => {
   const r = await http("GET", "/v2/training", { token: read });
   assert.equal(r.status, 200, r.text);
   assert.equal(r.json.empty, true);
   assert.equal(Object.keys(r.json.heat).length, 17); assert.equal(r.json.muscles.length, 17);
-  assert.equal(r.json.due.template, "legs"); assert.equal(r.json.due.exercise_count, 5);
+  assert.equal(r.json.due, null);
+  assert.deepEqual(r.json.splits, []);
   assert.deepEqual(r.json.sessions, []);
   assert.match(r.json.label, /^THIS WEEK · \d+ TO \d+ [A-Z]{3}$/);
 });
@@ -66,4 +67,24 @@ test("the week body counts this week's work", async () => {
   assert.equal(r.json.empty, false);
   assert.ok(r.json.sessions.length >= 1);
   assert.ok(r.json.weekly_sets.by_muscle.chest >= 0);
+});
+
+test("splits: define, rename in place, reject duplicates and unknown muscles, delete", async () => {
+  const write = tokens.createToken("splits write", "write").token;
+  const put = (id, body) => http("PUT", `/v2/splits/${id}`, { token: write, json: body });
+  assert.equal((await put("upper", { name: "Upper", muscles: ["chest", "lats"] })).status, 200);
+  const pull = await put("pull", { name: "Pull", muscles: ["lats", "biceps", "lats"] });
+  assert.deepEqual(pull.json.splits.map((x) => [x.id, x.ord, x.muscles]), [["upper", 0, ["chest", "lats"]], ["pull", 1, ["lats", "biceps"]]]);
+  const renamed = await put("upper", { name: "Upper A", muscles: ["chest"] });
+  assert.deepEqual(renamed.json.splits.map((x) => [x.id, x.name, x.ord]), [["upper", "Upper A", 0], ["pull", "Pull", 1]]);
+  assert.equal((await put("other", { name: "pull", muscles: [] })).status, 409);
+  assert.equal((await put("bad", { name: "Bad", muscles: ["wings"] })).status, 422);
+  assert.equal((await http("PUT", "/v2/splits/x", { token: read, json: { name: "X", muscles: [] } })).status, 403);
+  const tr = await http("GET", "/v2/training", { token: read });
+  // Earlier tests logged bench sets, so chest may be loaded: only the shape is fixed here.
+  assert.deepEqual(tr.json.splits.slice(0, 2).map((x) => [x.id, x.source, typeof x.ready]), [["upper", "defined", "boolean"], ["pull", "defined", "boolean"]]);
+  assert.equal((await http("DELETE", "/v2/splits/upper", { token: write })).status, 200);
+  assert.equal((await http("DELETE", "/v2/splits/upper", { token: write })).status, 404);
+  assert.deepEqual((await http("GET", "/v2/splits", { token: read })).json.splits.map((x) => x.id), ["pull"]);
+  await http("DELETE", "/v2/splits/pull", { token: write });
 });

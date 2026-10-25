@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ApiError, handle, readJson, setDetail } from "../http.js";
 import { KINDS, upsertWorkout } from "../training.js";
 import { sessionDetail, sessionPRs } from "../training-view.js";
+import { deleteSplit, putSplit, splitSchema } from "../splits.js";
 import { getTargets, putSchema, putTargets } from "../targets.js";
 import { deleteWeight, postWeight, weightNow, weightSchema } from "../weight.js";
 
@@ -27,13 +28,16 @@ writeRoutes.delete("/v2/weight/:id", handle("v2/weight:delete", "write", (c) => 
   return c.json({ weight: weightNow() });
 }));
 
+writeRoutes.put("/v2/splits/:id", handle("v2/splits:put", "write", async (c) => c.json(putSplit(c.req.param("id") ?? "", await readJson(c, splitSchema)))));
+writeRoutes.delete("/v2/splits/:id", handle("v2/splits:delete", "write", (c) => c.json(deleteSplit(c.req.param("id") ?? ""))));
+
 writeRoutes.post("/v2/exercises", handle("v2/exercises:post", "write", async (c) => c.json(postExercise(await readJson(c, newExerciseSchema)))));
 
 const when = z.string().min(10).max(40);
 const num = (lo: number, hi: number) => z.number().min(lo).max(hi).nullable().optional();
 const workoutSchema = z.strictObject({
   session: z.strictObject({
-    client_id: z.string().min(1).max(64), title: z.string().max(80).nullable().optional(), template: z.enum(["legs", "push", "pull"]).nullable().optional(),
+    client_id: z.string().min(1).max(64), title: z.string().max(80).nullable().optional(), template: z.string().min(1).max(80).nullable().optional(),
     source: z.enum(["watch", "phone"]), started_at: when, ended_at: when.nullable().optional(), tz_offset_min: z.number().int().min(-840).max(840),
     hk_workout_uuid: z.string().min(1).max(64).nullable().optional(), notes: z.string().max(2000).nullable().optional(),
   }),

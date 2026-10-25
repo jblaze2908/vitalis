@@ -10,7 +10,7 @@ Pure functions live in new modules (no SQL inside them):
 |---|---|
 | `app/src/scoring-config.ts` | Every constant below, exported as `const` objects |
 | `app/src/scoring.ts` | Baselines, sleep score, recovery score, bands, verdict + copy |
-| `app/src/training-analytics.ts` | Muscle load, heat, templates and due, session heat, weekly sets, e1RM trend |
+| `app/src/training-analytics.ts` | Muscle load, heat, split readiness, session heat, weekly sets, e1RM trend |
 | `app/src/fuel.ts` | Weight trend (EWMA), calorie and protein targets, adaptive target |
 | `app/src/activity.ts` | Step/energy curves and ahead/behind pace |
 
@@ -122,7 +122,7 @@ Parts (user decision): sleep score, HRV vs baseline, resting HR vs baseline.
 
 ## 5. Verdict (headline + one action)
 
-Computed by `scoring.ts` `verdict(input)` from: recovery band, the training due (§7.3), whether a strength session already exists today, fuel (§8), local time, and `bed_by` (§9.2). The result is a band label, a headline (≤ 2 lines of ≤ 18 characters each; the app sets it in condensed caps), a one-line reason, and **one** action.
+Computed by `scoring.ts` `verdict(input)` from: recovery band, whether the owner is trainable (§7.3), whether a strength session already exists today, fuel (§8), local time, and `bed_by` (§9.2). The result is a band label, a headline (≤ 2 lines of ≤ 18 characters each; the app sets it in condensed caps), a one-line reason, and **one** action.
 
 Rules, first match wins:
 
@@ -130,16 +130,15 @@ Rules, first match wins:
 |---|---|---|---|
 | 1 | Local time ≥ `bed_by − 90 min` | `Bed by HH:MM` | `bed_reminder`, `Remind me` |
 | 2 | A strength session already logged today | `Done for today` (reason: session title + sets) | `log_meal` for the next slot if kcal left > 300 (`Log dinner`), else `bed_reminder` |
-| 3 | Recovery `null` (missing or calibrating) and a template is due | `<Template> is due` | `start_workout`, `Start <template> on Watch` |
-| 4 | Recovery `null`, nothing due | `No score yet` | `log_meal` next slot |
-| 5 | band **ready** and a template is due | `Train <template> hard today` | `start_workout`, `Start <template> on Watch` |
-| 6 | band **steady** and a template is due | `Train <template> as planned` | `start_workout`, `Start <template> on Watch` |
-| 7 | band **ease** and a template is due | `Go easy on <template>` (reason adds "No records today") | `start_workout` with `intensity: "light"`, `Start <template> light` |
-| 8 | band **ready/steady/ease**, nothing due | `Muscles still loaded` | `log_meal` next slot |
+| 3 | Recovery `null` (missing or calibrating) and trainable | `Fresh to train` | `start_workout`, `Start workout` |
+| 4 | Recovery `null`, not trainable | `No score yet` | `log_meal` next slot |
+| 5 | band **ready** and trainable | `Train hard today` | `start_workout`, `Start workout` |
+| 6 | band **steady** and trainable | `Train as planned` | `start_workout`, `Start workout` |
+| 7 | band **ease** and trainable | `Go easy today` (reason adds "No records today") | `start_workout` with `intensity: "light"`, `Start light workout` |
+| 8 | band **ready/steady/ease**, not trainable | `Muscles still loaded` | `log_meal` next slot |
 | 9 | band **rest** | `Rest today` | `log_meal` next slot (if nothing left to eat: `bed_reminder`) |
 
-- `<template>` is the due template's name in lower case inside headlines (`Train legs hard today`).
-- The label `on Watch` becomes `on iPhone` client-side when the owner chose "Remember my choice: iPhone" (the only client-side text substitution; the server always says Watch).
+- Headlines never name a split; the start sheet offers them (§7.3). The action label is `Start workout` and leaves Watch vs iPhone to the start sheet.
 - The legacy MCP enum `get_brief.verdict.call` is kept for agents and derived from the band: ready → `good`, steady → `normal`, ease → `as_planned_no_records`, rest → `easy`, null → `unknown`. See [10 §8 MCP](10-server-api.md#8-mcp-tools).
 
 ### 5.1 Digest copy
@@ -178,23 +177,22 @@ Muscles = the 17 in `MUSCLES` (`app/src/exercises.ts`): abdominals, abductors, a
 - **Load** at time `t`: `L = Σ wᵢ × exp(−Δhᵢ / 36)` over sets in the last 14 days, `Δh` = hours since the set. (τ = 36 h, half-life ≈ 25 h.)
 - **Heat** 0–4: `0` = no working set touching the muscle in the last 30 days ("no data"); otherwise `1` fresh (L < 0.5), `2` recovering (0.5 ≤ L < 2), `3` partly loaded (2 ≤ L < 4), `4` loaded (L ≥ 4).
 - **Days since** per muscle: whole local days since the last working set with the muscle as **primary** (existing `daysSinceTrained` rule, extended from the 11 `MAJOR_MUSCLES` to all 17); `null` = never.
-- Labels for Today: `fresh_label` = the due template's name + ` fresh` (`Legs fresh`); `loaded_label` = the muscle group with the highest heat ≥ 3 + ` loaded` (`Chest loaded`), else `null`.
+- Labels for Today: `fresh_label` per §7.3 (`Push fresh`, `3 splits fresh`); `loaded_label` = the muscle group with the highest heat ≥ 3 + ` loaded` (`Chest loaded`), else `null`.
 
 Worked example: 4 squat sets (quadriceps primary). Heat 4 right after, 3 at 12–24 h, 2 at 36–72 h, 1 (fresh) from 84 h. 8 sets: fresh from 108 h.
 
-### 7.2 Templates (v1 default)
+### 7.2 Splits
 
-| Template | Muscles that must be fresh | Default exercises (catalog ids, verified in `app/data/exercises.json`) |
-|---|---|---|
-| Legs | quadriceps, hamstrings, glutes, calves | barbell-squat, romanian-deadlift, leg-press, lying-leg-curls, standing-calf-raises |
-| Push | chest, shoulders, triceps | barbell-bench-press-medium-grip, standing-military-press, incline-dumbbell-press, side-lateral-raise, triceps-pushdown |
-| Pull | lats, middle back, biceps | wide-grip-lat-pulldown, bent-over-barbell-row, seated-cable-rows, face-pull, barbell-curl |
+Nothing is predefined: the owner trains on no fixed calendar and changes order (25 Oct). Splits come from two places, in this order:
 
-The exercise list used is the owner's most recent non-deleted session whose `template` (new column) or title (case-insensitive) matches, in set order; else the defaults.
+1. **Defined** in Settings (`splits` table, `PUT /v2/splits/:id`): a name and a set of muscles (slugs), in the owner's order. Exercises = the latest session whose `template` is the split id or whose title matches the name (case-insensitive), in set order; none yet → empty (pick as you go).
+2. **History**: every other session title logged in the last `splitHistoryDays` (90) with at least one working set, by name, skipping generic titles (`Workout`, `Strength`, `Traditional Strength Training`) and names a defined split already has. Muscles = the primary muscles of the latest such session's working sets; exercises = its exercises.
 
-### 7.3 Training due
+Cardio needs no split: Apple's Workout app records it and it syncs as a Watch workout.
 
-A template is **ready** when every listed muscle has heat ≤ 1. The **due** template is the ready template with the largest `min(days_since)` over its muscles (`null` counts as infinite), ties in table order. `due.days_since` = that minimum (`6 DAYS`); `null` when never trained (label `NEW`). No ready template → `due: null`.
+### 7.3 Ready splits
+
+A split is **ready** when every one of its muscles has heat ≤ 1 (a split with no muscles is always ready). The list keeps the order above. Nothing is ranked or picked: the app offers the splits as equal choices and never names one. Each split's `days_since` = the minimum over its muscles (`null` when never trained, label `NEW`). `fresh_label` = `<Name> fresh` for one ready split, `<n> splits fresh` for more, `null` for none. **Trainable** (verdict input) = some split is ready, or no splits exist yet.
 
 ### 7.4 Session heat (Watch summary, session detail)
 

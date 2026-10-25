@@ -72,11 +72,13 @@ export function trainingWeek(dayInWeek: string, at = Date.now()) {
     heat: state.heat,
     muscles: SLUGS.map((m) => ({ slug: m, heat: state.fresh[m].heat, load: state.fresh[m].load, days_since: state.fresh[m].days_since,
       week_sets: ws.by_muscle[m], status: ws.status[m] })),
-    due: state.due && { template: state.due.template, name: state.due.name, days_since: state.due.days_since, exercise_count: state.due.exercises.length,
-      exercises: state.due.exercises.map((e) => {
+    // `due` stays null for apps built before `ready` (11 §7.3: nothing is picked for the owner).
+    due: null,
+    splits: state.splits.map((r) => ({ id: r.id, name: r.name, source: r.source, ready: r.ready, days_since: r.days_since, muscles: r.muscles,
+      exercise_count: r.exercises.length, exercises: r.exercises.map((e) => {
         const l = lastSet(e.id);
         return { ...e, last: l ? { weight_kg: l.weight_kg, reps: l.reps, day: isoAt(l.performed_at, l.tz_offset_min).slice(0, 10) } : null };
-      }) },
+      }) })),
     stats: { sessions: strength.length, working_sets: strength.reduce((n, s) => n + s.working_sets, 0), muscles_hit: ws.muscles_hit, muscles_total: ws.muscles_total },
     weekly_sets: { min: ws.min, max: ws.max, by_muscle: ws.by_muscle },
     sessions: list.map(sessionRow),

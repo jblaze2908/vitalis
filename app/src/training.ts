@@ -307,7 +307,7 @@ export function lastTraining(day: string) {
 }
 
 export type WorkoutInput = {
-  session: { client_id: string; title?: string | null; template?: "legs" | "push" | "pull" | null; source: "watch" | "phone"; started_at: string;
+  session: { client_id: string; title?: string | null; template?: string | null; source: "watch" | "phone"; started_at: string;
     ended_at?: string | null; tz_offset_min: number; hk_workout_uuid?: string | null; notes?: string | null };
   sets: (Partial<Omit<SetInput, "id">> & { id: string; deleted?: boolean })[];
 };
