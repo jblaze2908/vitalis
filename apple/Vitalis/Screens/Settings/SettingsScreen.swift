@@ -67,7 +67,12 @@ struct SettingsScreen: View {
             let status = statusLabel
             StatusRow(status.text, tint: status.tint).padding(.top, VSpace.statusTop)
             CachedPulseLine().padding(.top, 18)
-            HeadlineLines(["Settings"], size: 46).padding(.top, 8)
+            HStack(alignment: .firstTextBaseline) {
+                HeadlineLines(["Settings"], size: 46)
+                Spacer()
+                SecondaryButton("Done", size: .compact) { router.showsSettings = false }
+            }
+            .padding(.top, 8)
             if let error = targets.error as? APIError, t != nil {
                 MonoLabel(error.statusLine, tint: .watch).padding(.top, 12)
             }

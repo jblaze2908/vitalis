@@ -68,6 +68,8 @@ Custom five-tab shell (`TODAY · SLEEP · BODY · TRAIN · EAT`), replacing the 
 | Sync, token rejected | `25-state-sync-token-rejected.png` | local exporter + Outbox state | 03 → Sync |
 | Widgets | `29-widgets-home-lock.png` | `TodaySnapshot` from App Group (§9) | 03 → Widgets |
 
+Navigation rules (owner feedback, 25 Oct): Sleep and Body keep their state across tab switches (shared stores). In-app actions open their sheet over the current tab and never change tabs (quick add, start workout); only deep links switch tabs. The Settings gear sits top-left on every tab, and Settings has a Done button. Tappable numbers on Today carry a `›`: Recovery, HRV and Resting land on Body's vitals, Steps on Body's activity, Fuel left on Eat, Sleep on Sleep, and the date opens the digest. The digest has a close button as well as Start my day. A live workout can be minimised; a resume bar then sits above the tab bar.
+
 Deep links (register `CFBundleURLTypes` scheme `vitalis`): `vitalis://today`, `vitalis://digest`, `vitalis://sleep`, `vitalis://body`, `vitalis://train`, `vitalis://eat`, `vitalis://eat/add?slot=lunch`, `vitalis://workout/start`, `vitalis://settings`, `vitalis://settings/sync`. A link that opened the app holds back the automatic morning digest for 10 s, so Siri or a widget lands where it pointed; the digest shows on the next foreground.
 
 ## 4. Behaviour per screen (data and interactions)

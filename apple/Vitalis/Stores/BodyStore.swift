@@ -5,6 +5,9 @@ import VitalisKit
 /// Body tab and the Log weight sheet (spec 20 §4 Body, §8): renders `GET /v2/body`; Save writes Health then queues the POST.
 @MainActor @Observable
 final class BodyStore {
+    /// One per app: the tab is rebuilt on every switch, and its night, scroll target and toasts should survive that.
+    static let shared = BodyStore()
+
     /// The durable write path; the app uses the Outbox via `Services.shared`, tests a fake.
     @MainActor protocol Writes {
         /// Queues and tries to deliver; returns the outbox id.

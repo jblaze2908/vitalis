@@ -36,6 +36,16 @@ struct DigestScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     TodayTop(label: d == nil ? "" : label(status), tint: status.isStale ? .watch : .steel, pulse: d?.pulse)
+                        .overlay(alignment: .topLeading) {
+                            // A way out that isn't "Start my day", e.g. when reopened in the evening.
+                            Button { TodayStore.shared.finishDigest(); router.showsDigest = false } label: {
+                                Image(systemName: "xmark").vLabel().frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, VSpace.statusSide - 12)
+                            .padding(.top, VSpace.statusTop - 14)
+                            .accessibilityLabel("Close digest")
+                        }
                     content(d).padding(.horizontal, VSpace.gutter)
                 }
                 .padding(.bottom, VSpace.gutter)

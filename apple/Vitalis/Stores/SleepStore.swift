@@ -30,6 +30,9 @@ struct NotificationBedReminder: BedReminding {
 /// Sleep tab (spec 20 §4 Sleep): one night by wake day, the week ending on that day, and the tonight reminder.
 @MainActor @Observable
 final class SleepStore {
+    /// One per app: the tab is rebuilt on every switch, and its night, scroll target and toasts should survive that.
+    static let shared = SleepStore()
+
     enum Reminder: Equatable { case idle, set, denied }
 
     private(set) var night = Loadable<SleepResponse>()

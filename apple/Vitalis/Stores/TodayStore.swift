@@ -231,7 +231,8 @@ final class TodayStore {
     /// Navigation intents go to the router; the reminder is scheduled here.
     func apply(_ intent: TodayIntent, router: Router) {
         switch intent {
-        case .startWorkout: router.open(.workoutStart)
+        // In-app: the sheet over Today, no tab change (deep links still go to Train).
+        case .startWorkout: router.sheet = .workoutStart
         case .quickAdd(let slot): router.sheet = .quickAdd(slot: slot)
         case .bedReminder(let fireAt, let bedBy): Task { await scheduleReminder(fireAt: fireAt, bedBy: bedBy) }
         case .none: break

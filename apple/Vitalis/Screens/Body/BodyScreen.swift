@@ -8,8 +8,9 @@ struct BodyScreen: View {
     @State private var showsLogWeight = false
     @Environment(Services.self) private var services: Services?
     private let live: Bool
+    @Environment(Router.self) private var router
 
-    init() { _store = State(initialValue: BodyStore()); live = true }
+    init() { _store = State(initialValue: BodyStore.shared); live = true }
     /// Previews: a preloaded store and no fetching.
     init(store: BodyStore, showsLogWeight: Bool = false) {
         _store = State(initialValue: store); _showsLogWeight = State(initialValue: showsLogWeight); live = false
@@ -18,6 +19,7 @@ struct BodyScreen: View {
     private var v: BodyResponse? { store.value }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 TabTopChrome(status: TabTopChrome.status(store.body, freshness: v?.freshness))
@@ -29,9 +31,9 @@ struct BodyScreen: View {
                     if v == nil, store.body.error != nil, !store.body.isLoading {
                         unreachable
                     } else {
-                        weight.padding(.top, 22)
-                        activity
-                        vitals
+                        weight.padding(.top, 22).id(BodySection.weight)
+                        activity.id(BodySection.activity)
+                        vitals.id(BodySection.vitals)
                     }
                 }
                 .padding(.horizontal, VSpace.gutter)
@@ -39,6 +41,13 @@ struct BodyScreen: View {
             }
         }
         .scrollIndicators(.hidden)
+        // A tap on Today's HRV or Steps lands on that section, once the page has content to scroll to.
+        .task(id: [router.bodySection.map { "\($0)" }, v?.day].compactMap { $0 }) {
+            guard let section = router.bodySection, v != nil else { return }
+            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(section, anchor: .top) }
+            router.bodySection = nil
+        }
+        }
         .overlay(alignment: .bottom) { toast }
         .sensoryFeedback(.success, trigger: store.lastSaved) { _, new in new != nil }
         .refreshable { if live { await store.load() } }

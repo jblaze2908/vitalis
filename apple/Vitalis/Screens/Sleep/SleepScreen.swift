@@ -8,7 +8,7 @@ struct SleepScreen: View {
     @State private var showsStages = false
     private let live: Bool
 
-    init() { _store = State(initialValue: SleepStore()); live = true }
+    init() { _store = State(initialValue: SleepStore.shared); live = true }
     /// Previews: a preloaded store and no fetching.
     init(store: SleepStore) { _store = State(initialValue: store); live = false }
 

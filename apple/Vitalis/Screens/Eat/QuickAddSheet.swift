@@ -49,7 +49,7 @@ struct QuickAddSheet: View {
         }
         .fullScreenCover(isPresented: $scanning) {
             ScanScreen(store: store, slot: currentSlot, onDescribe: { code in scanning = false; go(.describe(text: "", barcode: code)) },
-                       onDone: { scanning = false; router.tab = .eat; router.sheet = nil })
+                       onDone: { scanning = false; router.sheet = nil })
         }
     }
 
@@ -62,7 +62,7 @@ struct QuickAddSheet: View {
     /// Every plus logs immediately; the toast shows on Eat once the sheet is gone.
     private func add(_ drafts: [FoodDraft], source: String, sourceRef: String? = nil, estimate: Bool? = nil) {
         let slot = currentSlot
-        router.tab = .eat
+        // Stay where the add started; the Undo toast follows to any tab (RootView).
         router.sheet = nil
         Task { await store.log(drafts, slot: slot, source: source, sourceRef: sourceRef, estimate: estimate) }
     }

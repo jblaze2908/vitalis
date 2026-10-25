@@ -140,7 +140,8 @@ struct TodayScreen: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(["Now" + (t?.verdict.label.map { ", \($0.lowercased())" } ?? ""), t?.verdict.headline].compactMap { $0 }.joined(separator: ". "))
         .overlay(alignment: .topTrailing) {
-            HStack(alignment: .firstTextBaseline, spacing: 14) { dateButton(t?.day); gearButton }
+            // The Settings gear now sits on every tab (RootView); the date reads as a link to the digest.
+            HStack(alignment: .firstTextBaseline, spacing: 14) { dateButton(t?.day) }
                 .padding(.top, TodayLayout.afterPulse)
         }
     }
@@ -148,16 +149,10 @@ struct TodayScreen: View {
     @ViewBuilder private func dateButton(_ day: String?) -> some View {
         if let label = TodayFormat.dateLabel(day: day) {
             // Reopens today's digest without touching the dismissed flag.
-            Button { router.showsDigest = true } label: { MonoLabel(label).hitSlop() }
+            Button { router.showsDigest = true } label: { MonoLabel("\(label) ›", tint: .bone).hitSlop() }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(label). Morning digest")
         }
-    }
-
-    private var gearButton: some View {
-        Button { router.open(.settings) } label: { Image(systemName: "gearshape").vLabel().hitSlop() }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Settings")
     }
 
     @ViewBuilder private func recovery(_ r: TodayResponse.Recovery?) -> some View {
@@ -166,10 +161,11 @@ struct TodayScreen: View {
         } else {
             let score = TodayFormat.number(r?.score)
             HStack(alignment: .bottom, spacing: TodayLayout.columnGap) {
-                Button { router.tab = .sleep } label: {
+                // Recovery is HRV and resting HR against your range plus sleep: Body's vitals show those parts.
+                Button { router.showBody(.vitals) } label: {
                     VStack(alignment: .leading, spacing: -2.4) {
                         Text(score ?? "–").vNumber(92, color: score == nil ? VColor.steel : nil).lineLimit(1).fixedSize()
-                        MonoLabel("Recovery")
+                        MonoLabel("Recovery ›")
                     }
                 }
                 .buttonStyle(.plain)
@@ -177,9 +173,9 @@ struct TodayScreen: View {
                 .accessibilityLabel(["Recovery \(score ?? "not available")", r?.band].compactMap { $0 }.joined(separator: ", "))
                 .accessibilityAddTraits(.isButton)
                 VStack(spacing: 0) {
-                    Button { router.tab = .sleep } label: { row("Sleep", TodayFormat.number(r?.parts?.sleep?.score), tint: nil, arrow: nil) }
-                    Button { router.tab = .body } label: { vital("HRV", r?.parts?.hrv) }
-                    Button { router.tab = .body } label: { vital("Resting", r?.parts?.restingHr, showsRule: false) }
+                    Button { router.tab = .sleep } label: { row("Sleep ›", TodayFormat.number(r?.parts?.sleep?.score), tint: nil, arrow: nil) }
+                    Button { router.showBody(.vitals) } label: { vital("HRV ›", r?.parts?.hrv) }
+                    Button { router.showBody(.vitals) } label: { vital("Resting ›", r?.parts?.restingHr, showsRule: false) }
                 }
                 .buttonStyle(.plain)
             }
@@ -207,10 +203,14 @@ struct TodayScreen: View {
         let over = (left ?? 0) < 0
         let value = TodayFormat.number(left?.magnitude)
         return VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-            VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-                MonoLabel(over ? "Over by" : "Fuel left", tint: over ? .watch : .steel)
-                Text(value ?? "–").vNumber(32, color: value == nil ? VColor.steel : over ? VColor.watch : nil).lineLimit(1)
+            Button { router.tab = .eat } label: {
+                VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
+                    MonoLabel(over ? "Over by ›" : "Fuel left ›", tint: over ? .watch : .steel)
+                    Text(value ?? "–").vNumber(32, color: value == nil ? VColor.steel : over ? VColor.watch : nil).lineLimit(1)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             if let next = f?.nextLabel {
                 Button { router.sheet = .quickAdd(slot: f?.nextSlot) } label: { MonoLabel("+ \(next)", tint: .bone).hitSlop() }
@@ -226,9 +226,9 @@ struct TodayScreen: View {
         let target = ["OF \(TodayFormat.number(a?.stepsTarget) ?? "–")", TodayFormat.pace(a?.stepsPace)].compactMap { $0 }.joined(separator: " · ")
         // Decided in brief 01: active energy rides as a second line so Activity shows both pillars.
         let active = ["\(TodayFormat.number(a?.activeKcal) ?? "–") ACTIVE KCAL", TodayFormat.pace(a?.activeKcalPace)].compactMap { $0 }.joined(separator: " · ")
-        return Button { router.tab = .body } label: {
+        return Button { router.showBody(.activity) } label: {
             VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-                MonoLabel("Steps")
+                MonoLabel("Steps ›")
                 Text(steps ?? "–").vNumber(32, color: steps == nil ? VColor.steel : nil).lineLimit(1)
                 VStack(alignment: .leading, spacing: 4) {
                     MonoLabel(target)
@@ -266,7 +266,7 @@ struct TodayScreen: View {
                 .buttonStyle(.plain)
                 // Empty training offers a start as a secondary unless the verdict's primary already does.
                 if empty, t?.verdict.action?.kind != "start_workout" {
-                    SecondaryButton(store.startLabel) { router.open(.workoutStart) }
+                    SecondaryButton(store.startLabel) { router.sheet = .workoutStart }
                 }
             }
             .padding(.top, 3)
@@ -280,9 +280,8 @@ struct TodayScreen: View {
         let t = store.today.value
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                dateButton(t?.day)
                 Spacer(minLength: 8)
-                gearButton
+                dateButton(t?.day)
             }
             .padding(.top, TodayLayout.afterPulse)
             VStack(alignment: .leading, spacing: 0) {

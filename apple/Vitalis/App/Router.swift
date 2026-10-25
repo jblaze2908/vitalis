@@ -3,6 +3,8 @@ import SwiftUI
 import VitalisUI
 
 enum SettingsPage: Hashable { case sync, splits }
+/// Where a tap on Today lands inside Body, so HRV opens on the vitals rather than the top of the page.
+enum BodySection: Hashable { case weight, activity, vitals }
 enum AppSheet: Identifiable, Equatable {
     case quickAdd(slot: String?)
     case workoutStart
@@ -21,6 +23,8 @@ final class Router {
     /// The full-screen iPhone logger (I-12); the tab bar hides while it shows.
     var showsLiveWorkout = false
     var settingsPath: [SettingsPage] = []
+    /// Consumed by Body once it has scrolled there.
+    var bodySection: BodySection?
     /// When a URL last opened the app: the morning digest waits so it doesn't cover where the link (Siri, a widget) went.
     private(set) var linkedAt: Date?
 
@@ -44,6 +48,8 @@ final class Router {
     func openedByLink(within seconds: TimeInterval = 10, now: Date = Date()) -> Bool {
         linkedAt.map { now.timeIntervalSince($0) < seconds } ?? false
     }
+
+    func showBody(_ section: BodySection) { bodySection = section; tab = .body }
 
     /// Leave the start-choice sheet for the iPhone logger.
     func startLoggingOnPhone() { sheet = nil; showsLiveWorkout = true }

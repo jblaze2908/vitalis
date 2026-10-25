@@ -90,6 +90,12 @@ private actor FakeReminders: ReminderScheduling {
         #expect(!router.openedByLink(now: now.addingTimeInterval(11)), "the digest can show on a later foreground")
     }
 
+    @Test func todaysVitalsLandOnBodysVitalsSection() {
+        let router = Router()
+        router.showBody(.vitals)
+        #expect(router.tab == .body && router.bodySection == .vitals)
+    }
+
     @Test func digestWaitsWhileAnotherSheetIsUp() {
         defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
         let router = Router()
@@ -120,7 +126,7 @@ private actor FakeReminders: ReminderScheduling {
         let store = makeStore(fixture)
         let router = Router()
         store.apply(.startWorkout, router: router)
-        #expect(router.tab == .train)
+        #expect(router.tab == .today, "an in-app action opens its sheet over Today, no tab jump")
         #expect(router.sheet == .workoutStart)
 
         let meal = Router()

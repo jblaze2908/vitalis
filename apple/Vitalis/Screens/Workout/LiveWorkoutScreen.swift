@@ -49,6 +49,16 @@ struct LiveWorkoutScreen: View {
     private func content(_ s: LiveSession) -> some View {
         VStack(spacing: 0) {
             TrainTopBar(status: readOnly ? "Live on Watch · read only" : s.isJoined ? "Shared with Watch · live" : "Workout · live", pulse: train.pulse)
+                .overlay(alignment: .topLeading) {
+                    // Minimise: the workout keeps running; a resume bar sits above the tab bar.
+                    Button { focus = nil; router.showsLiveWorkout = false } label: {
+                        Image(systemName: "chevron.down").vLabel().frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, VSpace.statusSide - 12)
+                    .padding(.top, VSpace.statusTop - 14)
+                    .accessibilityLabel("Minimise workout")
+                }
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     TimelineView(.periodic(from: s.startedAt, by: 1)) { tick in
