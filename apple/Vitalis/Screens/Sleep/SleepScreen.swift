@@ -186,6 +186,7 @@ struct SleepScreen: View {
 /// The night across the clock: Awake, REM, Core and Deep rows, one block per stage spell.
 private struct StageChart: View {
     let segments: [SleepResponse.Segment]
+    @State private var sx: Double?
     var body: some View {
         let spans = segments.compactMap { s -> (String, Date, Date)? in
             guard let a = APIDate.parse(s.start), let b = APIDate.parse(s.end) else { return nil }; return (s.stage, a, b)
@@ -213,6 +214,19 @@ private struct StageChart: View {
                 }
             }
             .frame(height: 116)
+            .overlay {
+                GeometryReader { g in
+                    if let sx {
+                        let t = start.addingTimeInterval(end.timeIntervalSince(start) * sx)
+                        let hit = spans.first { $0.1 <= t && t < $0.2 }
+                        Rectangle().fill(VColor.bone.opacity(0.5)).frame(width: 1, height: g.size.height).offset(x: g.size.width * sx)
+                        ChartCallout(hit.map { "\(SleepCopy.stageName($0.0)) · \(SleepCopy.clock($0.1, like: segments.first?.start))–\(SleepCopy.clock($0.2, like: segments.first?.start))" }
+                                     ?? SleepCopy.clock(t, like: segments.first?.start))
+                            .position(x: min(max(g.size.width * sx, 80), g.size.width - 80), y: -12)
+                    }
+                }
+            }
+            .scrub($sx)
             HStack {
                 ForEach(0..<4, id: \.self) { i in
                     let t = start.addingTimeInterval(end.timeIntervalSince(start) * Double(i) / 3)
@@ -341,6 +355,7 @@ private struct MonthCalendar: View {
 
 /// Sleep's words and small maths, apart from layout.
 enum SleepCopy {
+    static func stageName(_ s: String) -> String { ["rem": "REM", "deep": "Deep", "core": "Core", "awake": "Awake"][s] ?? "Asleep" }
     static func hm(_ h: Double) -> String { let m = Int((h * 60).rounded()); return "\(m / 60):" + String(format: "%02d", m % 60) }
 
     static func headline(_ v: SleepResponse?) -> [String] {

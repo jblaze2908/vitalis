@@ -309,3 +309,38 @@ public struct PeriodStepper: View {
         .buttonStyle(.plain).disabled(action == nil).accessibilityLabel(label)
     }
 }
+
+/// Touch-to-read for charts: the finger's x (0…1 of the width) while touching, kept 3 s after lifting.
+public struct Scrub: ViewModifier {
+    @Binding var x: Double?
+    @State private var clear: Task<Void, Never>?
+    public init(_ x: Binding<Double?>) { _x = x }
+    public func body(content: Content) -> some View {
+        content.overlay {
+            GeometryReader { g in
+                Color.clear.contentShape(Rectangle())
+                    // Simultaneous, so a vertical swipe that starts on a chart still scrolls the page.
+                    .simultaneousGesture(DragGesture(minimumDistance: 0)
+                        .onChanged { v in clear?.cancel(); x = min(max(v.location.x / max(g.size.width, 1), 0), 1) }
+                        .onEnded { _ in
+                            clear = Task { try? await Task.sleep(for: .seconds(3)); if !Task.isCancelled { x = nil } }
+                        })
+            }
+        }
+    }
+}
+
+public extension View {
+    func scrub(_ x: Binding<Double?>) -> some View { modifier(Scrub(x)) }
+}
+
+/// The value under the finger: a small dark pill with a bone label.
+public struct ChartCallout: View {
+    let text: String
+    public init(_ text: String) { self.text = text }
+    public var body: some View {
+        Text(text).vUI(12, weight: 600).lineLimit(1).fixedSize()
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color(hex: 0x2A2A2A), in: Capsule())
+    }
+}

@@ -68,13 +68,15 @@ struct BodyScreen: View {
     private var weightHero: some View {
         let w = v?.weight
         return VStack(alignment: .leading, spacing: 12) {
-            Figure(SleepBodyFormat.kg(w?.trendKg), unit: "kg trend", size: 52, color: w?.trendKg == nil ? VColor.steel : nil).padding(.top, 16)
+            // The number you stepped on the scale with; the smoothed trend sits in the readouts.
+            Figure(SleepBodyFormat.kg(w?.latest?.kg ?? w?.trendKg), unit: w?.latest == nil ? "kg trend" : "kg", size: 52,
+                   color: w?.latest == nil && w?.trendKg == nil ? VColor.steel : nil).padding(.top, 16)
             WeightTrendChart(series: w?.series ?? [], goal: w?.goalKg).frame(height: 160)
             ReadoutRow([
                 Readout("30 days", SleepBodyFormat.signedKg(w?.monthChangeKg),
                         status: w?.monthChangeKg == nil ? nil : w?.towardGoal == true ? ("Toward goal", .good) : ("Away from goal", .watch)),
                 Readout("Goal", w?.goalKg.map { "\(SleepBodyFormat.kg($0)) kg" } ?? "–"),
-                Readout("Latest", w?.latest.map { "\(SleepBodyFormat.kg($0.kg))" } ?? "–", status: w?.latest?.at.flatMap { APIDate.clockText($0) }.map { ($0, .quiet) }),
+                Readout("Trend", w?.trendKg.map { "\(SleepBodyFormat.kg($0))" } ?? "–", status: w?.latest?.at.flatMap { BodyCopy.when($0) }.map { ($0, .quiet) }),
             ])
         }
     }
@@ -360,6 +362,7 @@ struct BodyPreviewWrites: BodyStore.Writes {
 private struct WeightTrendChart: View {
     let series: [WeightBlock.Point]
     let goal: Double?
+    @State private var sx: Double?
     var body: some View {
         Canvas { ctx, size in
             let raws = series.compactMap(\.rawKg), trends = series.compactMap(\.trendKg)
@@ -388,6 +391,19 @@ private struct WeightTrendChart: View {
             ctx.draw(Text(BodyCopy.short(first)).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x7A7A7A)), at: CGPoint(x: 0, y: size.height - 4), anchor: .leading)
             ctx.draw(Text(BodyCopy.short(end)).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x7A7A7A)), at: CGPoint(x: w, y: size.height - 4), anchor: .trailing)
         }
+        .overlay {
+            GeometryReader { g in
+                if let sx, series.count > 1 {
+                    let i = Int((sx * Double(series.count - 1)).rounded()), p = series[i]
+                    let px = (g.size.width - 24) * Double(i) / Double(series.count - 1)
+                    Rectangle().fill(VColor.bone.opacity(0.5)).frame(width: 1, height: g.size.height - 18).offset(x: px)
+                    ChartCallout([BodyCopy.short(p.day), p.rawKg.map { "\(SleepBodyFormat.kg($0)) kg" }, p.trendKg.map { "trend \(SleepBodyFormat.kg($0))" }]
+                        .compactMap { $0 }.joined(separator: " · "))
+                        .position(x: min(max(px, 90), g.size.width - 90), y: 8)
+                }
+            }
+        }
+        .scrub($sx)
         .accessibilityLabel("Weight trend")
     }
 }
@@ -431,6 +447,12 @@ enum BodyCopy {
         [Readout("Steps", SleepBodyFormat.grouped(a?.steps), status: a?.stepsTarget.map { ("of \(SleepBodyFormat.grouped($0))", .quiet) }),
          Readout("Active", a?.activeKcal.map { "\(Int($0.rounded()))" } ?? "–", status: ("kcal", .quiet)),
          Readout("Exercise", a?.exerciseMin.map(String.init) ?? "–", status: a?.exerciseTargetMin.map { ("of \($0) min", .quiet) })]
+    }
+    /// "Weighed 08:10" today, else the day it was ("Weighed 24 Oct").
+    static func when(_ iso: String) -> String? {
+        guard let clock = APIDate.clockText(iso) else { return nil }
+        let day = String(iso.prefix(10)), today = EatStore.iso(Date(), calendar: .current).prefix(10)
+        return day == today ? "Weighed \(clock)" : "Weighed \(short(day).capitalized)"
     }
     static func short(_ day: String) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"

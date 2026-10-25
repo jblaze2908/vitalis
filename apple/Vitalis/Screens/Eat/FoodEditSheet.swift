@@ -184,6 +184,7 @@ struct DayCurve: View {
     let eaten: Double
     let isToday: Bool
     let nextSlot: String?
+    @State private var sx: Double?
 
     private static let usualTime: [String: Double] = ["breakfast": 8.5, "lunch": 13.5, "snack": 17.5, "dinner": 21]
 
@@ -246,6 +247,18 @@ struct DayCurve: View {
                 ctx.draw(Text(label).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x7A7A7A)), at: CGPoint(x: x(h), y: size.height - 6), anchor: anchor)
             }
         }
+        .overlay {
+            GeometryReader { g in
+                if let sx {
+                    let h = 6 + 18 * sx
+                    let k = meals.filter { (Self.hours($0.time) ?? 99) <= h }.reduce(0) { $0 + $1.kcal }
+                    Rectangle().fill(VColor.bone.opacity(0.5)).frame(width: 1, height: g.size.height - 20).offset(x: g.size.width * sx)
+                    ChartCallout(String(format: "%02d:%02d", Int(h), Int((h - floor(h)) * 60)) + " · \(FoodFormat.kcal(k)) kcal")
+                        .position(x: min(max(g.size.width * sx, 70), g.size.width - 70), y: 6)
+                }
+            }
+        }
+        .scrub($sx)
         .accessibilityLabel("Calories through the day")
     }
 
