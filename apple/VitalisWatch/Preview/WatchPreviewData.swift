@@ -2,16 +2,19 @@
 import Foundation
 import VitalisKit
 
-/// Preview fixtures in the phone's pack shape (spec 21 §6 sample, extended to the legs plan in frames 30–33).
+/// Preview fixtures in the phone's pack shape: a ready, a loaded and a never-trained split; `Push` also repeats (deduped on Start).
 enum WatchPreviewData {
     static let packJSON = """
     {
       "generated_at": "2026-10-24T18:09:41+05:30",
       "settings": { "rest_s": 120, "crown_step_kg": 2.5 },
-      "due": { "template": "legs", "name": "Legs", "days_since": 6,
-               "exercise_ids": ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
-      "recent_sessions": [ { "title": "Push", "template": "push", "day": "2026-10-22", "exercise_ids": ["barbell-bench-press-medium-grip"] },
-                           { "title": "Pull", "template": "pull", "day": "2026-10-20", "exercise_ids": ["pullups"] } ],
+      "splits": [ { "id": "legs", "template": "legs", "name": "Legs", "ready": true, "days_since": 6,
+                    "exercise_ids": ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
+                  { "id": "push", "template": null, "name": "Push", "ready": false, "days_since": 1,
+                    "exercise_ids": ["barbell-bench-press-medium-grip"] },
+                  { "id": "arms", "template": "arms", "name": "Arms", "ready": true, "days_since": null, "exercise_ids": [] } ],
+      "recent_sessions": [ { "title": "Push", "template": null, "day": "2026-10-23", "exercise_ids": ["barbell-bench-press-medium-grip"] },
+                           { "title": "Workout", "template": null, "day": "2026-10-20", "exercise_ids": ["pullups"] } ],
       "exercises": {
         "barbell-squat": { "name": "Squat", "equipment": "barbell", "primary": ["quadriceps"], "secondary": ["calves","glutes","hamstrings","lower back"],
                            "prefill": { "sets": [ { "kind": "warmup", "weight_kg": 60, "reps": 8 }, { "kind": "normal", "weight_kg": 97.5, "reps": 6 },

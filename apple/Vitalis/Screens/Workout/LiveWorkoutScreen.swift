@@ -13,6 +13,8 @@ struct LiveWorkoutScreen: View {
     @State private var confirmFinish = false
     @State private var addingExercise = false
     @State private var finishing = false
+    @State private var naming = false
+    @State private var name = ""
 
     init() { self.init(store: .shared, train: .shared) }
     init(store: LiveSessionStore, train: TrainStore) { self.store = store; self.train = train }
@@ -80,12 +82,26 @@ struct LiveWorkoutScreen: View {
             }
             Button("Keep going", role: .cancel) {}
         }
+        .alert("Name this workout", isPresented: $naming) {
+            TextField("Push, Upper, Legs…", text: $name).textInputAutocapitalization(.words)
+            Button("Save and finish") { store.rename(name); Task { await finish() } }
+            Button("Finish without a name") { Task { await finish() } }
+            Button("Keep going", role: .cancel) {}
+        } message: {
+            Text("Named workouts are offered when you start the next one.")
+        }
     }
 
     private func header(_ s: LiveSession, now: Date) -> some View {
         let context = "\(TrainFormat.elapsed(now.timeIntervalSince(s.startedAt))) · \(s.sets.count) of \(max(s.plannedSets, s.sets.count)) sets"
         return ScreenHeader(context: context, title: s.title) {
-            if !readOnly { SecondaryButton("Finish", enabled: !finishing) { focus = nil; confirmFinish = true } }
+            if !readOnly {
+                SecondaryButton("Finish", enabled: !finishing) {
+                    focus = nil
+                    // An unnamed workout can't be offered again, so ask for a name once at the end.
+                    if s.title == "Workout", !s.sets.isEmpty { name = ""; naming = true } else { confirmFinish = true }
+                }
+            }
         }
         .padding(.top, VSpace.sectionTop)
     }
@@ -317,11 +333,11 @@ struct OtherExerciseRow: View {
 
 #if DEBUG
 #Preview("Logging · resting") {
-    LiveWorkoutScreen(store: TrainPreviewData.liveStore(), train: TrainPreviewData.trainStore(.due))
+    LiveWorkoutScreen(store: TrainPreviewData.liveStore(), train: TrainPreviewData.trainStore(.splits))
         .environment(Router()).onAppear { VFont.register() }
 }
 #Preview("Logging · Watch live, read only") {
-    LiveWorkoutScreen(store: TrainPreviewData.liveStore(watchLive: true), train: TrainPreviewData.trainStore(.due))
+    LiveWorkoutScreen(store: TrainPreviewData.liveStore(watchLive: true), train: TrainPreviewData.trainStore(.splits))
         .environment(Router()).onAppear { VFont.register() }
 }
 #endif

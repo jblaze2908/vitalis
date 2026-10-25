@@ -120,13 +120,13 @@ final class LiveSessionStore {
 
     // MARK: Start
 
-    /// Starts a session from the due template (or an empty one); an existing session is resumed instead.
-    func begin(due: DueWorkout?) {
+    /// Starts a session from the chosen split (or an empty one); an existing session is resumed instead.
+    func begin(split: Split?) {
         guard session == nil else { return }
-        let exercises = (due?.exercises ?? []).map { e in
+        let exercises = (split?.exercises ?? []).map { e in
             LiveExercise(id: e.id, name: e.name, best: nil, rows: [Self.row(fromLast: e.last)])
         }
-        session = LiveSession(id: UUID(), title: due?.name ?? "Workout", template: due?.template, startedAt: now(),
+        session = LiveSession(id: UUID(), title: split?.name ?? "Workout", template: split?.templateID, startedAt: now(),
                               exercises: exercises, currentIndex: 0)
         persist()
     }
@@ -183,7 +183,7 @@ final class LiveSessionStore {
         return rows.isEmpty ? [SetRow()] : rows
     }
 
-    nonisolated static func row(fromLast last: DueWorkout.Exercise.Last?) -> SetRow {
+    nonisolated static func row(fromLast last: Split.Exercise.Last?) -> SetRow {
         guard let last else { return SetRow() }
         return SetRow(last: TrainFormat.set(last.weightKg, last.reps), weight: TrainFormat.kg(last.weightKg, empty: ""),
                       reps: last.reps.map(String.init) ?? "")
@@ -289,6 +289,14 @@ final class LiveSessionStore {
     }
 
     // MARK: Finish
+
+    /// A named workout becomes a start choice next time (11 §7.2 history splits).
+    func rename(_ title: String) {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, session != nil else { return }
+        session?.title = String(t.prefix(80))
+        persist()
+    }
 
     /// Saves the HKWorkout (a failure never blocks the server write), sends the final upsert and clears the session.
     /// Returns the session id (`client_id` = server `sessions.id`), or nil when nothing was logged.

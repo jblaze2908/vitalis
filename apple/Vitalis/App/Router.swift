@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 import VitalisUI
 
-enum SettingsPage: Hashable { case sync }
+enum SettingsPage: Hashable { case sync, splits }
 enum AppSheet: Identifiable, Equatable {
     case quickAdd(slot: String?)
     case workoutStart

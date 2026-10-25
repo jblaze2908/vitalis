@@ -47,7 +47,7 @@ Custom five-tab shell (`TODAY · SLEEP · BODY · TRAIN · EAT`), replacing the 
 | Log weight sheet | `08-log-weight-sheet.png` | `POST /v2/weight` (+ HealthKit write) | 03 → Log weight |
 | Train tab | `06-train-tab.png` | `GET /v2/training` | 03 → Train |
 | Train, no workouts yet | `26-state-train-empty.png` | `GET /v2/training` (`empty: true`) | 03 → Train |
-| Workout start choice (sheet) | `11-workout-start-choice.png` | `GET /v2/training` (`due`) | 03 → Start choice |
+| Workout start choice (sheet) | `11-workout-start-choice.png` | `GET /v2/training` (`splits`) | 03 → Start choice |
 | Workout logging on iPhone | `12-workout-logging-iphone.png` | `GET /v2/exercises/:id`, `POST /v2/workouts` | 03 → iPhone logging |
 | Session detail | `09-session-detail-push.png` | `GET /v2/training/sessions/:id` | 03 → Session detail |
 | Exercise detail | `10-exercise-detail-bench-press.png` | `GET /v2/exercises/:id` | 03 → Exercise detail |
@@ -95,11 +95,11 @@ Visual specifics are in the briefs; this is what each screen does.
 - **Log weight sheet**: prefilled with `weight.latest.kg`. Save: (1) if "Also save to Apple Health" is on, write `HKQuantitySample(.bodyMass)` (§8) and keep its UUID; (2) enqueue `POST /v2/weight` with a new client UUID and `hk_uuid`; (3) dismiss, show the response's weight block (or the cached block plus a `WAITING TO SYNC` mono label when offline).
 
 ### Train
-- `due` drives the headline (`Legs are due`) and button (`Start legs on Watch`). Sessions list rows open Session detail; exercise rows there open Exercise detail. `empty: true` → empty state frame.
-- **Start choice sheet**: Start on Watch → send `WatchMessage.plan` (21 §6) then `HKHealthStore().startWatchApp(with: HKWorkoutConfiguration(.traditionalStrengthTraining, .indoor))` ([Apple: startWatchApp, iOS 10+](https://developer.apple.com/documentation/healthkit/hkhealthstore/startwatchapp(with:completion:))). On failure (no paired Watch / app not installed) show the inline error and keep Log on iPhone available. `REMEMBER MY CHOICE` stores `rememberedStart`; Settings → Training can clear it.
+- Nothing names a split for the owner ([11 §7.3](11-scoring.md#73-ready-splits)). Above the stats: `FRESH · PUSH · LOWER` (or `ALL SPLITS LOADED`) and a `Start workout` button; the empty state has the same button. Sessions list rows open Session detail; exercise rows there open Exercise detail. `empty: true` → empty state frame.
+- **Start choice sheet**: every split from `splits` as an equal row in server order (`FRESH · 3 DAYS` / `NEW`; `LOADED` in steel, still tappable), plus `Empty workout`. None is preselected; the headline is the chosen split's name, else `Workout`. Start on Watch → send `WatchMessage.plan` (21 §6) then `HKHealthStore().startWatchApp(with: HKWorkoutConfiguration(.traditionalStrengthTraining, .indoor))` ([Apple: startWatchApp, iOS 10+](https://developer.apple.com/documentation/healthkit/hkhealthstore/startwatchapp(with:completion:))). On failure (no paired Watch / app not installed) show the inline error and keep Log on iPhone available. `REMEMBER WATCH OR IPHONE` stores `rememberedStart`: tapping a split then starts at once; with no splits the sheet acts on appear. Settings → Training can clear it.
 
 ### iPhone workout logging
-- Builds a local `LiveSession` (client UUID, template, exercises from `due.exercises`), prefill per exercise from `GET /v2/exercises/:id` (`last_session.sets` for set rows, `next` for the suggestion). Offline: prefill from the cached exercise responses; if none, empty fields.
+- Builds a local `LiveSession` (client UUID, title = the split's name or `Workout`, `template` = a Settings split's id, exercises from the split), prefill per exercise from `GET /v2/exercises/:id` (`last_session.sets` for set rows, `next` for the suggestion). Offline: prefill from the cached exercise responses; if none, empty fields.
 - Each check tap: append a `LoggedSet` (client UUID, `performed_at` now, kind `normal` or `warmup` for the `W` row), start the rest timer (`targets.effective` rest from `GET /v2/targets`, default 120 s), haptic `.success`, and enqueue `POST /v2/workouts` with the whole session so far (idempotent upsert, [10 §6](10-server-api.md#post-v2workouts--write)).
 - Rest timer: driven by a stored end `Date`, rendered with `TimelineView(.periodic(from:by:1))`; `−15S`/`+15S` adjust the end date; `SKIP` clears it.
 - Finish: confirm; set `ended_at`; save an `HKWorkout` with `HKWorkoutBuilder` (iOS 12+; see §8) and put its UUID in `hk_workout_uuid`; final `POST /v2/workouts`; navigate to Session detail for the returned id.
@@ -119,8 +119,10 @@ Visual specifics are in the briefs; this is what each screen does.
 1. Welcome → 2. Connect: validate URL (`ServerSettings`), `TokenStore.save`, `GET /v2/sync/status`. Continue only when 200 **and** `token.can_write`. Errors inline: invalid URL, unreachable, 401 (`TOKEN REJECTED`), `can_write` false (`THIS TOKEN CAN'T LOG WORKOUTS OR FOOD`). → 3. Health access: `requestAuthorization(toShare:read:)` with the share types in §8 plus existing read types. → 4. Reading your history: progress from `SyncEngine.snapshot()`; percent = position of the current page's newest sample date between the oldest sample date seen and now (design default; HealthKit gives no total count). `Set targets while this runs` continues to step 5 while backfill runs. → 5. Targets: `GET /v2/targets` `suggested`; editing a row then Finish sends `PUT /v2/targets` with the values shown.
 - Setup is complete when a token is saved and step 5 finished; stored as `UserDefaults setupCompleted = true`. Clearing the token returns to step 2.
 
+- **Finish**: a session still titled `Workout` asks for a name first (`Save and finish` / `Finish without a name`); named workouts become history splits.
+
 ### Settings and Sync
-- Settings rows: SERVER (host, token in Keychain, last sync → Sync screen), TARGETS (from `GET /v2/targets`, edit → `PUT`), TRAINING (weekly sets range, default rest, crown step, remembered start choice), Acknowledgements (Archivo OFL, Azeret Mono OFL, muscle map MIT), Reset local export state (existing), Replace token, version.
+- Settings rows: SERVER (host, token in Keychain, last sync → Sync screen), TARGETS (from `GET /v2/targets`, edit → `PUT`), TRAINING (weekly sets range, default rest, crown step, Splits → list + editor: name and the muscles it needs fresh, via `GET /v2/splits` and direct `PUT`/`DELETE /v2/splits/:id` so a 409 duplicate name shows in the sheet; remembered start choice), Acknowledgements (Archivo OFL, Azeret Mono OFL, muscle map MIT), Reset local export state (existing), Replace token, version.
 - Sync screen: existing `SyncView` content restyled, plus the Outbox (§5.3) count and Watch sets held count.
 - Token rejected (last exporter upload or any API call returned 401): frame `25-state-sync-token-rejected.png`, counts = exporter pending batches + outbox items + Watch sets not yet posted. `Replace token` → secure field → `TokenStore.save` → `syncNow()` + outbox flush. Record `firstAuthFailureAt` in `UserDefaults` for the `SINCE …` label; clear it on the next 200.
 

@@ -64,7 +64,8 @@ public struct TodayResponse: Codable, Sendable, Equatable {
         public let heat: MuscleHeat
         public let freshLabel: String?
         public let loadedLabel: String?
-        public let due: DueWorkout?
+        /// Nil from servers older than splits (11 §7.2).
+        public let splits: [Split]?
         public let trainedToday: Bool?
     }
     public struct DigestFlag: Codable, Sendable, Equatable {
@@ -83,8 +84,8 @@ public struct TodayResponse: Codable, Sendable, Equatable {
     public let freshness: Freshness?
 }
 
-/// `due` block shared by /v2/today and /v2/training.
-public struct DueWorkout: Codable, Sendable, Equatable {
+/// One of the owner's splits, shared by /v2/today and /v2/training (11 §7.2–7.3). Offered as a choice, never picked for them.
+public struct Split: Codable, Sendable, Equatable, Identifiable {
     public struct Exercise: Codable, Sendable, Equatable {
         public struct Last: Codable, Sendable, Equatable {
             public let weightKg: Double?
@@ -94,12 +95,46 @@ public struct DueWorkout: Codable, Sendable, Equatable {
         public let id: String
         public let name: String
         public let last: Last?
+        public init(id: String, name: String, last: Last? = nil) { self.id = id; self.name = name; self.last = last }
     }
-    public let template: String
+    public let id: String
     public let name: String
+    /// `defined` (Settings) or `history` (a logged workout name).
+    public let source: String
+    public let ready: Bool
     public let daysSince: Int?
+    public let muscles: [String]?
     public let exerciseCount: Int?
     public let exercises: [Exercise]
+
+    public init(id: String, name: String, source: String = "defined", ready: Bool = true, daysSince: Int? = nil, muscles: [String]? = nil,
+                exerciseCount: Int? = nil, exercises: [Exercise] = []) {
+        self.id = id; self.name = name; self.source = source; self.ready = ready; self.daysSince = daysSince; self.muscles = muscles
+        self.exerciseCount = exerciseCount; self.exercises = exercises
+    }
+
+    /// The id to send as `session.template`: only Settings splits have a stable id; history splits match by title.
+    public var templateID: String? { source == "defined" ? id : nil }
+}
+
+// MARK: GET /v2/splits, PUT / DELETE /v2/splits/:id (10 §6)
+
+public struct DefinedSplit: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public var name: String
+    public var muscles: [String]
+    public let ord: Int
+}
+
+public struct SplitsResponse: Codable, Sendable, Equatable {
+    public let splits: [DefinedSplit]
+}
+
+public struct SplitPut: Codable, Sendable, Equatable {
+    public let name: String
+    public let muscles: [String]
+    public let ord: Int?
+    public init(name: String, muscles: [String], ord: Int? = nil) { self.name = name; self.muscles = muscles; self.ord = ord }
 }
 
 // MARK: GET /v2/digest (10 §4)

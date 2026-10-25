@@ -3,8 +3,8 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
-/// Start choice (frame 11): Start on Watch / Log on iPhone, remember my choice. Today and Train both open it;
-/// with a remembered choice it acts on appear.
+/// Start choice (frame 11, 11 §7.3): the owner's splits as equal choices (none preselected), then Watch or iPhone.
+/// A remembered destination starts as soon as a split is tapped; with no splits it acts on appear.
 struct WorkoutStartSheet: View {
     private let train: TrainStore
     private let live: LiveSessionStore
@@ -14,6 +14,7 @@ struct WorkoutStartSheet: View {
     @Environment(Router.self) private var router
     @AppStorage("rememberedStart") private var rememberedStart = ""
     @State private var remember = false
+    @State private var chosen: String?
     @State private var watchError: String?
     @State private var starting = false
 
@@ -22,63 +23,105 @@ struct WorkoutStartSheet: View {
         self.train = train; self.live = live; self.actsOnAppear = actsOnAppear
     }
 
-    private var due: DueWorkout? { train.week.value?.due }
+    private var splits: [Split] { train.week.value?.splits ?? [] }
+    private var split: Split? { splits.first { $0.id == chosen } }
 
     var body: some View {
         SheetChrome {
-            VStack(alignment: .leading, spacing: 0) {
-                MonoLabel(dueLabel).padding(.top, 28)
-                HeadlineLines([due?.name ?? "Workout"], size: 56).padding(.top, 6)
-                if let due, !due.exercises.isEmpty {
-                    Text(due.exercises.map(\.name).joined(separator: " · ")).vReading(14, tint: .steel).textCase(.uppercase)
-                        .lineSpacing(6).fixedSize(horizontal: false, vertical: true).padding(.top, 14)
-                }
-
-                PrimaryButton("Start on Watch", icon: "applewatch") { Task { await startOnWatch() } }
-                    .disabled(starting)
-                    .padding(.top, 28)
-                caption(watchError ?? "Log sets from your wrist · phone stays away", tint: watchError == nil ? .steel : .watch)
-
-                SecondaryButton(live.watchSessionLive ? "Workout live on Watch" : "Log on iPhone", systemImage: "iphone",
-                                size: .full, enabled: !live.watchSessionLive) { logOnPhone() }
-                    .padding(.top, 20)
-                caption("Full set table · good for new exercises", tint: .steel)
-
-                VSection(top: 20) {
-                    Button { remember.toggle() } label: {
-                        HStack(spacing: 16) {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous).inset(by: 0.75)
-                                .stroke(VColor.future, lineWidth: 1.5)
-                                .frame(width: 18, height: 18)
-                                .overlay { if remember { Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(VColor.bone) } }
-                            MonoLabel("Remember my choice", tint: .bone)
-                            Spacer()
-                        }
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    MonoLabel(splits.isEmpty ? "Pick exercises as you go" : "Your splits · you pick").padding(.top, 28)
+                    HeadlineLines([split?.name ?? "Workout"], size: 56).padding(.top, 6)
+                    if let split, !split.exercises.isEmpty {
+                        Text(split.exercises.map(\.name).joined(separator: " · ")).vReading(14, tint: .steel).textCase(.uppercase)
+                            .lineSpacing(6).fixedSize(horizontal: false, vertical: true).padding(.top, 14)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(remember ? .isSelected : [])
+                    if !splits.isEmpty { choices.padding(.top, 20) }
+
+                    PrimaryButton("Start on Watch", icon: "applewatch") { Task { await startOnWatch() } }
+                        .disabled(starting)
+                        .padding(.top, 28)
+                    caption(watchError ?? "Log sets from your wrist · phone stays away", tint: watchError == nil ? .steel : .watch)
+
+                    SecondaryButton(live.watchSessionLive ? "Workout live on Watch" : "Log on iPhone", systemImage: "iphone",
+                                    size: .full, enabled: !live.watchSessionLive) { logOnPhone() }
+                        .padding(.top, 20)
+                    caption("Full set table · good for new exercises", tint: .steel)
+
+                    VSection(top: 20) {
+                        Button { remember.toggle() } label: {
+                            HStack(spacing: 16) {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous).inset(by: 0.75)
+                                    .stroke(VColor.future, lineWidth: 1.5)
+                                    .frame(width: 18, height: 18)
+                                    .overlay { if remember { Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(VColor.bone) } }
+                                MonoLabel("Remember Watch or iPhone", tint: .bone)
+                                Spacer()
+                            }
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(remember ? .isSelected : [])
+                    }
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, VSpace.gutter)
+                .padding(.bottom, VSpace.gutter)
             }
-            .padding(.horizontal, VSpace.gutter)
         }
-        .presentationDetents([.height(486)])
+        .presentationDetents([.large])
         .task {
             if train.week.value == nil { await train.load() }
-            guard actsOnAppear else { return }
-            switch rememberedStart {
-            case "watch": await startOnWatch()
-            case "phone": logOnPhone()
-            default: break
-            }
+            guard actsOnAppear, splits.isEmpty else { return }
+            await startRemembered()
         }
     }
 
-    private var dueLabel: String {
-        guard let due else { return "Pick exercises as you go" }
-        return "Fresh · " + (due.daysSince.map { "\(TrainFormat.plural($0, "day", "days")) since" } ?? "New")
+    /// One row per split, in server order; loaded ones stay tappable because the owner decides.
+    private var choices: some View {
+        VStack(spacing: 0) {
+            Rule()
+            ForEach(splits) { s in choiceRow(s.name, detail: Self.detail(s), dim: !s.ready, on: chosen == s.id) { pick(s.id) } }
+            choiceRow("Empty workout", detail: "Pick as you go", dim: false, on: chosen == nil && !splits.isEmpty) { pick(nil) }
+        }
+    }
+
+    static func detail(_ s: Split) -> String {
+        guard s.ready else { return "Loaded" }
+        return "Fresh · " + (s.daysSince.map { TrainFormat.plural($0, "day", "days") } ?? "New")
+    }
+
+    private func choiceRow(_ name: String, detail: String, dim: Bool, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? VColor.bone : VColor.future)
+                    Text(name).vReading(15, tint: dim ? .steel : .bone).textCase(.uppercase).lineLimit(1)
+                    Spacer(minLength: 8)
+                    MonoLabel(detail, tint: dim ? .steel : .good)
+                }
+                .frame(minHeight: 52)
+                Rule()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func pick(_ id: String?) {
+        chosen = id
+        guard actsOnAppear else { return }
+        Task { await startRemembered() }
+    }
+
+    private func startRemembered() async {
+        switch rememberedStart {
+        case "watch": await startOnWatch()
+        case "phone": logOnPhone()
+        default: break
+        }
     }
 
     private func caption(_ text: String, tint: VTint) -> some View {
@@ -93,7 +136,7 @@ struct WorkoutStartSheet: View {
         guard !starting else { return }
         starting = true
         defer { starting = false }
-        WatchBridge.sendPlan(template: due?.template, exerciseIDs: due?.exercises.map(\.id) ?? [])
+        WatchBridge.sendPlan(title: split?.name, template: split?.templateID, exerciseIDs: split?.exercises.map(\.id) ?? [])
         let config = HKWorkoutConfiguration()
         config.activityType = .traditionalStrengthTraining
         config.locationType = .indoor
@@ -112,7 +155,7 @@ struct WorkoutStartSheet: View {
     private func logOnPhone() {
         guard !live.watchSessionLive else { return }
         if remember { rememberedStart = "phone" }
-        live.begin(due: due)
+        live.begin(split: split)
         router.startLoggingOnPhone()
     }
 }
@@ -120,12 +163,12 @@ struct WorkoutStartSheet: View {
 #if DEBUG
 #Preview("Start choice") {
     Color.clear.sheet(isPresented: .constant(true)) {
-        WorkoutStartSheet(train: TrainPreviewData.trainStore(.due), live: TrainPreviewData.idleLive,
+        WorkoutStartSheet(train: TrainPreviewData.trainStore(.splits), live: TrainPreviewData.idleLive,
                           actsOnAppear: false)
     }
     .vScreen().environment(Router()).onAppear { VFont.register() }
 }
-#Preview("Start choice · nothing due") {
+#Preview("Start choice · no splits") {
     Color.clear.sheet(isPresented: .constant(true)) {
         WorkoutStartSheet(train: TrainPreviewData.trainStore(.fixture), live: TrainPreviewData.idleLive,
                           actsOnAppear: false)

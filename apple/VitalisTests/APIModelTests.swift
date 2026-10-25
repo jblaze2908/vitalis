@@ -42,7 +42,7 @@ import VitalisKit
         #expect(today.verdict.action?.kind == "bed_reminder")
         #expect(today.training.heat.count == 17)
         #expect(today.training.heat["lower-back"] == 1)
-        #expect(today.training.due == nil)
+        #expect(today.training.splits ?? [] == [])
         #expect(today.fuel.nextLabel == "LOG BREAKFAST")
         let pulse = try #require(today.pulse)
         #expect(APIDate.clockText(pulse.now) == "22:14")

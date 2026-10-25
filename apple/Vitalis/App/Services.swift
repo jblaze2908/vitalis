@@ -54,6 +54,9 @@ final class Services {
 
     /// Queue a write and try to deliver it now. Returns the outbox id (Undo can drop it before it is sent).
     @discardableResult
+    /// A direct (not queued) write landed: screens keyed on `writesVersion` refetch.
+    func noteWrite() { writesVersion += 1 }
+
     func send(_ request: APIRequest) async -> UUID? {
         guard let outbox else { return nil }
         let id = try? await outbox.enqueue(request)

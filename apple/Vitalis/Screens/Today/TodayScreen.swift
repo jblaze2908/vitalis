@@ -244,7 +244,7 @@ struct TodayScreen: View {
 
     @ViewBuilder private func training(_ t: TodayResponse?) -> some View {
         let tr = t?.training
-        // Heat 0 everywhere = no working set in 30 days; a "Legs fresh" label over a blank body would mislead.
+        // Heat 0 everywhere = no working set in 30 days; a "Push fresh" label over a blank body would mislead.
         let empty = tr.map { $0.heat.values.allSatisfy { $0 == 0 } } ?? false
         let lines: [(String, Color)] = empty ? [("No workouts yet", VColor.bone)]
             : [tr?.freshLabel.map { ($0, VColor.bone) }, tr?.loadedLabel.map { ($0, VColor.steel) }].compactMap { $0 }
@@ -302,17 +302,15 @@ struct TodayScreen: View {
 
     /// The verdict's action, demoted to a secondary button while sync is broken.
     private func staleAction(_ t: TodayResponse, _ action: TodayResponse.Action) -> some View {
-        let due = action.kind == "start_workout" ? t.training.due : nil
-        let watchStart = store.startLabel.hasSuffix("Watch")
+        let training = action.kind == "start_workout"
         return HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 0) {
-                MonoLabel(due == nil ? "Now" : "Training")
-                HeadlineLines(HeadlineLines.split(due.map { "\($0.name) are due" } ?? t.verdict.headline, maxChars: 22), size: 26)
+                MonoLabel(training ? "Training" : "Now")
+                HeadlineLines(HeadlineLines.split(t.verdict.headline, maxChars: 22), size: 26)
                     .padding(.top, 9)
-                if due != nil, watchStart { Text("Watch logging still works offline").vBody().padding(.top, 3) }
             }
             Spacer(minLength: 0)
-            SecondaryButton(due == nil ? (store.actionLabel ?? action.label) : "Start") { store.apply(store.intent, router: router) }
+            SecondaryButton(training ? "Start" : (store.actionLabel ?? action.label)) { store.apply(store.intent, router: router) }
         }
     }
 }
@@ -388,7 +386,7 @@ private let stalePatch = #"""
 #Preview("Home · empty training") {
     TodayPreview(store: previewStore(TodayPreviewData.today(TodayPreviewData.frame03, #"""
     {"verdict": {"headline": "Eat well today", "action": {"kind": "log_meal", "label": "Log lunch"}},
-     "training": {"fresh_label": null, "loaded_label": null, "due": null,
+     "training": {"fresh_label": null, "loaded_label": null, "splits": [],
                   "heat": {"abdominals": 0, "abductors": 0, "adductors": 0, "biceps": 0, "calves": 0, "chest": 0, "forearms": 0,
                            "glutes": 0, "hamstrings": 0, "lats": 0, "lower-back": 0, "middle-back": 0, "neck": 0, "quadriceps": 0,
                            "shoulders": 0, "traps": 0, "triceps": 0}}}

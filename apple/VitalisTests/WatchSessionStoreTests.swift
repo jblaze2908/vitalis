@@ -92,7 +92,7 @@ import VitalisKit
     @Test func packPersistsForOfflineLaunch() throws {
         let root = temporaryDirectory()
         let pack = WatchPack(generatedAt: "2026-10-24T09:41:02+05:30", settings: .init(restS: 90, crownStepKg: 1.25),
-                             due: .init(template: "legs", name: "Legs", daysSince: 6, exerciseIDs: ["barbell-squat"]))
+                             splits: [.init(id: "legs", template: "legs", name: "Legs", ready: true, daysSince: 6, exerciseIDs: ["barbell-squat"])])
         #expect(try WatchSessionStore(root: root).loadPack() == nil)
         try WatchSessionStore(root: root).savePack(pack)
         #expect(try WatchSessionStore(root: root).loadPack() == pack)

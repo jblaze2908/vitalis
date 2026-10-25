@@ -43,7 +43,7 @@ struct TrainWeekView: View {
             TrainTopBar(status: status(t).0, tint: status(t).1, pulse: store.pulse)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if let t, t.empty { TrainEmptyBody(heat: t.heat) } else { week(t) }
+                    if let t, t.empty { TrainEmptyBody(heat: t.heat, start: start) } else { week(t) }
                 }
                 .padding(.horizontal, VSpace.gutter)
                 .padding(.bottom, VSpace.gutter)
@@ -73,17 +73,13 @@ struct TrainWeekView: View {
 
         if let live {
             VSection { PrimaryButton("Resume \(live.title)", action: start) }
-        } else if let due = t?.due {
-            VSection {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(due.name) are due").vHeadline(28).lineLimit(1).minimumScaleFactor(0.7)
-                    Spacer(minLength: 12)
-                    MonoLabel(dueLabel(due))
-                }
-                PrimaryButton("Start \(due.name) on Watch", action: start).padding(.top, VSpace.sectionTop)
-            }
         } else if t != nil {
-            VSection { SecondaryButton("Start a workout", size: .full, action: start) }
+            VSection {
+                if let splits = t?.splits, !splits.isEmpty {
+                    MonoLabel(Self.readyLine(splits))
+                }
+                PrimaryButton("Start workout", action: start).padding(.top, t?.splits?.isEmpty ?? true ? 0 : 14)
+            }
         }
 
         VSection {
@@ -99,9 +95,10 @@ struct TrainWeekView: View {
         if let t, let weekly = t.weeklySets, !t.muscles.isEmpty { WeeklySetsSection(muscles: t.muscles, weekly: weekly) }
     }
 
-    private func dueLabel(_ due: DueWorkout) -> String {
-        let days = due.daysSince.map { TrainFormat.plural($0, "day", "days") } ?? "New"
-        return [days, due.exerciseCount.map { TrainFormat.plural($0, "exercise", "exercises") }].compactMap { $0 }.joined(separator: " · ")
+    /// "Fresh · Push · Lower" or "All splits loaded"; the start sheet is where one gets picked.
+    static func readyLine(_ splits: [Split]) -> String {
+        let ready = splits.filter(\.ready).map(\.name)
+        return ready.isEmpty ? "All splits loaded" : "Fresh · " + ready.joined(separator: " · ")
     }
 
     @ViewBuilder private var sessions: some View {
@@ -204,14 +201,15 @@ struct WeeklySetsSection: View {
 /// Frame 26: no strength session ever logged.
 struct TrainEmptyBody: View {
     let heat: MuscleHeat
-    private let steps = ["Open Vitalis on your Watch", "Pick an exercise", "Turn the Crown for weight, log the set"]
+    let start: () -> Void
+    private let steps = ["Tap Start workout", "Log on your Watch or this iPhone", "Name it when you finish, to repeat it later"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HeadlineLines(["Train"], size: 46).padding(.top, VSpace.sectionTop)
             MuscleMap(heat: heat, view: .both).frame(width: 240).frame(maxWidth: .infinity).padding(.top, VSpace.sectionTop)
             Text("No workouts yet").vHeadline(30).padding(.top, 28)
-            Text("Start one on your Watch. Every set you log lights up the muscles you trained.").vBody(15)
+            Text("Every set you log lights up the muscles you trained.").vBody(15)
                 .fixedSize(horizontal: false, vertical: true).padding(.top, 8)
             VStack(spacing: 0) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
@@ -226,15 +224,16 @@ struct TrainEmptyBody: View {
                 Rule()
             }
             .padding(.top, VSpace.sectionTop)
+            PrimaryButton("Start workout", action: start).padding(.top, VSpace.sectionTop)
         }
     }
 }
 
 #if DEBUG
-#Preview("Train · week with due") {
-    TrainScreen(store: TrainPreviewData.trainStore(.due), live: TrainPreviewData.idleLive).environment(Router()).onAppear { VFont.register() }
+#Preview("Train · week with splits") {
+    TrainScreen(store: TrainPreviewData.trainStore(.splits), live: TrainPreviewData.idleLive).environment(Router()).onAppear { VFont.register() }
 }
-#Preview("Train · week, nothing due") {
+#Preview("Train · week, no splits") {
     TrainScreen(store: TrainPreviewData.trainStore(.fixture), live: TrainPreviewData.idleLive).environment(Router()).onAppear { VFont.register() }
 }
 #Preview("Train · empty") {

@@ -8,6 +8,7 @@ public enum Muscle: String, CaseIterable, Sendable {
     case neck, quadriceps, shoulders, traps, triceps
 
     var spokenName: String { rawValue.replacingOccurrences(of: "-", with: " ") }
+    public var displayName: String { spokenName.capitalized }
 }
 
 /// Front + back anatomical figure lit by server heat 0–4 (spec 30 → MuscleMap). Size it by width.

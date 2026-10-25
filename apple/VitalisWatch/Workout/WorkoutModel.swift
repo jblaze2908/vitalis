@@ -75,29 +75,29 @@ import VitalisUI
 
     var settings: WatchPack.Settings { pack?.settings ?? .init() }
 
-    /// Start screen headline: the server's due template, `Workout` with no pack.
-    var startTitle: String { pack?.due?.name ?? "Workout" }
-
-    func startDue() {
-        guard let due = pack?.due else { showsAddExercise = true; return }
-        start(WatchPlan(title: due.name, template: due.template, exerciseIDs: due.exerciseIDs))
+    /// The title stays the split's name verbatim: history splits have no template and the server matches them by title.
+    func start(split: WatchPack.Split) {
+        start(WatchPlan(title: split.name, template: split.template, exerciseIDs: split.exerciseIDs))
+        // A Settings split never trained yet has no exercises: pick as you go (11 §7.2).
+        if split.exerciseIDs.isEmpty, record?.isLive == true { showsAddExercise = true }
     }
 
     func repeatSession(_ recent: WatchPack.RecentSession) {
         start(WatchPlan(title: recent.title, template: recent.template, exerciseIDs: recent.exerciseIDs))
     }
 
-    /// Phone's `startWatchApp`: skip Start and log the plan it sent (spec 21 §2 flow).
+    /// Phone's `startWatchApp`: skip Start and log the plan it sent (spec 21 §2 flow). No plan: Start stays up, since no
+    /// split is picked for the owner.
     func startFromPhone() async {
         await bootstrap()
-        guard record?.isLive != true else { return }
-        if let plan = plan ?? pack?.plan { start(plan) } else { startDue() }
+        guard record?.isLive != true, let plan = plan ?? pack?.plan else { return }
+        start(plan)
     }
 
     func start(_ plan: WatchPlan) {
         guard record?.isLive != true else { return }
         let started = now()
-        let fresh = WorkoutSessionRecord(title: plan.title ?? pack?.due?.name ?? "Workout", template: plan.template, startedAt: started,
+        let fresh = WorkoutSessionRecord(title: plan.title ?? "Workout", template: plan.template, startedAt: started,
                                          tzOffsetMin: TimeZone.current.secondsFromGMT(for: started) / 60, exerciseIDs: plan.exerciseIDs)
         guard persist(fresh) else { Haptic.play(.failure); return }
         record = fresh
@@ -394,7 +394,7 @@ extension WorkoutModel {
         case .setEntryFirstEver:
             model.start(WatchPlan(title: "Leg day", template: nil, exerciseIDs: ["hack-squat"]))
         default:
-            model.startDue()
+            model.start(split: WatchPreviewData.pack.splits[0])
             model.weight = 97.5; model.reps = 8
             model.logSet(kind: .warmup)
             model.prefill()

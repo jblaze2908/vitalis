@@ -264,7 +264,7 @@ import VitalisKit
         guard case .pack(let pack)? = PhoneSessionDelegate.decode(PhoneSessionDelegate.contextWithoutToday(context)) else {
             Issue.record("context has no pack"); return
         }
-        #expect(pack.due?.template == "legs" && pack.plan?.exerciseIDs == ["barbell-squat"])
+        #expect(pack.splits.first?.template == "legs" && pack.plan?.exerciseIDs == ["barbell-squat"])
     }
 
     @Test func reachablePlanGoesStraightToTheWatch() async throws {

@@ -41,7 +41,8 @@ public struct TrainingResponse: Codable, Sendable, Equatable {
     public let label: String?
     public let heat: MuscleHeat
     public let muscles: [Muscle]
-    public let due: DueWorkout?
+    /// Nil from servers older than splits (11 §7.2).
+    public let splits: [Split]?
     public let stats: Stats?
     public let weeklySets: WeeklySets?
     public let sessions: [SessionRow]

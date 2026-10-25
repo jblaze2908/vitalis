@@ -5,12 +5,13 @@ import VitalisKit
 @Suite struct WatchMessagesTests {
     static let t0 = Date(timeIntervalSince1970: 1_792_800_000)
 
-    /// The sample from spec 21 §6, verbatim: the phone's pack builder (W-02) must emit these keys.
+    /// The spec 21 §6 sample with `splits` (11 §7.3) in place of `due`: the phone's pack builder (W-02) must emit these keys.
     static let specPack = """
     {
       "generated_at": "2026-10-24T09:41:02+05:30",
       "settings": { "rest_s": 120, "crown_step_kg": 2.5 },
-      "due": { "template": "legs", "name": "Legs", "days_since": 6, "exercise_ids": ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
+      "splits": [ { "id": "legs", "template": "legs", "name": "Legs", "ready": true, "days_since": 6, "exercise_ids": ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
+                  { "id": "upper", "template": null, "name": "Upper", "ready": false, "days_since": 1, "exercise_ids": ["barbell-bench-press-medium-grip"] } ],
       "recent_sessions": [ { "title": "Push", "template": "push", "day": "2026-10-22", "exercise_ids": ["barbell-bench-press-medium-grip"] } ],
       "exercises": {
         "barbell-squat": { "name": "Barbell Squat", "primary": ["quadriceps"], "secondary": ["calves","glutes","hamstrings","lower-back"],
@@ -93,13 +94,21 @@ import VitalisKit
         #expect(pack.settings.rest == 120)
         #expect(pack.settings.crownStep == 2.5)
         #expect(pack.settings.suggests)
-        #expect(pack.due?.daysSince == 6)
-        #expect(pack.due?.exerciseIDs.count == 5)
+        #expect(pack.splits.map(\.name) == ["Legs", "Upper"])
+        #expect(pack.splits.first?.daysSince == 6 && pack.splits.first?.exerciseIDs.count == 5)
+        let upper = try #require(pack.splits.last)
+        #expect(upper.template == nil && !upper.ready)
         #expect(pack.recentSessions.first?.exerciseIDs == ["barbell-bench-press-medium-grip"])
         let squat = try #require(pack.exercises["barbell-squat"])
         #expect(squat.secondary.contains("lower-back"))
         #expect(squat.prefill?.next?.weightKg == 100)
         #expect(pack.recentExerciseIDs == ["barbell-squat"])
+    }
+
+    @Test func packFromAnOlderPhoneHasNoSplits() throws {
+        let json = #"{"generated_at":"2026-10-24T09:41:02+05:30","due":{"template":"legs","name":"Legs","days_since":6,"exercise_ids":[]}}"#
+        let pack = try WatchCoding.decoder().decode(WatchPack.self, from: Data(json.utf8))
+        #expect(pack.splits.isEmpty, "the old due block is ignored, not promoted to a split")
     }
 
     @Test func settingsFallBackToDefaults() {

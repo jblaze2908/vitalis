@@ -5,16 +5,20 @@ import VitalisKit
 /// Preview stores built from the bundled DemoData responses (no network, no HealthKit).
 @MainActor
 enum TrainPreviewData {
-    enum Week { case fixture, due, empty }
+    enum Week { case fixture, splits, empty }
 
-    /// The demo responses carry `due: null`; previews patch in an example plan to show the due block and sheet.
-    static let dueJSON: [String: Any] = [
-        "template": "legs", "name": "Legs", "days_since": 6, "exercise_count": 3,
+    /// Example splits for the start sheet: one defined and fresh, one learned from history and still loaded.
+    static let lowerJSON: [String: Any] = [
+        "id": "lower", "name": "Lower", "source": "defined", "ready": true, "days_since": 6, "exercise_count": 3,
         "exercises": [
             ["id": "barbell-squat", "name": "Barbell Squat", "last": ["weight_kg": 97.5, "reps": 6, "day": "2026-10-18"]],
             ["id": "romanian-deadlift", "name": "Romanian Deadlift", "last": ["weight_kg": 95, "reps": 8, "day": "2026-10-18"]],
             ["id": "leg-press", "name": "Leg Press", "last": ["weight_kg": 180, "reps": 10, "day": "2026-10-18"]],
         ],
+    ]
+    static let pushJSON: [String: Any] = [
+        "id": "history:push", "name": "Push", "source": "history", "ready": false, "days_since": 1, "exercise_count": 1,
+        "exercises": [["id": "barbell-bench-press-medium-grip", "name": "Barbell Bench Press - Medium Grip"]],
     ]
 
     static func json(_ name: String) -> [String: Any] {
@@ -28,13 +32,13 @@ enum TrainPreviewData {
         return try? APICoding.decoder().decode(T.self, from: data)
     }
 
-    static var due: DueWorkout? { decode(DueWorkout.self, dueJSON) }
+    static var lower: Split? { decode(Split.self, lowerJSON) }
 
     static func training(_ week: Week) -> TrainingResponse? {
         var t = json("training")
         switch week {
         case .fixture: break
-        case .due: t["due"] = dueJSON
+        case .splits: t["splits"] = [lowerJSON, pushJSON]
         case .empty:
             t["empty"] = true; t["sessions"] = [Any](); t["heat"] = [String: Int]()
             t["stats"] = ["sessions": 0, "working_sets": 0, "muscles_hit": 0, "muscles_total": 17]
@@ -57,7 +61,7 @@ enum TrainPreviewData {
     /// Mid-session logger: squat prefilled from the demo exercise detail, warm-up and one set done, rest running.
     static func liveStore(watchLive: Bool = false) -> LiveSessionStore {
         let store = LiveSessionStore(fileURL: nil, api: { nil }, send: { _ in }, health: FakeHealthWriter())
-        store.begin(due: due)
+        store.begin(split: lower)
         if let e = exercise { store.apply(e, to: "barbell-squat") }
         Task { await store.check(); await store.check(); store.watchSessionLive = watchLive }
         return store

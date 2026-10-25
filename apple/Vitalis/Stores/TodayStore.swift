@@ -224,10 +224,8 @@ final class TodayStore {
         return Self.actionLabel(t.verdict.action, rememberedStart: defaults.string(forKey: Self.rememberedStartKey))
     }
 
-    /// Secondary start on the empty-training block (brief 01 States).
-    var startLabel: String {
-        defaults.string(forKey: Self.rememberedStartKey) == "phone" ? "Start on iPhone" : "Start on Watch"
-    }
+    /// Secondary start on the empty-training block (brief 01 States); Watch or iPhone is chosen in the start sheet.
+    var startLabel: String { "Start workout" }
 
     /// Navigation intents go to the router; the reminder is scheduled here.
     func apply(_ intent: TodayIntent, router: Router) {

@@ -45,6 +45,7 @@ struct WatchPrimaryButton: View {
 struct WatchRow: View {
     let title: String
     let detail: String?
+    var detailTint: VTint = .steel
     let action: () -> Void
 
     var body: some View {
@@ -54,7 +55,7 @@ struct WatchRow: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(title).vHeadline(17).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 6)
-                    if let detail { MonoLabel(detail) }
+                    if let detail { MonoLabel(detail, tint: detailTint) }
                 }
                 .frame(maxHeight: .infinity)
             }

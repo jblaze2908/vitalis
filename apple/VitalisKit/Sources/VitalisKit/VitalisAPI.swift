@@ -50,6 +50,8 @@ public struct APIRequest: Codable, Sendable, Equatable {
 
     public static func putTargets(_ patch: TargetsPatch) throws -> APIRequest { try json("PUT", "v2/targets", patch) }
     public static func postWeight(_ entry: WeightEntry) throws -> APIRequest { try json("POST", "v2/weight", entry) }
+    public static func putSplit(id: String, _ split: SplitPut) throws -> APIRequest { try json("PUT", "v2/splits/\(seg(id))", split) }
+    public static func deleteSplit(id: String) -> APIRequest { APIRequest(method: "DELETE", path: "v2/splits/\(seg(id))") }
     public static func deleteWeight(id: String) -> APIRequest { APIRequest(method: "DELETE", path: "v2/weight/\(seg(id))") }
     public static func createExercise(_ exercise: NewExercise) throws -> APIRequest { try json("POST", "v2/exercises", exercise) }
     public static func postWorkout(_ workout: WorkoutUpsert) throws -> APIRequest { try json("POST", "v2/workouts", workout) }
@@ -112,6 +114,7 @@ public struct VitalisAPI: OutboxTransport {
         try await get(SyncStatus.self, "v2/sync/status", cached: false).value
     }
     public func targets() async throws -> APIResponse<TargetsResponse> { try await get(TargetsResponse.self, "v2/targets") }
+    public func splits() async throws -> APIResponse<SplitsResponse> { try await get(SplitsResponse.self, "v2/splits") }
     public func today(date: String? = nil) async throws -> APIResponse<TodayResponse> {
         try await get(TodayResponse.self, "v2/today", query: Self.query(["date": date]))
     }
@@ -160,6 +163,12 @@ public struct VitalisAPI: OutboxTransport {
 
     public func putTargets(_ patch: TargetsPatch) async throws -> TargetsResponse {
         try await send(.putTargets(patch), as: TargetsResponse.self)
+    }
+    public func putSplit(id: String, _ split: SplitPut) async throws -> SplitsResponse {
+        try await send(.putSplit(id: id, split), as: SplitsResponse.self)
+    }
+    public func deleteSplit(id: String) async throws -> SplitsResponse {
+        try await send(.deleteSplit(id: id), as: SplitsResponse.self)
     }
     public func postWeight(_ entry: WeightEntry) async throws -> WeightPostResponse {
         try await send(.postWeight(entry), as: WeightPostResponse.self)

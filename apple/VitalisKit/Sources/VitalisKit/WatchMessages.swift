@@ -59,7 +59,7 @@ public struct LoggedSet: Codable, Sendable, Identifiable, Hashable {
 public struct WorkoutSessionRecord: Codable, Sendable, Identifiable, Equatable {
     public var id: UUID              // session client_id
     public var title: String
-    public var template: String?     // "legs" | "push" | "pull" | nil
+    public var template: String?     // a Settings split id, or nil
     public var source: String        // "watch"
     public var startedAt: Date
     public var endedAt: Date?
@@ -146,16 +146,19 @@ public struct WatchPack: Codable, Sendable, Equatable {
         public var suggests: Bool { useSuggestion ?? true }
     }
 
-    public struct Due: Codable, Sendable, Equatable {
-        public var template: String
+    /// The owner's split as a start choice (11 §7.3); `template` is nil for history splits, which match by title.
+    public struct Split: Codable, Sendable, Equatable, Identifiable {
+        public var id: String
+        public var template: String?
         public var name: String
+        public var ready: Bool
         public var daysSince: Int?
         public var exerciseIDs: [String]
-        public init(template: String, name: String, daysSince: Int?, exerciseIDs: [String]) {
-            self.template = template; self.name = name; self.daysSince = daysSince; self.exerciseIDs = exerciseIDs
+        public init(id: String, template: String?, name: String, ready: Bool, daysSince: Int?, exerciseIDs: [String]) {
+            self.id = id; self.template = template; self.name = name; self.ready = ready; self.daysSince = daysSince; self.exerciseIDs = exerciseIDs
         }
         private enum CodingKeys: String, CodingKey {
-            case template, name, daysSince = "days_since", exerciseIDs = "exercise_ids"
+            case id, template, name, ready, daysSince = "days_since", exerciseIDs = "exercise_ids"
         }
     }
 
@@ -211,21 +214,21 @@ public struct WatchPack: Codable, Sendable, Equatable {
 
     public var generatedAt: String
     public var settings: Settings
-    public var due: Due?
+    public var splits: [Split]
     public var recentSessions: [RecentSession]
     public var exercises: [String: Exercise]
     public var recentExerciseIDs: [String]
     /// The start-choice plan when `sendMessage` couldn't reach the Watch (spec 21 §6 `plan`).
     public var plan: WatchPlan?
 
-    public init(generatedAt: String, settings: Settings = .init(), due: Due? = nil, recentSessions: [RecentSession] = [],
+    public init(generatedAt: String, settings: Settings = .init(), splits: [Split] = [], recentSessions: [RecentSession] = [],
                 exercises: [String: Exercise] = [:], recentExerciseIDs: [String] = [], plan: WatchPlan? = nil) {
-        self.generatedAt = generatedAt; self.settings = settings; self.due = due; self.recentSessions = recentSessions
+        self.generatedAt = generatedAt; self.settings = settings; self.splits = splits; self.recentSessions = recentSessions
         self.exercises = exercises; self.recentExerciseIDs = recentExerciseIDs; self.plan = plan
     }
 
     private enum CodingKeys: String, CodingKey {
-        case settings, due, exercises, plan
+        case settings, splits, exercises, plan
         case generatedAt = "generated_at", recentSessions = "recent_sessions", recentExerciseIDs = "recent_exercise_ids"
     }
 
@@ -233,7 +236,7 @@ public struct WatchPack: Codable, Sendable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         generatedAt = try c.decode(String.self, forKey: .generatedAt)
         settings = try c.decodeIfPresent(Settings.self, forKey: .settings) ?? .init()
-        due = try c.decodeIfPresent(Due.self, forKey: .due)
+        splits = try c.decodeIfPresent([Split].self, forKey: .splits) ?? []
         recentSessions = try c.decodeIfPresent([RecentSession].self, forKey: .recentSessions) ?? []
         exercises = try c.decodeIfPresent([String: Exercise].self, forKey: .exercises) ?? [:]
         recentExerciseIDs = try c.decodeIfPresent([String].self, forKey: .recentExerciseIDs) ?? []

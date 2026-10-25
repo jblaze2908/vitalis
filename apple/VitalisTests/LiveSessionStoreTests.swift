@@ -12,10 +12,10 @@ final class SentRequests {
 @MainActor @Suite struct LiveSessionStoreTests {
     let bench = "barbell-bench-press-medium-grip"
 
-    func due(_ ids: [String]) throws -> DueWorkout {
+    func split(_ ids: [String]) throws -> Split {
         let exercises = ids.map { #"{"id":"\#($0)","name":"\#($0)","last":{"weight_kg":60,"reps":8,"day":"2026-10-20"}}"# }.joined(separator: ",")
-        let json = #"{"template":"push","name":"Push","days_since":2,"exercise_count":\#(ids.count),"exercises":[\#(exercises)]}"#
-        return try APICoding.decoder().decode(DueWorkout.self, from: Data(json.utf8))
+        let json = #"{"id":"push","name":"Push","source":"defined","ready":true,"days_since":2,"exercise_count":\#(ids.count),"exercises":[\#(exercises)]}"#
+        return try APICoding.decoder().decode(Split.self, from: Data(json.utf8))
     }
 
     func make(file: URL? = temporaryDirectory().appendingPathComponent("live-session.json"), api: VitalisAPI? = nil,
@@ -28,7 +28,7 @@ final class SentRequests {
         let file = temporaryDirectory().appendingPathComponent("live-session.json")
         let clock = TestClock()
         let store = make(file: file, clock: clock)
-        store.begin(due: try due([bench, "barbell-squat"]))
+        store.begin(split: try split([bench, "barbell-squat"]))
         await store.check()
         clock.advance(20)
         store.adjustRest(by: 15)
@@ -59,14 +59,14 @@ final class SentRequests {
         }
         let api = VitalisAPI.stubbed(host, cache: try ResponseCache(directory: temporaryDirectory()))
         let online = make(api: api)
-        online.begin(due: try due([bench]))
+        online.begin(split: try split([bench]))
         await online.prefill(bench)
         #expect(online.session?.exercises[0].best == "78 kg × 8")
         #expect(online.session?.exercises[0].rows.count == 4)
 
         host.setHandler { _ in .failure(URLError(.notConnectedToInternet)) }
         let offline = make(api: api)
-        offline.begin(due: try due([bench]))
+        offline.begin(split: try split([bench]))
         await offline.prefill(bench)
         func shape(_ s: LiveSession?) -> [String] { s?.exercises[0].rows.map { "\($0.kind) \($0.last ?? "-") \($0.weight) \($0.reps)" } ?? [] }
         #expect(shape(offline.session) == shape(online.session))
@@ -82,7 +82,7 @@ final class SentRequests {
     @Test func restTimerRunsFromItsEndDate() async throws {
         let clock = TestClock()
         let store = make(clock: clock)
-        store.begin(due: try due([bench]))
+        store.begin(split: try split([bench]))
         let start = clock.now
         await store.check()
         let s = try #require(store.session)
@@ -110,7 +110,7 @@ final class SentRequests {
     @Test func plusFifteenNeverOverfillsTheTrack() async throws {
         let clock = TestClock()
         let store = make(clock: clock)
-        store.begin(due: try due([bench]))
+        store.begin(split: try split([bench]))
         await store.check()
         store.adjustRest(by: 15)
         let s = try #require(store.session)
@@ -123,7 +123,7 @@ final class SentRequests {
     @Test func everyUpsertCarriesTheWholeSessionWithStableIds() async throws {
         let sent = SentRequests()
         let store = make(sent: sent)
-        store.begin(due: try due([bench]))
+        store.begin(split: try split([bench]))
         store.addSet(to: 0)
         await store.check()
         await store.check()
@@ -153,7 +153,7 @@ final class SentRequests {
         let sent = SentRequests()
         let health = FakeHealthWriter()
         let store = make(sent: sent, health: health)
-        store.begin(due: try due([bench]))
+        store.begin(split: try split([bench]))
         await store.check()
         let id = await store.finish()
         let last = try #require(sent.workouts.last)
@@ -168,7 +168,7 @@ final class SentRequests {
         let health = FakeHealthWriter()
         health.failNext = true
         let store = make(sent: sent, health: health)
-        store.begin(due: try due([bench]))
+        store.begin(split: try split([bench]))
         await store.check()
         #expect(await store.finish() != nil)
         #expect(sent.workouts.last?.session.endedAt != nil)
@@ -178,7 +178,7 @@ final class SentRequests {
     @Test func watchSessionMakesThePhoneReadOnly() async throws {
         let sent = SentRequests()
         let store = make(sent: sent)
-        store.begin(due: try due([bench]))
+        store.begin(split: try split([bench]))
         store.watchSessionLive = true
         await store.check()
         #expect(store.session?.sets.isEmpty == true)

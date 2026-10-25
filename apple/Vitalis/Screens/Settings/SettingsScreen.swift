@@ -34,6 +34,7 @@ struct SettingsScreen: View {
                 .navigationDestination(for: SettingsPage.self) { page in
                     switch page {
                     case .sync: SyncScreen(model: model, sync: sync)
+                    case .splits: SplitsScreen()
                     }
                 }
         }
@@ -90,6 +91,7 @@ struct SettingsScreen: View {
                 }
                 row(.restS, t?.values.restS.map(Double.init), key: "Default rest")
                 row(.crownStepKg, t?.values.crownStepKg)
+                SettingsRow(key: "Splits", value: "Edit") { router.settingsPath.append(.splits) }
                 SettingsRow(key: "Workout start", value: startChoice) { choosingStart = true }
             }
 

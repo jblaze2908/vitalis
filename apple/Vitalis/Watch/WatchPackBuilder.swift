@@ -44,32 +44,35 @@ enum WatchPackBuilder {
         .prefix(recentSessionCount).map { $0 }
     }
 
-    /// Ids whose `GET /v2/exercises/:id` the sender fetches: due, recent sessions, recent exercises.
+    /// Ids whose `GET /v2/exercises/:id` the sender fetches: every split's, recent sessions', recent exercises.
     static func neededExerciseIDs(_ inputs: Inputs) -> [String] {
         var seen = Set<String>()
-        let ids = (inputs.training?.due?.exercises.map(\.id) ?? []) + recentSessions(inputs).flatMap(\.exerciseIDs)
+        let ids = (inputs.training?.splits ?? []).flatMap { $0.exercises.map(\.id) } + recentSessions(inputs).flatMap(\.exerciseIDs)
             + recentExerciseIDs(inputs)
         return ids.filter { seen.insert($0).inserted }
     }
 
     static func build(_ inputs: Inputs, generatedAt: Date) -> WatchPack {
-        let due = inputs.training?.due.map {
-            WatchPack.Due(template: $0.template, name: $0.name, daysSince: $0.daysSince, exerciseIDs: $0.exercises.map(\.id))
+        let serverSplits = inputs.training?.splits ?? []
+        // Server order, unranked (11 §7.3).
+        let splits = serverSplits.map {
+            WatchPack.Split(id: $0.id, template: $0.templateID, name: $0.name, ready: $0.ready, daysSince: $0.daysSince,
+                            exerciseIDs: $0.exercises.map(\.id))
         }
-        let dueNames = Dictionary(inputs.training?.due?.exercises.map { ($0.id, $0.name) } ?? [], uniquingKeysWith: { a, _ in a })
+        let splitNames = Dictionary(serverSplits.flatMap { $0.exercises.map { ($0.id, $0.name) } }, uniquingKeysWith: { a, _ in a })
         var exercises: [String: WatchPack.Exercise] = [:]
         for id in neededExerciseIDs(inputs) {
-            exercises[id] = exercise(detail: inputs.exercises[id], info: inputs.catalog[id], dueName: dueNames[id])
+            exercises[id] = exercise(detail: inputs.exercises[id], info: inputs.catalog[id], splitName: splitNames[id])
         }
         let values = inputs.targets?.values
         let pack = WatchPack(generatedAt: timestamp(generatedAt),
                              settings: .init(restS: values?.restS, crownStepKg: values?.crownStepKg),
-                             due: due, recentSessions: recentSessions(inputs), exercises: exercises,
+                             splits: splits, recentSessions: recentSessions(inputs), exercises: exercises,
                              recentExerciseIDs: recentExerciseIDs(inputs))
         return trimmed(pack)
     }
 
-    static func exercise(detail: ExerciseDetail?, info: ExerciseInfo?, dueName: String?) -> WatchPack.Exercise? {
+    static func exercise(detail: ExerciseDetail?, info: ExerciseInfo?, splitName: String?) -> WatchPack.Exercise? {
         if let detail {
             let e = detail.exercise
             return WatchPack.Exercise(name: e.name, equipment: e.equipment, primary: e.primary, secondary: e.secondary,
@@ -79,7 +82,7 @@ enum WatchPackBuilder {
             return WatchPack.Exercise(name: info.name, equipment: info.equipment, primary: info.primary, secondary: info.secondary,
                                       aliases: info.aliases)
         }
-        return dueName.map { WatchPack.Exercise(name: $0, primary: [], secondary: []) }
+        return splitName.map { WatchPack.Exercise(name: $0, primary: [], secondary: []) }
     }
 
     /// Last session's sets and the server's `next` suggestion, as returned.
@@ -89,11 +92,11 @@ enum WatchPackBuilder {
         return sets.isEmpty && next == nil ? nil : WatchPack.Prefill(sets: sets, next: next)
     }
 
-    /// Drops the oldest recent exercises (never the due template's or a recent session's) until the pack fits.
+    /// Drops the oldest recent exercises (never a split's, a recent session's or the plan's) until the pack fits.
     /// Encodes once per drop, and only when the first encode is over the limit.
     static func trimmed(_ pack: WatchPack, limit: Int = byteLimit) -> WatchPack {
         var out = pack
-        let keep = Set((pack.due?.exerciseIDs ?? []) + pack.recentSessions.flatMap(\.exerciseIDs) + (pack.plan?.exerciseIDs ?? []))
+        let keep = Set(pack.splits.flatMap(\.exerciseIDs) + pack.recentSessions.flatMap(\.exerciseIDs) + (pack.plan?.exerciseIDs ?? []))
         var droppable = pack.recentExerciseIDs.reversed().filter { !keep.contains($0) }
         while size(out) > limit, !droppable.isEmpty {
             let id = droppable.removeFirst()
@@ -130,8 +133,8 @@ enum WatchPackBuilder {
         Task { await refresh() }
     }
 
-    /// Per wake or Today refresh, throttled to 15 min. One run: training, targets, sessions, ≤ 10 session details,
-    /// the catalog and ≤ ~26 exercise details, all ETag-revalidated (mostly 304s), details fetched concurrently.
+    /// Per wake or Today refresh, throttled to 15 min. One run: training, targets, sessions, ≤ 10 session details, the catalog
+    /// and one exercise detail per needed id (every split's + recent), all ETag-revalidated (mostly 304s), fetched concurrently.
     func refresh() async {
         let relay = PhoneSessionDelegate.shared
         guard !running, relay.channel?.hasWatchApp == true, let api = Services.shared.api else { return }

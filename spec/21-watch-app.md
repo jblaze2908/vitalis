@@ -14,7 +14,7 @@ Visual measurements: [apple/briefs/02-watch-logger.md](../apple/briefs/02-watch-
 
 | Screen | Frame | Data source |
 |---|---|---|
-| Start | `spec/design/30-watch-start.png` | `WatchPack.due` + `WatchPack.recentSessions` |
+| Start | `spec/design/30-watch-start.png` | `WatchPack.splits` + `WatchPack.recentSessions` |
 | Set entry | `spec/design/31-watch-set-entry.png` | Live session + `WatchPack.exercises[id].prefill` |
 | Rest | `spec/design/32-watch-rest.png` | Live session; `WatchPack.settings.rest_s` |
 | Summary | `spec/design/33-watch-summary.png` | Live session; `session.heat` + `prs` relayed from the server response |
@@ -24,12 +24,13 @@ Visual measurements: [apple/briefs/02-watch-logger.md](../apple/briefs/02-watch-
 | Add exercise | **no approved frame** | `WatchPack.catalog` |
 | End workout | **no approved frame** | Live session |
 
-Flow: Start → (Start) → Set entry → (Log set) → Rest → (timer ends / tap) → Set entry for the next set … → after the planned sets of an exercise → Next-exercise handoff → Set entry … → End → Summary → Done → Start. Started from the phone (`startWatchApp`), the app skips Start and opens Set entry for the plan the phone sent.
+Flow: Start → (a split row) → Set entry → (Log set) → Rest → (timer ends / tap) → Set entry for the next set … → after the planned sets of an exercise → Next-exercise handoff → Set entry … → End → Summary → Done → Start. Started from the phone (`startWatchApp`), the app skips Start and opens Set entry for the plan the phone sent; with no plan it stays on Start.
 
 ### 2.1 Start (frame 30)
-- MonoLabel `FRESH · <N> DAYS` in `good` from `due.days_since` (`NEW` when null), Headline 54 pt the template name, PrimaryButton **Start**.
-- Rows below (35 pt, rule on top): `Repeat <title>` for the last 3 sessions (`recentSessions`, right label = weekday), then `Choose exercises` (opens Add exercise to build a session from scratch).
-- No pack yet (fresh install, phone never reachable): headline `Workout`, Start opens Add exercise.
+- Headline 54 pt `Workout`; nothing names a split ([11 §7.3](11-scoring.md#73-ready-splits)).
+- One row per split in pack order (35 pt, rule on top): the split name, right label `FRESH · <N> DAYS` / `NEW` in `good` when ready, `LOADED` in steel when not (still tappable). Tapping starts a session titled with the split's name; a split with no exercises opens Add exercise.
+- Then `Repeat <title>` for up to 3 recent sessions whose title no split has (`recentSessions`, right label = weekday), then `Choose exercises` (opens Add exercise to build a session from scratch).
+- No pack yet (fresh install, phone never reachable): headline `Workout` and `Choose exercises` only.
 
 ### 2.2 Set entry (frame 31)
 - Top label `<EXERCISE> · <SET>/<PLANNED>`. Weight Number 75 pt + `KG`; reps Headline 25 pt `6 REPS`; small label `LAST 97.5` (last time's weight for this set number).
@@ -145,7 +146,8 @@ All messages are `Codable` enums encoded to `[String: Any]` via JSON, defined on
 {
   "generated_at": "2026-10-24T09:41:02+05:30",
   "settings": { "rest_s": 120, "crown_step_kg": 2.5 },
-  "due": { "template": "legs", "name": "Legs", "days_since": 6, "exercise_ids": ["barbell-squat", "romanian-deadlift", "leg-press", "lying-leg-curls", "standing-calf-raises"] },
+  "splits": [ { "id": "lower", "template": "lower", "name": "Lower", "ready": true, "days_since": 6, "exercise_ids": ["barbell-squat", "romanian-deadlift", "leg-press"] },
+              { "id": "history:push", "template": null, "name": "Push", "ready": false, "days_since": 1, "exercise_ids": ["barbell-bench-press-medium-grip"] } ],
   "recent_sessions": [ { "title": "Push", "template": "push", "day": "2026-10-22", "exercise_ids": ["barbell-bench-press-medium-grip"] } ],
   "exercises": {
     "barbell-squat": { "name": "Barbell Squat", "primary": ["quadriceps"], "secondary": ["calves","glutes","hamstrings","lower-back"],
@@ -155,7 +157,7 @@ All messages are `Codable` enums encoded to `[String: Any]` via JSON, defined on
 }
 ```
 
-`exercises` covers the due template, the recent sessions' exercises and the 20 most recent exercises, using `GET /v2/exercises/:id` responses (`last_session`, `next`). Keep the encoded pack under 64 KB (design limit; drop the oldest recent exercises first).
+`exercises` covers every split, the recent sessions' exercises and the 20 most recent exercises, using `GET /v2/exercises/:id` responses (`last_session`, `next`). Keep the encoded pack under 64 KB (design limit; drop the oldest recent exercises first).
 
 Phone side (`Vitalis/Watch/PhoneSessionDelegate.swift`):
 
