@@ -192,7 +192,7 @@ Cardio needs no split: Apple's Workout app records it and it syncs as a Watch wo
 
 ### 7.3 Ready splits
 
-A split is **ready** when every one of its muscles has heat ≤ 1 (a split with no muscles is always ready). The list keeps the order above. Nothing is ranked or picked: the app offers the splits as equal choices and never names one. Each split's `days_since` = the minimum over its muscles (`null` when never trained, label `NEW`). `fresh_label` = `<Name> fresh` for one ready split, `<n> splits fresh` for more, `null` for none. **Trainable** (verdict input) = some split is ready, or no splits exist yet.
+A split is **ready** when every one of its muscles has heat ≤ 1 (a split with no muscles is always ready). The list keeps the order above. Nothing is ranked or picked: the app offers the splits as equal choices and never names one. Each split's `days_since` = the minimum over its muscles (`null` when never trained, label `NEW`). `fresh_label` = `<Name> fresh` for one ready split, `<n> splits fresh` for more, `null` for none. **Trainable** (verdict input) = some split is ready; with no splits yet, no muscle is loaded (`loaded_label` is `null`).
 
 ### 7.4 Session heat (Watch summary, session detail)
 

@@ -15,6 +15,8 @@ struct WorkoutStartSheet: View {
     @AppStorage("rememberedStart") private var rememberedStart = ""
     @State private var remember = false
     @State private var chosen: String?
+    /// Nothing reads as selected until the owner taps a row, Empty workout included.
+    @State private var picked = false
     @State private var watchError: String?
     @State private var starting = false
 
@@ -82,7 +84,7 @@ struct WorkoutStartSheet: View {
         VStack(spacing: 0) {
             Rule()
             ForEach(splits) { s in choiceRow(s.name, detail: Self.detail(s), dim: !s.ready, on: chosen == s.id) { pick(s.id) } }
-            choiceRow("Empty workout", detail: "Pick as you go", dim: false, on: chosen == nil && !splits.isEmpty) { pick(nil) }
+            choiceRow("Empty workout", detail: "Pick as you go", dim: false, on: picked && chosen == nil) { pick(nil) }
         }
     }
 
@@ -111,7 +113,7 @@ struct WorkoutStartSheet: View {
     }
 
     private func pick(_ id: String?) {
-        chosen = id
+        chosen = id; picked = true
         guard actsOnAppear else { return }
         Task { await startRemembered() }
     }

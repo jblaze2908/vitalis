@@ -88,3 +88,14 @@ test("GET /v2/today: read scope, ETag with 304, and a food write changes the ETa
   assert.equal((await http("GET", "/v2/digest", { token: read })).status, 200);
   assert.equal((await http("GET", "/v2/today?date=2999-01-01", { token: read })).status, 400);
 });
+
+test("no splits yet but a muscle is loaded: Muscles still loaded, not Train hard", async () => {
+  const { logSets } = await import("../dist/src/training.js");
+  const sets = Array.from({ length: 6 }, (_, i) => ({ exercise: "barbell-squat", weight_kg: 100, reps: 5, performed_at: `${addDays(GOOD, -1)}T18:${String(10 + i).padStart(2, "0")}:00+05:30` }));
+  const id = logSets({ title: "Workout", sets }, "test").session.id;
+  const t = todayBody(GOOD, at(GOOD, "09:41"));
+  assert.deepEqual(t.training.splits, [], "a generic title is not a split");
+  assert.equal(t.training.loaded_label, "Quadriceps loaded");
+  assert.equal(t.verdict.headline, "Muscles still loaded");
+  run("UPDATE sets SET deleted_at=1 WHERE session_id=?", id); run("UPDATE sessions SET deleted_at=1 WHERE id=?", id); markDirty([addDays(GOOD, -1), GOOD]);
+});

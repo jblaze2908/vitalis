@@ -94,7 +94,8 @@ function assemble(day: string, at: number) {
   const v = verdict({
     recovery: { band: rec.band as Verdict["band"], score: rec.score, reason: rec.reason },
     hints: { hrv: { arrow: rec.parts.hrv.arrow as never, tint: rec.parts.hrv.tint as never }, resting_hr: { arrow: rec.parts.resting_hr.arrow as never, tint: rec.parts.resting_hr.tint as never } },
-    trainable: training.splits.length === 0 || training.splits.some((s) => s.ready), strength_today: last ? { title: last.title ?? "Workout", sets: sessions.reduce((n, s) => n + s.working, 0) } : null,
+    // No splits yet: a loaded muscle is a fact worth saying; otherwise anything goes.
+    trainable: training.splits.length ? training.splits.some((s) => s.ready) : training.loaded_label === null, strength_today: last ? { title: last.title ?? "Workout", sets: sessions.reduce((n, s) => n + s.working, 0) } : null,
     kcal_left: kcalLeft, next_slot: slot, now_min: day === todayOf(at) ? nowMin : 12 * 60, bed_by_min: day === todayOf(at) ? night.bed_by_min : null,
   });
   return { off, scores, rec, targets, night, sums, slot, kcalLeft, training, v };
