@@ -210,6 +210,8 @@ Field rules:
 - `training.heat` always has all 17 slugs ([11 §7.1](11-scoring.md#71-muscle-load-and-heat-17-muscles)). `splits` lists the owner's splits, defined then history, each with `ready` ([11 §7.2–7.3](11-scoring.md#72-splits)); it may be empty. `due` is always `null`; it stays only so older app builds still decode.
 - `pulse` resolves the PulseLine time→x question: `window.start` = today's wake (`sleep_end` of today's night; 06:00 local if none), `window.end` = `bed_by` ([11 §9.2](11-scoring.md#92-tonight)). Events (each draws a dip): `wake`, `weigh_in` (weight entry or HealthKit weight sample time), `meal` (first `eaten_at` of each `meal_id`), `workout` (session `started_at`). Events after `now` are omitted. The app maps `x = (t − start) / (end − start)` clamped to 0…1.
 - `digest.available`: see `GET /v2/digest`.
+- `recovery.bands` = the band floors `{ready, steady, ease}` (below `ease` is rest), so the app draws the band bar without its own copy. `recovery.parts.hrv.week` and `resting_hr.week`: seven daily values ending on `day`, oldest first, `null` where none was recorded (Today's sparklines).
+- `sleep`: the night ending on `day` (`asleep_h`, `need_h` after any nap credit, `score`, `band`), or `null` when there's no night. Naps are not in `asleep_h` ([11 §3](11-scoring.md)).
 
 ### GET /v2/digest — read
 

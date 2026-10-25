@@ -111,7 +111,7 @@ test("barcode status 0 is found:false, cached for a day, then refetched", async 
   handler = () => resp(404, { status: 0, status_verbose: "product not found" });
   const miss = { code: "8904109450018", found: false, source: "openfoodfacts", item: null, label: "NOT IN OPEN FOOD FACTS YET" };
   assert.deepEqual(await barcode("8904109450018"), miss);
-  assert.equal(calls[0].url, "https://world.openfoodfacts.org/api/v2/product/8904109450018?fields=code,product_name,brands,serving_size,serving_quantity,quantity,nutriments");
+  assert.equal(calls[0].url, "https://world.openfoodfacts.org/api/v2/product/8904109450018?fields=code,product_name,brands,serving_size,serving_quantity,quantity,product_quantity,product_quantity_unit,nutriments");
   t += DAY - 1;
   assert.deepEqual(await barcode("8904109450018"), miss);
   assert.equal(calls.length, 1);
@@ -125,7 +125,7 @@ test("a found barcode is cached for 30 days; found without kcal counts as not fo
     : resp(200, { status: 1, product: { code: "8901063010031", product_name: "Lassi", brands: "Amul", quantity: "200 ml bottle", serving_size: "200 ml bottle", serving_quantity: "200",
       nutriments: { "energy-kcal_100g": 72, proteins_100g: 3, carbohydrates_100g: 11, fat_100g: 2 } } });
   const want = { code: "8901063010031", found: true, source: "openfoodfacts",
-    item: { name: "Lassi", brand: "Amul", quantity_label: "200 ML BOTTLE", per_100g: { kcal: 72, protein_g: 3, carbs_g: 11, fat_g: 2 },
+    item: { name: "Lassi", brand: "Amul", quantity_label: "200 ML BOTTLE", package_g: 200, per_100g: { kcal: 72, protein_g: 3, carbs_g: 11, fat_g: 2 },
       serving: { label: "200 ML BOTTLE", grams: 200, kcal: 144, protein_g: 6, carbs_g: 22, fat_g: 4 } },
     label: "200 ML BOTTLE · OPEN FOOD FACTS" };
   assert.deepEqual(await barcode("8901063010031"), want);
@@ -191,4 +191,13 @@ test("User-Agent carries the contact e-mail when set, else the self-hosted fallb
     console.warn = warn;
     if (saved === undefined) delete process.env.VITALIS_CONTACT_EMAIL; else process.env.VITALIS_CONTACT_EMAIL = saved;
   }
+});
+
+test("a barcode carries the whole-pack size so the app can log half a pack", async () => {
+  handler = () => resp(200, { status: 1, product: { code: "8901491101837", product_name: "Classic Salted", brands: "Lay's", quantity: "52 g",
+    product_quantity: 52, product_quantity_unit: "g", nutriments: { "energy-kcal_100g": 536, proteins_100g: 6.5, carbohydrates_100g: 53, fat_100g: 34 } } });
+  const r = await barcode("8901491101837");
+  assert.deepEqual([r.item.package_g, r.item.per_100g.kcal, Math.round(r.item.per_100g.kcal * r.item.package_g / 2 / 100)], [52, 536, 139]);
+  handler = () => resp(200, { status: 1, product: { code: "8901491101844", product_name: "Mixed nuts", quantity: "1 jar", nutriments: { "energy-kcal_100g": 600 } } });
+  assert.equal((await barcode("8901491101844")).item.package_g, null);
 });

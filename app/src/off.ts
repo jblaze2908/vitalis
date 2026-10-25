@@ -16,7 +16,7 @@ export type SearchItem = {
 export type SearchBody = {
   q: string; page: number; remote: "ok" | "rate_limited" | "unavailable"; count: number; results: SearchItem[]; next_page: number | null;
 };
-export type BarcodeItem = { name: string; brand: string | null; quantity_label: string | null; per_100g: Macros | null; serving: Serving };
+export type BarcodeItem = { name: string; brand: string | null; quantity_label: string | null; package_g?: number | null; per_100g: Macros | null; serving: Serving };
 export type BarcodeBody = { code: string; found: boolean; source: "openfoodfacts" | "you"; item: BarcodeItem | null; label: string };
 
 const VERSION = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -25,7 +25,7 @@ const SEARCH_TTL = 7 * DAY_MS, FOUND_TTL = 30 * DAY_MS, MISSING_TTL = DAY_MS;
 const MAX_PAGE = 100, MAX_Q = 100, LOCAL_MAX = 5, TIMEOUT_MS = 5000;
 const NOT_FOUND_LABEL = "NOT IN OPEN FOOD FACTS YET";
 const SEARCH_FIELDS = "code,product_name,brands,serving_size,serving_quantity,nutriments";
-const PRODUCT_FIELDS = "code,product_name,brands,serving_size,serving_quantity,quantity,nutriments";
+const PRODUCT_FIELDS = "code,product_name,brands,serving_size,serving_quantity,quantity,product_quantity,product_quantity_unit,nutriments";
 
 // Continuous refill (cap per 60 s), process-wide: OFF limits are per IP (10 search, 15 product/min); we stay under both.
 type Bucket = { cap: number; tokens: number; at: number | null };
@@ -97,7 +97,17 @@ function normalise(p: Record<string, unknown>): BarcodeItem | null {
   const label = useSq ? (str(p.serving_size, 60)?.toUpperCase() ?? `${grams} G`) : "100 G";
   // Brands come as "A, B" from the product API and as an array from Search-a-licious; show the first.
   const brand = str(p.brands)?.split(",")[0].trim() || null;
-  return { name, brand, quantity_label: str(p.quantity, 60)?.toUpperCase() ?? null, per_100g: scale(per, 1), serving: { label, grams, ...scale(per, grams / 100) } };
+  return { name, brand, quantity_label: str(p.quantity, 60)?.toUpperCase() ?? null, package_g: packageGrams(p), per_100g: scale(per, 1), serving: { label, grams, ...scale(per, grams / 100) } };
+}
+
+/** Whole-pack size in g (or ml, which per_100g also uses for drinks), so the app can offer ½ or ¼ of a pack; null when unknown. */
+function packageGrams(p: Record<string, unknown>): number | null {
+  const unit = str(p.product_quantity_unit)?.toLowerCase();
+  const q = num(p.product_quantity);
+  if (q != null && q > 0 && q <= 5000 && (!unit || unit === "g" || unit === "ml")) return r1(q);
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*(g|ml)\b/i.exec(str(p.quantity, 60) ?? "");
+  const v = m ? Number(m[1].replace(",", ".")) : null;
+  return v != null && v > 0 && v <= 5000 ? r1(v) : null;
 }
 
 type EntryRow = { name: string; portion_text: string | null; grams: number | null; kcal: number; protein_g: number | null; carbs_g: number | null; fat_g: number | null; estimate: number };

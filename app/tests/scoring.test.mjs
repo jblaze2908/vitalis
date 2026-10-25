@@ -193,7 +193,7 @@ test("§5 verdict rules 1–9", () => {
     [{ recovery: { band: null, score: null, reason: "Needs 9 more nights" } }, 3, "Fresh to train", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
     [{ recovery: { band: null, score: null }, trainable: false }, 4, "No score yet", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
     [{}, 5, "Train hard today", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
-    [{ recovery: { band: "steady", score: 70 } }, 6, "Train as planned", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
+    [{ recovery: { band: "steady", score: 70 } }, 6, "Train normally", { kind: "start_workout", label: "Start workout", template: null, intensity: "normal" }],
     [{ recovery: { band: "ease", score: 50 } }, 7, "Go easy today", { kind: "start_workout", label: "Start light workout", template: null, intensity: "light" }],
     [{ trainable: false }, 8, "Muscles still loaded", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],
     [{ recovery: { band: "rest", score: 30 } }, 9, "Rest today", { kind: "log_meal", label: "Log lunch", slot: "lunch" }],

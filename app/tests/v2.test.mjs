@@ -644,3 +644,17 @@ test("the sleep API lists naps beside the night and credits them to the next nig
   const week = (await http("GET", "/v2/sleep/week?end=2026-09-15", { token: readToken })).json.nights.at(-2);
   assert.deepEqual([week.day, week.asleep_h, week.nap_h, week.sleep_start.slice(11, 16)], ["2026-09-14", 7, 1, "01:00"]);
 });
+
+test("sleep shows the night's stages in order, week averages, and a month of nights", async () => {
+  await post(batch([sleep(3, "2026-06-08", "23:30", "23:30", { end: at("2026-06-09", "01:00") }), sleep(4, "2026-06-09", "01:00", "02:00"),
+    sleep(2, "2026-06-09", "02:00", "02:10"), sleep(5, "2026-06-09", "02:10", "03:00"), sleep(3, "2026-06-09", "03:00", "06:30"),
+    sleep(3, "2026-06-10", "01:00", "07:00")]));
+  const d = (await http("GET", "/v2/sleep?date=2026-06-09", { token: readToken })).json;
+  assert.deepEqual(d.night.segments.map((x) => x.stage), ["core", "deep", "awake", "rem", "core"]);
+  assert.equal(d.night.segments[0].start, at("2026-06-08", "23:30"));
+  const w = (await http("GET", "/v2/sleep/week?end=2026-06-10", { token: readToken })).json;
+  assert.deepEqual([w.avg.nights, w.avg.asleep_h, w.avg.bedtime, w.avg.wake, w.avg.missing], [2, 6.42, "00:15", "06:45", 5]);
+  const m = (await http("GET", "/v2/sleep/month?month=2026-06", { token: readToken })).json;
+  assert.deepEqual([m.days.length, m.avg.nights, m.prev_month, m.next_month], [30, 2, "2026-05", "2026-07"]);
+  assert.equal((await http("GET", "/v2/sleep/month?month=2026-6", { token: readToken })).status, 400);
+});

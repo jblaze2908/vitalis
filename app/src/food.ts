@@ -57,7 +57,9 @@ export const savedSchema = z.strictObject({ id: z.string().min(1).max(64), name:
 const MIN = 60_000;
 const r1 = (v: number | null) => (v === null ? null : Math.round(v * 10) / 10);
 const entryView = (e: EntryRow) => ({ id: e.id, meal_id: e.meal_id, name: e.name, portion_text: e.portion_text, grams: e.grams, kcal: Math.round(e.kcal),
-  protein_g: r1(e.protein_g), carbs_g: r1(e.carbs_g), fat_g: r1(e.fat_g), estimate: !!e.estimate, source: e.source });
+  protein_g: r1(e.protein_g), carbs_g: r1(e.carbs_g), fat_g: r1(e.fat_g), estimate: !!e.estimate, source: e.source,
+  // What an edit re-posts unchanged: the app updates an entry by sending it again with the same id.
+  slot: e.slot, eaten_at: isoAt(e.eaten_at, e.tz_offset_min), source_ref: e.source_ref, hk_uuid: e.hk_uuid });
 const itemView = (e: Pick<EntryRow, "name" | "portion_text" | "grams" | "kcal" | "protein_g" | "carbs_g" | "fat_g">) => ({ name: e.name, portion_text: e.portion_text,
   grams: e.grams, kcal: Math.round(e.kcal), protein_g: r1(e.protein_g), carbs_g: r1(e.carbs_g), fat_g: r1(e.fat_g) });
 const sum = (xs: (number | null)[]) => xs.reduce<number>((a, b) => a + (b ?? 0), 0);

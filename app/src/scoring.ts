@@ -279,7 +279,7 @@ export function verdict(i: VerdictInput): Verdict {
   }
   if (!i.trainable) return out(8, "Muscles still loaded", recoveryReason(i), logMeal(i.next_slot));
   if (band === "ready") return out(5, "Train hard today", recoveryReason(i), startWorkout());
-  if (band === "steady") return out(6, "Train as planned", recoveryReason(i), startWorkout());
+  if (band === "steady") return out(6, "Train normally", recoveryReason(i), startWorkout());
   return out(7, "Go easy today", `${recoveryReason(i)} No records today.`, startWorkout(true));
 }
 

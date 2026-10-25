@@ -133,7 +133,7 @@ Rules, first match wins:
 | 3 | Recovery `null` (missing or calibrating) and trainable | `Fresh to train` | `start_workout`, `Start workout` |
 | 4 | Recovery `null`, not trainable | `No score yet` | `log_meal` next slot |
 | 5 | band **ready** and trainable | `Train hard today` | `start_workout`, `Start workout` |
-| 6 | band **steady** and trainable | `Train as planned` | `start_workout`, `Start workout` |
+| 6 | band **steady** and trainable | `Train normally` (no schedule is assumed) | `start_workout`, `Start workout` |
 | 7 | band **ease** and trainable | `Go easy today` (reason adds "No records today") | `start_workout` with `intensity: "light"`, `Start light workout` |
 | 8 | band **ready/steady/ease**, not trainable | `Muscles still loaded` | `log_meal` next slot |
 | 9 | band **rest** | `Rest today` | `log_meal` next slot (if nothing left to eat: `bed_reminder`) |

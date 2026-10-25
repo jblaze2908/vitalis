@@ -7,6 +7,7 @@ import { daySums, mealTimes, nextSlot, type Slot } from "./food.js";
 import { stepsTarget } from "./fuel.js";
 import { freshnessBlock } from "./health.js";
 import { digestHeadline, verdict, type Verdict } from "./scoring.js";
+import { RECOVERY, roundHalfAway } from "./scoring-config.js";
 import { baseline, daily, nights } from "./stats.js";
 import { addDays, isoAt, localDay, ownerOffsetMin, today as todayOf } from "./time.js";
 import { effectiveTargets } from "./targets.js";
@@ -103,12 +104,20 @@ function assemble(day: string, at: number) {
 
 const verdictView = (v: Verdict) => ({ band: v.band, label: v.label, headline: v.headline, reason: v.reason, action: v.action });
 
+/** Seven days ending on `day`, oldest first, null where nothing was recorded: Today's HRV and resting-HR sparklines. */
+const week = (key: string, day: string) => {
+  const m = daily(key, addDays(day, -6), day);
+  return Array.from({ length: 7 }, (_, i) => { const v = m.get(addDays(day, i - 6)); return v === undefined ? null : roundHalfAway(v, 1); });
+};
+
 export function todayBody(day: string, at = Date.now()) {
-  const a = assemble(day, at);
+  const a = assemble(day, at), n = nights(day, day)[0] ?? null, sl = a.scores.sleep;
   return {
     day, generated_at: isoAt(at, a.off),
     verdict: verdictView(a.v),
-    recovery: a.rec,
+    recovery: { ...a.rec, bands: RECOVERY.BANDS,
+      parts: { ...a.rec.parts, hrv: { ...a.rec.parts.hrv, week: week("hrv", day) }, resting_hr: { ...a.rec.parts.resting_hr, week: week("resting_hr", day) } } },
+    sleep: n ? { asleep_h: roundHalfAway(n.asleep_h, 2), need_h: sl?.need_h ?? null, score: sl?.score ?? null, band: sl?.band ?? null } : null,
     fuel: { kcal_target: a.targets.kcal, kcal_eaten: Math.round(a.sums.kcal), kcal_left: a.kcalLeft,
       protein_target_g: a.targets.protein_g, protein_g: Math.round(a.sums.protein_g), next_slot: a.slot, next_label: `LOG ${a.slot.toUpperCase()}` },
     activity: activity(day, at, a.targets.steps),
