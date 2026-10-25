@@ -13,6 +13,7 @@ struct SettingsScreen: View {
     @State private var editing: SettingsEdit?
     @State private var replacing = false
     @State private var choosingStart = false
+    @State private var settingGoal = false
     @State private var confirmReset = false
     @State private var message: String?
     @AppStorage("rememberedStart") private var rememberedStart: String?
@@ -42,6 +43,7 @@ struct SettingsScreen: View {
         .task(id: services.writesVersion) { await load() }
         .sheet(item: $editing) { edit in editSheet(edit) }
         .sheet(isPresented: $replacing) { ReplaceTokenSheet(sync: sync) }
+        .sheet(isPresented: $settingGoal) { GoalSheet(targets: targets.value) }
         .confirmationDialog("Workout start", isPresented: $choosingStart, titleVisibility: .visible) {
             Button("Ask each time") { rememberedStart = nil }
             Button("Apple Watch") { rememberedStart = "watch" }
@@ -82,7 +84,9 @@ struct SettingsScreen: View {
                 SettingsRow(key: "Calories", value: calories(t), tint: t?.effective.kcal == nil ? .steel : .bone) { editing = .target(.kcal) }
                 row(.proteinG, t?.effective.proteinG)
                 row(.sleepNeedH, t?.effective.sleepNeedH)
-                row(.goalWeightKg, t?.values.goalWeightKg)
+                SettingsRow(key: "Goal", value: Self.goalText(t), tint: t?.values.goal == nil && t?.values.goalWeightKg == nil ? .steel : .bone) {
+                    settingGoal = true
+                }
             }
 
             SettingsGroup(title: "Training") {
@@ -142,6 +146,14 @@ struct SettingsScreen: View {
     private func weeklySets(_ t: TargetsResponse?) -> String {
         guard let lo = t?.values.weeklySetsMin, let hi = t?.values.weeklySetsMax else { return "–" }
         return "\(lo)–\(hi)"
+    }
+
+    /// "Lose · 80.0 kg", "Maintain", or "Set" when neither is stored.
+    static func goalText(_ t: TargetsResponse?) -> String {
+        let goal = (t?.values.goal ?? t?.plan?.goal)?.capitalized
+        let kg = t?.values.goalWeightKg.map { String(format: "%.1f kg", $0) }
+        let parts = [goal, goal == "Maintain" ? nil : kg].compactMap { $0 }
+        return parts.isEmpty ? "Set" : parts.joined(separator: " · ")
     }
 
     private var startChoice: String {

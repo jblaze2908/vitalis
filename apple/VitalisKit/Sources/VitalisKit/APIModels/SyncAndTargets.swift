@@ -46,6 +46,8 @@ public struct TargetsResponse: Codable, Sendable, Equatable {
         public let sleepNeedH: Double?
         public let wakeTime: String?
         public let goalWeightKg: Double?
+        /// `lose` | `maintain` | `gain`; nil from older servers or when unset.
+        public let goal: String?
         public let exerciseMin: Int?
         public let weeklySetsMin: Int?
         public let weeklySetsMax: Int?
@@ -68,12 +70,27 @@ public struct TargetsResponse: Codable, Sendable, Equatable {
         public let steps, kcal, proteinG, sleepNeedH, goalWeightKg: Suggestion?
     }
     public struct IsSet: Codable, Sendable, Equatable {
-        public let steps, kcalMode, kcal, proteinG, sleepNeedH, wakeTime, goalWeightKg: Bool?
+        public let steps, kcalMode, kcal, proteinG, sleepNeedH, wakeTime, goalWeightKg, goal: Bool?
         public let exerciseMin, weeklySetsMin, weeklySetsMax, restS, crownStepKg: Bool?
+    }
+    /// How the calorie target follows from the goal (10 §3, 11 §8.2).
+    public struct Plan: Codable, Sendable, Equatable {
+        public let goal: String?
+        public let goalWeightKg: Double?
+        public let trendKg: Double?
+        public let rateKgWeek: Double
+        public let maintenanceKcal: Int?
+        public let kcal: Int?
+        public let kcalMode: String?
+        /// `adaptive` (logged food + weight), `watch` (resting + active energy) or `estimate` (30 kcal per kg).
+        public let basis: String
+        public let reached: Bool
     }
     public let values: Values
     public let effective: Effective
     public let suggested: Suggested?
+    /// Nil from servers older than goals.
+    public let plan: Plan?
     public let isSet: IsSet?
     public let freshness: Freshness?
 }

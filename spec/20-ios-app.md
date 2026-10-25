@@ -121,8 +121,10 @@ Visual specifics are in the briefs; this is what each screen does.
 
 - **Finish**: a session still titled `Workout` asks for a name first (`Save and finish` / `Finish without a name`); named workouts become history splits.
 
+- **Eat goal prompt**: while `is_set.goal` is `false`, Eat shows `YOUR GOAL` with Set my goal (opens the Goal sheet) above the day. Servers without the flag don't prompt.
+
 ### Settings and Sync
-- Settings rows: SERVER (host, token in Keychain, last sync → Sync screen), TARGETS (from `GET /v2/targets`, edit → `PUT`), TRAINING (weekly sets range, default rest, crown step, Splits → list + editor: name and the muscles it needs fresh, via `GET /v2/splits` and direct `PUT`/`DELETE /v2/splits/:id` so a 409 duplicate name shows in the sheet; remembered start choice), Acknowledgements (Archivo OFL, Azeret Mono OFL, muscle map MIT), Reset local export state (existing), Replace token, version.
+- Settings rows: SERVER (host, token in Keychain, last sync → Sync screen), TARGETS (from `GET /v2/targets`, edit → `PUT`; **Goal** row → Goal sheet: Lose / Maintain / Gain + target weight, saved directly with `PUT /v2/targets {goal, goal_weight_kg}`, then the resulting kcal with its reasons from `plan`: maintenance and where it came from, the daily deficit or surplus and kg a week, weeks to the target, and when it starts adapting; lose needs a target below the current trend, gain above), TRAINING (weekly sets range, default rest, crown step, Splits → list + editor: name and the muscles it needs fresh, via `GET /v2/splits` and direct `PUT`/`DELETE /v2/splits/:id` so a 409 duplicate name shows in the sheet; remembered start choice), Acknowledgements (Archivo OFL, Azeret Mono OFL, muscle map MIT), Reset local export state (existing), Replace token, version.
 - Sync screen: existing `SyncView` content restyled, plus the Outbox (§5.3) count and Watch sets held count.
 - Token rejected (last exporter upload or any API call returned 401): frame `25-state-sync-token-rejected.png`, counts = exporter pending batches + outbox items + Watch sets not yet posted. `Replace token` → secure field → `TokenStore.save` → `syncNow()` + outbox flush. Record `firstAuthFailureAt` in `UserDefaults` for the `SINCE …` label; clear it on the next 200.
 

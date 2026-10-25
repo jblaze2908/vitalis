@@ -125,6 +125,7 @@ public struct TargetsPatch: Codable, Sendable, Equatable {
     public var sleepNeedH: TargetPatchValue<Double>?
     public var wakeTime: TargetPatchValue<String>?
     public var goalWeightKg: TargetPatchValue<Double>?
+    public var goal: TargetPatchValue<String>?
     public var exerciseMin: TargetPatchValue<Int>?
     public var weeklySetsMin: TargetPatchValue<Int>?
     public var weeklySetsMax: TargetPatchValue<Int>?
@@ -133,7 +134,7 @@ public struct TargetsPatch: Codable, Sendable, Equatable {
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case steps, kcalMode, kcal, proteinG, sleepNeedH, wakeTime, goalWeightKg
+        case steps, kcalMode, kcal, proteinG, sleepNeedH, wakeTime, goalWeightKg, goal
         case exerciseMin, weeklySetsMin, weeklySetsMax, restS, crownStepKg
     }
     public init(from decoder: any Decoder) throws {
@@ -144,7 +145,7 @@ public struct TargetsPatch: Codable, Sendable, Equatable {
         }
         steps = try field(.steps); kcalMode = try field(.kcalMode); kcal = try field(.kcal)
         proteinG = try field(.proteinG); sleepNeedH = try field(.sleepNeedH); wakeTime = try field(.wakeTime)
-        goalWeightKg = try field(.goalWeightKg); exerciseMin = try field(.exerciseMin)
+        goalWeightKg = try field(.goalWeightKg); goal = try field(.goal); exerciseMin = try field(.exerciseMin)
         weeklySetsMin = try field(.weeklySetsMin); weeklySetsMax = try field(.weeklySetsMax)
         restS = try field(.restS); crownStepKg = try field(.crownStepKg)
     }
@@ -154,7 +155,8 @@ public struct TargetsPatch: Codable, Sendable, Equatable {
         try c.encodeIfPresent(steps, forKey: .steps); try c.encodeIfPresent(kcalMode, forKey: .kcalMode)
         try c.encodeIfPresent(kcal, forKey: .kcal); try c.encodeIfPresent(proteinG, forKey: .proteinG)
         try c.encodeIfPresent(sleepNeedH, forKey: .sleepNeedH); try c.encodeIfPresent(wakeTime, forKey: .wakeTime)
-        try c.encodeIfPresent(goalWeightKg, forKey: .goalWeightKg); try c.encodeIfPresent(exerciseMin, forKey: .exerciseMin)
+        try c.encodeIfPresent(goalWeightKg, forKey: .goalWeightKg); try c.encodeIfPresent(goal, forKey: .goal)
+        try c.encodeIfPresent(exerciseMin, forKey: .exerciseMin)
         try c.encodeIfPresent(weeklySetsMin, forKey: .weeklySetsMin); try c.encodeIfPresent(weeklySetsMax, forKey: .weeklySetsMax)
         try c.encodeIfPresent(restS, forKey: .restS); try c.encodeIfPresent(crownStepKg, forKey: .crownStepKg)
     }

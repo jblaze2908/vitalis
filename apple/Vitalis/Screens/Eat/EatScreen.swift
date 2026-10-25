@@ -9,6 +9,9 @@ struct EatScreen: View {
     @State private var scanning = false
     /// Barcode handed to Describe; the sheet opens only after the scan cover has gone.
     @State private var describeCode: String?
+    /// Asked once until answered: the calorie target starts from the goal (11 §8.2).
+    @State private var needsGoal = false
+    @State private var settingGoal = false
 
     init(store: EatStore = .shared) { self.store = store }
 
@@ -17,6 +20,7 @@ struct EatScreen: View {
             EatChrome(status: status.label, tint: status.tint, pulse: store.todayPulse) {
                 ScrollView {
                     Group {
+                        if needsGoal { goalPrompt }
                         if let day = store.day.value {
                             if day.empty && !store.pending.contains(where: { $0.day == day.day }) { EmptyEat(day: day, store: store, open: open) }
                             else { loaded(day) }
@@ -37,6 +41,8 @@ struct EatScreen: View {
         .animation(.easeOut(duration: 0.2), value: store.toast)
         .sensoryFeedback(.success, trigger: store.toast?.mealID) { _, new in new != nil }
         .task { await store.load() }
+        .task(id: Services.shared.writesVersion) { await checkGoal() }
+        .sheet(isPresented: $settingGoal) { GoalSheet() }
         .onChange(of: Services.shared.writesVersion) { Task { await store.writesDelivered() } }
         .fullScreenCover(isPresented: $scanning, onDismiss: {
             guard let code = describeCode else { return }
@@ -59,6 +65,25 @@ struct EatScreen: View {
         case .offline(let label): return (label, .steel)
         case .stale(let label, _, _): return (label, .watch)
         }
+    }
+
+    private var goalPrompt: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            MonoLabel("Your goal", tint: .watch)
+            Text("Lose, maintain or gain? Your calorie target starts from your goal and target weight.").vBody()
+                .fixedSize(horizontal: false, vertical: true)
+            SecondaryButton("Set my goal", size: .compact) { settingGoal = true }
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rule() }
+    }
+
+    private func checkGoal() async {
+        guard let api = Services.shared.api else { return }
+        let t = try? await api.targets().value
+        // Old servers send no `goal` flag: don't nag there.
+        needsGoal = t.map { $0.isSet?.goal == false } ?? false
     }
 
     private func open(_ kind: FoodTile.Kind) {
