@@ -3,6 +3,8 @@ import { now } from "./config.js";
 import { all, one, run } from "./db.js";
 import { dayAt, HK_METRICS, HR_TYPE, nativeValue, SLEEP_TYPE, splitDays, STAND_TYPE } from "./v2-metrics.js";
 import { blobFor, unpack } from "./v2-storage.js";
+import { sleepBlocks, type SleepBlock } from "./sleep-split.js";
+import { addDays } from "./time.js";
 import type { DailyStat, Sample } from "./v2-schema.js";
 
 export type RawRow = { id: number; type_id: number; source_id: number | null; uuid: string; type: string; kind: Sample["kind"]; start_ms: number; end_ms: number; start_iso: string; end_iso: string;
@@ -120,78 +122,62 @@ export class Derivations {
     return out;
   }
 
+  /** Recompute every night and nap of the sources whose sleep changed in this batch (or in resplitAll). */
   private sleep() {
-    // Expand to whole connected sessions, so changes to an early stage also move/remove its old wake-day row.
-    const affected = this.sleepAffected;
-    for (const { day, source } of affected.values()) {
+    const bySource = new Map<string, { start: number; end: number; days: Set<string> }>();
+    const span = (source: string) => bySource.get(source) ?? bySource.set(source, { start: Infinity, end: -Infinity, days: new Set() }).get(source)!;
+    for (const w of this.sleepWindows) { const s = span(w.source); s.start = Math.min(s.start, w.start); s.end = Math.max(s.end, w.end); }
+    for (const { day, source } of this.sleepAffected.values()) {
+      const s = span(source); s.days.add(day);
+      // Bounds include tombstoned members, so a moved or deleted segment still pulls in its old sleep day.
       for (const r of all<RawRow>("SELECT s.* FROM hk_sleep_members m JOIN hk_raw s USING(uuid) WHERE m.day=? AND m.source=?", day, source)) {
-        if (r.type === SLEEP_TYPE) this.sleepWindows.push({ source: r.source_name, start: r.start_ms, end: r.end_ms });
+        s.start = Math.min(s.start, r.start_ms); s.end = Math.max(s.end, r.end_ms);
       }
     }
     for (const uuid of this.sleepTouched) run("DELETE FROM hk_sleep_members WHERE uuid=?", uuid);
-    const windows = this.merge(this.sleepWindows, 3 * HOUR);
-    const rows = new Map<string, RawRow>();
-    for (const w of windows) {
-      let from = w.start, to = w.end;
-      const duration = one<{ duration_ms: number }>("SELECT duration_ms FROM hk_sleep_bounds WHERE source=?", w.source)?.duration_ms ?? 0;
-      for (;;) {
-        const found = all<RawRow>(`SELECT r.* FROM hk_samples s JOIN hk_raw r ON r.id=s.id
-          WHERE s.kind=1 AND s.deleted_at IS NULL AND s.type_id=(SELECT id FROM hk_types WHERE identifier=?)
-          AND s.source_id IN (SELECT id FROM hk_sources WHERE name=?) AND s.start_ms BETWEEN ? AND ? AND s.end_ms>=?`,
-          SLEEP_TYPE, w.source, from - 3 * HOUR - duration, to + 3 * HOUR, from - 3 * HOUR);
-        let nextFrom = from, nextTo = to;
-        for (const r of found) {
-          // Include tombstoned segments as bridges when finding the old session; never count their hours.
-          rows.set(r.uuid, r); nextFrom = Math.min(nextFrom, r.start_ms); nextTo = Math.max(nextTo, r.end_ms);
-          const old = one<{ day: string; source: string }>("SELECT day,source FROM hk_sleep_members WHERE uuid=?", r.uuid);
-          if (old) affected.set(JSON.stringify([old.day, old.source]), old);
-        }
-        if (nextFrom === from && nextTo === to) break;
-        from = nextFrom; to = nextTo;
-      }
+    for (const [source, s] of bySource) {
+      if (!Number.isFinite(s.start)) continue;
+      const duration = one<{ duration_ms: number }>("SELECT duration_ms FROM hk_sleep_bounds WHERE source=?", source)?.duration_ms ?? 0;
+      // A sleep day's blocks start within 24 h of each other, so a 48 h margin sees every block of any day touched here.
+      const rows = all<RawRow>(`SELECT r.* FROM hk_samples s JOIN hk_raw r ON r.id=s.id
+        WHERE s.kind=1 AND s.deleted_at IS NULL AND s.type_id=(SELECT id FROM hk_types WHERE identifier=?)
+        AND s.source_id IN (SELECT id FROM hk_sources WHERE name=?) AND s.start_ms BETWEEN ? AND ? AND s.end_ms>=?`,
+        SLEEP_TYPE, source, s.start - 48 * HOUR - duration, s.end + 48 * HOUR, s.start - 48 * HOUR);
+      const blocks = sleepBlocks(rows.map((r) => ({ uuid: r.uuid, start: r.start_ms, end: r.end_ms, startIso: r.start_iso, endIso: r.end_iso, tz: r.tz, value: r.category_value ?? -1 })));
+      for (const b of blocks) if (b.end >= s.start && b.start <= s.end) s.days.add(b.day);
+      for (const day of s.days) this.writeSleepDay(day, source, blocks.filter((b) => b.day === day));
     }
-    // The membership row also remembers the original night when a UUID changes time or source.
-    for (const r of rows.values()) run("DELETE FROM hk_sleep_members WHERE uuid=?", r.uuid);
-    const groups = this.merge([...rows.values()].filter((r) => r.deleted_at === null).map((r) => ({ source: r.source_name, start: r.start_ms, end: r.end_ms })), 3 * HOUR);
-    const nights = new Map<string, RawRow[]>();
-    for (const g of groups) {
-      const members = [...rows.values()].filter((r) => r.deleted_at === null && r.source_name === g.source && r.start_ms >= g.start && r.end_ms <= g.end);
-      const asleep = members.filter((r) => [1, 3, 4, 5].includes(r.category_value!));
-      const last = (asleep.length ? asleep : members).reduce((a, b) => a.end_ms >= b.end_ms ? a : b);
-      const day = dayAt(last.end_ms, last.end_iso, last.tz), key = JSON.stringify([day, g.source]);
-      affected.set(key, { day, source: g.source }); nights.set(key, [...(nights.get(key) ?? []), ...members]);
-      for (const r of members) run("INSERT INTO hk_sleep_members(uuid,day,source) VALUES(?,?,?)", r.uuid, day, g.source);
+  }
+
+  private writeSleepDay(day: string, source: string, blocks: SleepBlock[]) {
+    // A nap changes the next night's sleep need, so that day's scores go stale too.
+    this.touchedDays.add(day); this.touchedDays.add(addDays(day, 1));
+    run("DELETE FROM hk_sleep_members WHERE day=? AND source=?", day, source);
+    run("DELETE FROM sleep_naps WHERE day=? AND source=?", day, source);
+    const night = blocks.find((b) => b.kind === "night");
+    if (!night) {
+      run("DELETE FROM sleep_nights WHERE day=? AND source=? AND payload_id IN (SELECT id FROM payloads WHERE origin='v2')", day, source);
+      return;
     }
-    for (const [key, { day, source }] of affected) {
-      this.touchedDays.add(day);
-      const rs = nights.get(key) ?? [];
-      // Another disconnected session on the same wake day (e.g. a nap) must remain included.
-      for (const r of all<RawRow>(`SELECT s.* FROM hk_sleep_members m JOIN hk_raw s USING(uuid) WHERE m.day=? AND m.source=? AND s.deleted_at IS NULL`, day, source)) {
-        if (!rs.some((x) => x.uuid === r.uuid)) rs.push(r);
-      }
-      const asleep = rs.filter((r) => [1, 3, 4, 5].includes(r.category_value!));
-      if (!asleep.length) {
-        run("DELETE FROM sleep_nights WHERE day=? AND source=? AND payload_id IN (SELECT id FROM payloads WHERE origin='v2')", day, source);
-        continue;
-      }
-      const hours = (values: number[]) => this.merge(rs.filter((r) => values.includes(r.category_value!))
-        .map((r) => ({ source, start: r.start_ms, end: r.end_ms }))).reduce((n, r) => n + (r.end - r.start) / HOUR, 0);
-      const edge = (xs: RawRow[], end: boolean) => xs.length ? xs.reduce((a, b) => end ? (a.end_ms >= b.end_ms ? a : b) : (a.start_ms <= b.start_ms ? a : b))[end ? "end_iso" : "start_iso"] : null;
-      const bed = rs.filter((r) => r.category_value === 0);
-      const staged = rs.some((r) => [3, 4, 5].includes(r.category_value!)), hasAwake = rs.some((r) => r.category_value === 2);
-      // Wake-ups: merged awake spells of ≥ 1 min inside the sleep span; unknown (null) when the source records neither stages nor awake.
-      const first = Math.min(...asleep.map((r) => r.start_ms)), last = Math.max(...asleep.map((r) => r.end_ms));
-      const wakeups = staged || hasAwake ? this.merge(rs.filter((r) => r.category_value === 2).map((r) => ({ source, start: r.start_ms, end: r.end_ms })))
-        .filter((w) => w.end - w.start >= 60_000 && w.start >= first && w.end <= last).length : null;
-      if (!one("SELECT 1 FROM sleep_nights WHERE day=?", day)) this.newNights.push(day);
-      run(`INSERT INTO sleep_nights(day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,wakeups,payload_id,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
-        in_bed_start=excluded.in_bed_start,in_bed_end=excluded.in_bed_end,asleep_h=excluded.asleep_h,core_h=excluded.core_h,deep_h=excluded.deep_h,
-        rem_h=excluded.rem_h,awake_h=excluded.awake_h,wakeups=excluded.wakeups,payload_id=excluded.payload_id,updated_at=excluded.updated_at`, day, source, edge(asleep, false), edge(asleep, true),
-        edge(bed, false), edge(bed, true), hours([1, 3, 4, 5]),
-        staged ? hours([3]) : null, staged ? hours([4]) : null, staged ? hours([5]) : null,
-        hasAwake ? hours([2]) : null, wakeups, this.payloadId, now());
+    for (const b of blocks) for (const uuid of b.members) run("INSERT OR REPLACE INTO hk_sleep_members(uuid,day,source) VALUES(?,?,?)", uuid, day, source);
+    for (const b of blocks) if (b.kind === "nap") run("INSERT INTO sleep_naps(day,source,start,end,asleep_h,payload_id,updated_at) VALUES(?,?,?,?,?,?,?)",
+      day, source, b.startIso, b.endIso, b.asleep_h, this.payloadId, now());
+    if (!one("SELECT 1 FROM sleep_nights WHERE day=?", day)) this.newNights.push(day);
+    run(`INSERT INTO sleep_nights(day,source,sleep_start,sleep_end,in_bed_start,in_bed_end,asleep_h,core_h,deep_h,rem_h,awake_h,wakeups,payload_id,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(day,source) DO UPDATE SET sleep_start=excluded.sleep_start,sleep_end=excluded.sleep_end,
+      in_bed_start=excluded.in_bed_start,in_bed_end=excluded.in_bed_end,asleep_h=excluded.asleep_h,core_h=excluded.core_h,deep_h=excluded.deep_h,
+      rem_h=excluded.rem_h,awake_h=excluded.awake_h,wakeups=excluded.wakeups,payload_id=excluded.payload_id,updated_at=excluded.updated_at`,
+      day, source, night.startIso, night.endIso, night.inBedStart, night.inBedEnd, night.asleep_h,
+      night.core_h, night.deep_h, night.rem_h, night.awake_h, night.wakeups, this.payloadId, now());
+  }
+
+  /** One-off: recompute every stored night with the current night/nap rules. Run once per rule change from server start. */
+  resplitAll() {
+    for (const r of all<{ source: string; start: number; end: number }>(`SELECT src.name source,MIN(s.start_ms) start,MAX(s.end_ms) end
+      FROM hk_samples s JOIN hk_sources src ON src.id=s.source_id WHERE s.kind=1 AND s.type_id=(SELECT id FROM hk_types WHERE identifier=?) GROUP BY src.name`, SLEEP_TYPE)) {
+      this.sleepWindows.push({ source: r.source, start: r.start, end: r.end });
     }
+    for (const r of all<{ day: string; source: string }>("SELECT DISTINCT day,source FROM hk_sleep_members")) this.sleepAffected.set(JSON.stringify([r.day, r.source]), r);
   }
 
   private workout(id: string) {

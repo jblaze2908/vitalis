@@ -330,10 +330,13 @@ test("stand-hour categories count stood hours; fixed catalog units cover body fa
   assert.equal(metric("exercise_min", "2026-10-01").qty, 2);
 });
 
-test("sleep source replacement and reparse preserve disconnected naps on the same wake day", async () => {
+test("a nap stays out of the night; source replacement and reparse keep both", async () => {
   const night = sleep(3, "2026-10-22", "01:00", "07:00"), nap = sleep(4, "2026-10-22", "15:00", "16:00");
   const b = batch([night, nap]); await post(b);
-  assert.equal(one("SELECT asleep_h FROM sleep_nights WHERE day='2026-10-22' AND source='Native Watch'").asleep_h, 7);
+  const n = one("SELECT asleep_h,sleep_end FROM sleep_nights WHERE day='2026-10-22' AND source='Native Watch'");
+  assert.deepEqual([n.asleep_h, n.sleep_end], [6, night.end]);
+  assert.deepEqual({ ...one("SELECT start,end,asleep_h FROM sleep_naps WHERE day='2026-10-22' AND source='Native Watch'") }, { start: nap.start, end: nap.end, asleep_h: 1 });
+  // With its night moved to another source, the nap is the only sleep left for Native Watch, so it becomes that day's night.
   await post(batch([{ ...night, source: { name: "New Sleep Watch", bundle_id: "new.sleep" } }]));
   assert.equal(one("SELECT asleep_h FROM sleep_nights WHERE day='2026-10-22' AND source='Native Watch'").asleep_h, 1);
   assert.equal(one("SELECT asleep_h FROM sleep_nights WHERE day='2026-10-22' AND source='New Sleep Watch'").asleep_h, 6);
@@ -448,14 +451,14 @@ test("a reused batch id with different bytes returns 409 and applies no objects"
   assert.equal((await post(b)).json.duplicate, true);
 });
 
-test("sleep wake day follows asleep end even when in-bed/awake extends across the next midnight", async () => {
+test("sleep that starts at 18:00 or later belongs to the next morning, with in-bed edges from the same block", async () => {
   const bed = sleep(0, "2027-01-04", "17:00", "18:00", { end: at("2027-01-05", "00:30") });
   const asleep = sleep(1, "2027-01-04", "18:00", "23:00");
   const awake = sleep(2, "2027-01-04", "23:00", "23:30", { end: at("2027-01-05", "00:30") });
   await post(batch([bed, asleep, awake]));
-  const n = one("SELECT * FROM sleep_nights WHERE day='2027-01-04' AND source='Native Watch'");
+  const n = one("SELECT * FROM sleep_nights WHERE day='2027-01-05' AND source='Native Watch'");
   assert.equal(n.sleep_end, asleep.end); assert.equal(n.in_bed_end, bed.end); assert.equal(n.asleep_h, 5);
-  assert.equal(one("SELECT * FROM sleep_nights WHERE day='2027-01-05' AND source='Native Watch'"), undefined);
+  assert.equal(one("SELECT * FROM sleep_nights WHERE day='2027-01-04' AND source='Native Watch'"), undefined);
 });
 
 test("status counters track type replacement, newest deletion, unknown tombstones and late upserts once", async () => {
@@ -630,4 +633,14 @@ test("a later unchanged acceptance prevents replay of an older rejected replacem
     time, createHash('sha256').update(rejectedBody).digest('hex'), rejectedBody.length, gzipSync(rejectedBody)).lastInsertRowid);
   assert.equal((await post(batch([s]))).json.counts.unchanged, 1);
   reparse(id); assert.equal(row(s).value, s.value); assert.equal(metric('steps', '2027-04-04').qty, s.value);
+});
+
+test("the sleep API lists naps beside the night and credits them to the next night's need", async () => {
+  await post(batch([sleep(3, "2026-09-14", "01:00", "08:00"), sleep(3, "2026-09-14", "15:00", "16:00"), sleep(3, "2026-09-15", "01:00", "07:00")]));
+  const d1 = (await http("GET", "/v2/sleep?date=2026-09-14", { token: readToken })).json;
+  assert.deepEqual([d1.night.asleep_h, d1.naps.length, d1.naps[0].asleep_h, d1.total_h], [7, 1, 1, 8]);
+  const d2 = (await http("GET", "/v2/sleep?date=2026-09-15", { token: readToken })).json;
+  assert.deepEqual([d2.naps.length, d2.duration.nap_credit_h], [0, 1]);
+  const week = (await http("GET", "/v2/sleep/week?end=2026-09-15", { token: readToken })).json.nights.at(-2);
+  assert.deepEqual([week.day, week.asleep_h, week.nap_h, week.sleep_start.slice(11, 16)], ["2026-09-14", 7, 1, "01:00"]);
 });

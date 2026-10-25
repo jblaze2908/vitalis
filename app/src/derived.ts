@@ -6,10 +6,10 @@ import { getExercise } from "./exercises.js";
 import { all, bumpDataVersion, dataVersions, db, one, run } from "./db.js";
 import { adaptiveKcal, goalRate, initialKcal, measuredBurn, weightTrend, type Goal } from "./fuel.js";
 import { bedHours, hrvPart, recoveryScore, rhrPart, sleepNeed, sleepParts, sleepScore, tonight } from "./scoring.js";
-import { BASELINE_DAYS, MIN_SCORE_DAYS, daily, nights, type Night } from "./stats.js";
+import { BASELINE_DAYS, MIN_SCORE_DAYS, daily, naps, nights, type Night } from "./stats.js";
 import { addDays, DAY_RE, eveningMinutes, localDay, ownerOffsetMin, today as todayOf } from "./time.js";
 import { freshLabel, freshness, loadedLabel, sessionMuscles, SLUGS, splitStates, type SplitCandidate, type TrainingSet } from "./training-analytics.js";
-import { FUEL, roundHalfAway, TRAINING } from "./scoring-config.js";
+import { FUEL, roundHalfAway, SLEEP, TRAINING } from "./scoring-config.js";
 
 const HOUR = 3_600_000;
 
@@ -147,9 +147,10 @@ export function scoresFor(day: string, at = Date.now()) {
   const need = sleepNeed({ target, asleepHistory: nums(window, "asleep_h") });
   let sleep: SleepScore | null = null;
   if (night) {
-    const parts = sleepParts({ asleep_h: night.asleep_h, need_h: need.need_h, bedtime_min: f.bedtime_min, bedtimeHistory: nums(window, "bedtime_min"),
+    const credit = napCreditH(addDays(day, -1), night.sleep_start ? { day, before: night.sleep_start } : null), need_h = need.need_h - credit;
+    const parts = sleepParts({ asleep_h: night.asleep_h, need_h, bedtime_min: f.bedtime_min, bedtimeHistory: nums(window, "bedtime_min"),
       bed_h: f.bed_h, wakeups: f.wakeups, awake_min: f.awake_min });
-    sleep = { ...sleepScore(parts), parts, need_h: need.need_h, need_basis: need.basis };
+    sleep = { ...sleepScore(parts), parts, need_h, need_basis: need.basis, nap_credit_h: credit };
   }
   const hrv = hrvPart(f.hrv_ms, nums(window, "hrv_ms")), rhr = rhrPart(f.rhr_bpm, nums(window, "rhr_bpm"));
   const rec = recoveryScore({ sleep: sleep?.score ?? null, hrv, rhr });
@@ -162,7 +163,7 @@ export function scoresFor(day: string, at = Date.now()) {
     JSON.stringify(sleep), JSON.stringify(recovery), Date.now(), day));
   return { day, sleep, recovery } as Scores;
 }
-type SleepScore = ReturnType<typeof sleepScore> & { parts: ReturnType<typeof sleepParts>; need_h: number; need_basis: string };
+type SleepScore = ReturnType<typeof sleepScore> & { parts: ReturnType<typeof sleepParts>; need_h: number; need_basis: string; nap_credit_h: number };
 export type Scores = { day: string; sleep: SleepScore | null; recovery: { score: number | null; band: string | null; label: string | null; status: string;
   reason: string | null; nights_of_history: number; nights_needed: number; parts: Record<string, Record<string, unknown>> } };
 
@@ -175,7 +176,20 @@ export function needFor(day: string, ignoreTarget = false) {
 /** Wake time and bed-by for the night after `day` (11 §9.2): target, else median wake of the last 14 nights. */
 export function tonightFor(day: string) {
   const wakes = nights(addDays(day, -13), day).filter((n) => n.sleep_end).map((n) => Number(n.sleep_end!.slice(11, 13)) * 60 + Number(n.sleep_end!.slice(14, 16)));
-  return tonight({ wakeTarget: storedTarget<string>("wake_time"), wakeHistoryMin: wakes, need_h: needFor(day).need_h });
+  return tonight({ wakeTarget: storedTarget<string>("wake_time"), wakeHistoryMin: wakes, need_h: needFor(day).need_h - napCreditH(day, { day: addDays(day, 1), before: null }) });
+}
+
+/**
+ * Hours of nap that shorten a night's need: every nap on sleep day `prev`, plus naps on `also.day` that ended before
+ * `also.before` (an evening nap before a 02:00 night). Per source, the largest; capped at SLEEP.NAP_CREDIT_MAX_H.
+ */
+export function napCreditH(prev: string, also: { day: string; before: string | null } | null): number {
+  const bySource = new Map<string, number>();
+  for (const n of naps(prev, also?.day ?? prev)) {
+    if (n.day !== prev && also && also.before !== null && Date.parse(n.end) > Date.parse(also.before)) continue;
+    bySource.set(n.source, (bySource.get(n.source) ?? 0) + n.asleep_h);
+  }
+  return Math.min(Math.max(0, ...bySource.values()), SLEEP.NAP_CREDIT_MAX_H);
 }
 
 /** Weight trend per day over [from, to], seeded from up to 120 days before `from` (11 §8.1). */

@@ -35,6 +35,11 @@ export function nights(from: string, to: string): Night[] {
   return [...pickPerDay(rows).values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
+export type Nap = { day: string; source: string; start: string; end: string; asleep_h: number };
+export function naps(from: string, to: string): Nap[] {
+  return all<Nap>("SELECT day,source,start,end,asleep_h FROM sleep_naps WHERE day BETWEEN ? AND ? ORDER BY start", from, to);
+}
+
 /** Day → value for one metric. heart_rate's value is the daily average; bedtime is minutes past 18:00. */
 export function daily(key: string, from: string, to: string): Map<string, number> {
   const out = new Map<string, number>();

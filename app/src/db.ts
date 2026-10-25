@@ -99,6 +99,11 @@ CREATE TABLE IF NOT EXISTS sleep_nights (
   asleep_h REAL NOT NULL, core_h REAL, deep_h REAL, rem_h REAL, awake_h REAL, payload_id INTEGER, updated_at INTEGER NOT NULL,
   PRIMARY KEY (day, source));
 
+-- Sleep blocks other than the night on the same sleep day (sleep-split.ts). Kept out of the night's hours and score.
+CREATE TABLE IF NOT EXISTS sleep_naps (
+  day TEXT NOT NULL, source TEXT NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL, asleep_h REAL NOT NULL, payload_id INTEGER, updated_at INTEGER NOT NULL,
+  PRIMARY KEY (day, source, start));
+
 CREATE TABLE IF NOT EXISTS hk_workouts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
   day TEXT NOT NULL, duration_s REAL NOT NULL, active_kcal REAL, hr_min REAL, hr_avg REAL, hr_max REAL, distance_km REAL,

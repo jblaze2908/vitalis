@@ -24,6 +24,8 @@ export const SLEEP = {
   NEED_STEP_H: 0.25,
   NEED_MIN_H: 7.0,
   NEED_MAX_H: 9.0,
+  // A nap before a night shortens its need by the nap's length (WHOOP's rule), capped at one 90-min cycle (design default).
+  NAP_CREDIT_MAX_H: 1.5,
   DURATION_ZERO_RATIO: 0.6,
   DURATION_SPAN_RATIO: 0.4,
   CONSISTENCY_MIN_NIGHTS: 14,

@@ -264,3 +264,17 @@ export function syncStatus(token?: Token) {
     batches: batches.map((b) => ({ batch_id: b.batch_id, payload_id: b.payload_id, received_at: new Date(b.received_at).toISOString(),
       counts: JSON.parse(b.counts_json) as Counts, rejected: JSON.parse(b.rejected_json) as Rejection[] })) };
 }
+
+const SLEEP_RULES = 2;
+/** Re-split stored nights once after the night/nap rules change (sleep-split.ts); a no-op once meta records the version. */
+export function resplitSleepOnce() {
+  if ((one<{ value: number }>("SELECT value FROM meta WHERE key='sleep_rules'")?.value ?? 0) >= SLEEP_RULES) return;
+  tx(() => {
+    const payload = one<{ id: number | null }>("SELECT MAX(id) id FROM payloads WHERE origin='v2'")?.id;
+    if (payload) {
+      const derived = new Derivations(payload, "[]");
+      derived.resplitAll(); derived.finish(); markDirty([...derived.touchedDays]);
+    }
+    run("INSERT INTO meta(key,value) VALUES('sleep_rules',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", SLEEP_RULES);
+  });
+}

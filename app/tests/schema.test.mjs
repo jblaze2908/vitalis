@@ -26,7 +26,9 @@ test("a fresh database has every new table, column, index and meta row", () => {
   assert.ok(cols("sleep_nights").includes("wakeups"));
   for (const c of ["hk_workout_uuid", "template", "client_source"]) assert.ok(cols("sessions").includes(c), c);
   assert.ok(all("SELECT name FROM sqlite_master WHERE type='index'").some((r) => r.name === "sessions_hk"));
-  assert.deepEqual(all("SELECT key FROM meta ORDER BY key").map((r) => r.key), ["data_version", "targets_version"]);
+  assert.ok(tables.includes("sleep_naps"));
+  // sleep_rules is written by resplitSleepOnce at server start; a fresh database runs it as a no-op.
+  assert.deepEqual(all("SELECT key FROM meta ORDER BY key").map((r) => r.key), ["data_version", "sleep_rules", "targets_version"]);
 });
 
 test("version helpers bump each counter independently", () => {

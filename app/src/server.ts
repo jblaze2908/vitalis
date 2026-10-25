@@ -12,9 +12,10 @@ import { readRoutes } from "./routes/read.js";
 import { writeRoutes } from "./routes/write.js";
 import { authenticate, logCall } from "./tokens.js";
 import { ingestAsync, ingestV2Async } from "./v2-client.js";
-import { syncStatus } from "./v2.js";
+import { resplitSleepOnce, syncStatus } from "./v2.js";
 
 seedExercises();
+resplitSleepOnce();
 
 export const app = new Hono();
 
