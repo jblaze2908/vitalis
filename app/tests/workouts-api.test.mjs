@@ -68,3 +68,15 @@ test("PRs come back from the server; validation and scope", async () => {
   const t = await http("GET", `/v2/training/sessions/S-4`, { token: read });
   assert.equal(t.json.client_source, "watch");
 });
+
+test("a shared workout: Watch and phone post their own sets to one session, read back in time order", async () => {
+  const id = "S-SHARED", s = (source) => ({ client_id: id, title: "Push", source, started_at: at("18:00"), ended_at: null, tz_offset_min: 330 });
+  const set = (sid, hm, reps) => ({ id: sid, exercise: "bench", weight_kg: 60, reps, performed_at: at(hm) });
+  assert.equal((await post({ session: s("phone"), sets: [set("P-2", "18:10", 7)] })).status, 200);
+  // The Watch's body arrives later but holds the earlier set, and none of the phone's.
+  const r = await post({ session: s("watch"), sets: [set("W-1", "18:05", 8), set("W-3", "18:15", 6)] });
+  assert.equal(r.status, 200, r.text);
+  const d = await http("GET", `/v2/training/sessions/${id}`, { token: read });
+  const reps = d.json.exercises.flatMap((e) => e.sets.map((x) => x.reps));
+  assert.deepEqual(reps, [8, 7, 6], "time order, not arrival order; no set lost");
+});

@@ -45,10 +45,15 @@ struct WorkoutStartSheet: View {
                         .padding(.top, 28)
                     caption(watchError ?? "Log sets from your wrist · phone stays away", tint: watchError == nil ? .steel : .watch)
 
-                    SecondaryButton(live.watchSessionLive ? "Workout live on Watch" : "Log on iPhone", systemImage: "iphone",
-                                    size: .full, enabled: !live.watchSessionLive) { logOnPhone() }
-                        .padding(.top, 20)
-                    caption("Full set table · good for new exercises", tint: .steel)
+                    if live.watchSessionLive {
+                        SecondaryButton("Join Watch workout", systemImage: "iphone", size: .full, enabled: live.liveWatch != nil) { joinWatch() }
+                            .padding(.top, 20)
+                        caption("Add sets here too · the Watch keeps recording", tint: .steel)
+                    } else {
+                        SecondaryButton("Log on iPhone", systemImage: "iphone", size: .full) { logOnPhone() }
+                            .padding(.top, 20)
+                        caption("Full set table · good for new exercises", tint: .steel)
+                    }
 
                     VSection(top: 20) {
                         Button { remember.toggle() } label: {
@@ -152,6 +157,12 @@ struct WorkoutStartSheet: View {
         } else {
             watchError = "No paired Watch with Vitalis · log on iPhone instead"
         }
+    }
+
+    /// One workout from both devices: the phone shows the Watch's sets and adds its own (20 §4).
+    private func joinWatch() {
+        live.join()
+        router.startLoggingOnPhone()
     }
 
     private func logOnPhone() {

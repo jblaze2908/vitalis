@@ -175,6 +175,7 @@ final class SentRequests {
         #expect(sent.workouts.last?.session.hkWorkoutUuid == nil)
     }
 
+    // Still true after shared workouts: until the phone joins, a live Watch workout keeps phone logging off.
     @Test func watchSessionMakesThePhoneReadOnly() async throws {
         let sent = SentRequests()
         let store = make(sent: sent)
@@ -183,5 +184,66 @@ final class SentRequests {
         await store.check()
         #expect(store.session?.sets.isEmpty == true)
         #expect(sent.all.isEmpty)
+    }
+
+    // MARK: Shared workout (20 §4)
+
+    func watchRecord(_ sets: [VitalisKit.LoggedSet], ended: Bool = false, phoneSets: [VitalisKit.LoggedSet] = []) -> WorkoutSessionRecord {
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        return WorkoutSessionRecord(id: UUID(uuidString: "6F0E6A44-0000-4000-8000-000000000001")!, title: "Push", startedAt: start,
+                                    endedAt: ended ? start.addingTimeInterval(3600) : nil, tzOffsetMin: 330, sets: sets, revision: 3,
+                                    exerciseIDs: [bench], phoneSets: phoneSets)
+    }
+
+    @Test func joiningShowsTheWatchSetsAndLogsThePhonesOwn() async throws {
+        let sent = SentRequests(), clock = TestClock()
+        let store = make(file: nil, sent: sent, clock: clock)
+        var shared: [WatchPhoneSets] = []
+        store.sendToWatch = { shared.append($0) }
+        let w1 = VitalisKit.LoggedSet(exerciseID: bench, weightKg: 60, reps: 8, performedAt: clock.now.addingTimeInterval(-120))
+        store.watchRecord(watchRecord([w1]))
+        #expect(store.watchSessionLive && store.liveWatch != nil)
+        store.join()
+        let s = try #require(store.session)
+        #expect(s.isJoined && s.id == watchRecord([]).id && s.title == "Push")
+        #expect(s.exercises.first?.rows.first?.byWatch == true && s.exercises.first?.rows.first?.loggedID == w1.id)
+        // The pending row after the Watch's set is the phone's to log.
+        store.setReps("8", row: try #require(store.currentRowID), in: 0)
+        store.setWeight("62.5", row: try #require(store.currentRowID), in: 0)
+        await store.check()
+        let body = try #require(sent.workouts.last)
+        #expect(body.session.clientId == s.id.uuidString && body.session.source == "phone")
+        #expect(body.session.title == nil && body.session.endedAt == nil && body.session.template == nil, "the Watch's to set")
+        #expect(body.sets.map(\.id) == [try #require(store.session?.sets.first?.id).uuidString], "only the phone's own set")
+        #expect(shared.last?.sets.map(\.id) == store.session?.sets.map(\.id))
+        // The Watch's next record keeps the phone's row and adds its own in time order.
+        let w2 = VitalisKit.LoggedSet(exerciseID: bench, weightKg: 60, reps: 7, performedAt: clock.now.addingTimeInterval(60))
+        store.watchRecord(watchRecord([w1, w2]))
+        #expect(store.session?.exercises.first?.rows.compactMap(\.loggedID) == [w1.id, try #require(store.session?.sets.first?.id), w2.id])
+    }
+
+    @Test func theWatchEndingTheWorkoutClosesItOnThePhoneWithoutAPhoneHealthWorkout() async throws {
+        let health = FakeHealthWriter()
+        let store = make(file: nil, health: health)
+        store.watchRecord(watchRecord([]))
+        store.join()
+        store.rename("Chest")
+        #expect(store.session?.title == "Push", "a joined workout keeps the Watch's title")
+        store.watchRecord(watchRecord([], ended: true))
+        #expect(store.session == nil && !store.watchSessionLive && store.liveWatch == nil)
+        #expect(await store.finish() == nil)
+    }
+
+    @Test func mergedSetsTakeTheOwnCopyAndRunInTimeOrder() {
+        let t = Date(timeIntervalSince1970: 1_790_000_000)
+        let a = VitalisKit.LoggedSet(exerciseID: bench, weightKg: 60, reps: 8, performedAt: t)
+        var aEdited = a; aEdited.reps = 9
+        let b = VitalisKit.LoggedSet(exerciseID: bench, weightKg: 60, reps: 7, performedAt: t.addingTimeInterval(-30))
+        let gone = VitalisKit.LoggedSet(exerciseID: bench, weightKg: 60, reps: 5, performedAt: t.addingTimeInterval(30), deleted: true)
+        let merged = VitalisKit.LoggedSet.merged(own: [aEdited, gone], foreign: [a, b])
+        #expect(merged.map(\.id) == [b.id, a.id] && merged[1].reps == 9)
+        let r = watchRecord([a], phoneSets: [b])
+        #expect(r.allSets.map(\.id) == [b.id, a.id])
+        #expect(r.upsert.sets.map(\.id) == [a.id.uuidString], "the Watch never posts the phone's sets")
     }
 }

@@ -18,7 +18,7 @@ struct AddExerciseScreen: View {
     private var planIDs: [String] {
         let plan = model.record?.exerciseIDs ?? []
         // The exercise being logged is excluded: picking it would insert a second copy.
-        let done = Set((model.record?.visibleSets.map(\.exerciseID) ?? []) + [model.currentExerciseID].compactMap { $0 })
+        let done = Set((model.record?.allSets.map(\.exerciseID) ?? []) + [model.currentExerciseID].compactMap { $0 })
         return Self.unique(plan.filter { !done.contains($0) })
     }
 

@@ -43,11 +43,12 @@ struct LiveWorkoutScreen: View {
         }
     }
 
-    private var readOnly: Bool { store.watchSessionLive }
+    /// Read-only only when the Watch logs a workout the phone hasn't joined.
+    private var readOnly: Bool { store.watchSessionLive && !(store.session?.isJoined ?? false) }
 
     private func content(_ s: LiveSession) -> some View {
         VStack(spacing: 0) {
-            TrainTopBar(status: readOnly ? "Live on Watch · read only" : "Workout · live", pulse: train.pulse)
+            TrainTopBar(status: readOnly ? "Live on Watch · read only" : s.isJoined ? "Shared with Watch · live" : "Workout · live", pulse: train.pulse)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     TimelineView(.periodic(from: s.startedAt, by: 1)) { tick in
@@ -93,9 +94,13 @@ struct LiveWorkoutScreen: View {
     }
 
     private func header(_ s: LiveSession, now: Date) -> some View {
-        let context = "\(TrainFormat.elapsed(now.timeIntervalSince(s.startedAt))) · \(s.sets.count) of \(max(s.plannedSets, s.sets.count)) sets"
+        let logged = s.sets.count + (s.watchSets?.count ?? 0)
+        let context = "\(TrainFormat.elapsed(now.timeIntervalSince(s.startedAt))) · \(logged) of \(max(s.plannedSets, logged)) sets"
         return ScreenHeader(context: context, title: s.title) {
-            if !readOnly {
+            if s.isJoined {
+                // The Watch ends the workout; leaving only stops logging from this phone.
+                SecondaryButton("Leave", enabled: !finishing) { focus = nil; Task { await finish() } }
+            } else if !readOnly {
                 SecondaryButton("Finish", enabled: !finishing) {
                     focus = nil
                     // An unnamed workout can't be offered again, so ask for a name once at the end.
@@ -194,7 +199,7 @@ struct CurrentExercise: View {
             ForEach(Array(exercise.rows.enumerated()), id: \.element.id) { i, row in
                 if i > 0 { Rule() }
                 SetRowView(store: store, row: row, exerciseIndex: index, label: label(i),
-                           state: row.isDone ? .done : i == current ? .current : .upcoming, readOnly: readOnly, focus: focus)
+                           state: row.isDone ? .done : i == current ? .current : .upcoming, readOnly: readOnly || row.byWatch == true, focus: focus)
             }
             Rule()
             Button { store.addSet(to: index) } label: {

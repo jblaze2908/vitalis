@@ -54,6 +54,13 @@ public struct LoggedSet: Codable, Sendable, Identifiable, Hashable {
         case id, kind, reps, deleted
         case exerciseID = "exercise_id", weightKg = "weight_kg", performedAt = "performed_at"
     }
+
+    /// One workout logged from two devices (20 §4 shared workout): union by id, `own` wins for its ids, time order.
+    public static func merged(own: [LoggedSet], foreign: [LoggedSet]) -> [LoggedSet] {
+        let ownIDs = Set(own.map(\.id))
+        return (own + foreign.filter { !ownIDs.contains($0.id) }).filter { !$0.deleted }
+            .sorted { ($0.performedAt, $0.id.uuidString) < ($1.performedAt, $1.id.uuidString) }
+    }
 }
 
 public struct WorkoutSessionRecord: Codable, Sendable, Identifiable, Equatable {
@@ -71,20 +78,22 @@ public struct WorkoutSessionRecord: Codable, Sendable, Identifiable, Equatable {
     public var revision: Int
     /// Exercise order for this session (plan, then additions), so crash recovery rebuilds the same sequence.
     public var exerciseIDs: [String]
+    /// Sets the phone logged into this workout. Shown and counted, never in `upsert`: the phone posts its own sets.
+    public var phoneSets: [LoggedSet]
     public enum Delivery: String, Codable, Sendable { case pending, sentToPhone, ackedByPhone }
 
     public init(id: UUID = UUID(), title: String, template: String? = nil, source: String = "watch", startedAt: Date,
                 endedAt: Date? = nil, tzOffsetMin: Int, hkWorkoutUUID: UUID? = nil, sets: [LoggedSet] = [],
-                delivery: Delivery = .pending, revision: Int = 0, exerciseIDs: [String] = []) {
+                delivery: Delivery = .pending, revision: Int = 0, exerciseIDs: [String] = [], phoneSets: [LoggedSet] = []) {
         self.id = id; self.title = title; self.template = template; self.source = source; self.startedAt = startedAt
         self.endedAt = endedAt; self.tzOffsetMin = tzOffsetMin; self.hkWorkoutUUID = hkWorkoutUUID; self.sets = sets
-        self.delivery = delivery; self.revision = revision; self.exerciseIDs = exerciseIDs
+        self.delivery = delivery; self.revision = revision; self.exerciseIDs = exerciseIDs; self.phoneSets = phoneSets
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, template, source, sets, delivery, revision
         case startedAt = "started_at", endedAt = "ended_at", tzOffsetMin = "tz_offset_min"
-        case hkWorkoutUUID = "hk_workout_uuid", exerciseIDs = "exercise_ids"
+        case hkWorkoutUUID = "hk_workout_uuid", exerciseIDs = "exercise_ids", phoneSets = "phone_sets"
     }
 
     public init(from decoder: Decoder) throws {
@@ -101,9 +110,12 @@ public struct WorkoutSessionRecord: Codable, Sendable, Identifiable, Equatable {
         delivery = try c.decode(Delivery.self, forKey: .delivery)
         revision = try c.decodeIfPresent(Int.self, forKey: .revision) ?? 0
         exerciseIDs = try c.decodeIfPresent([String].self, forKey: .exerciseIDs) ?? []
+        phoneSets = try c.decodeIfPresent([LoggedSet].self, forKey: .phoneSets) ?? []
     }
 
     public var isLive: Bool { endedAt == nil }
+    /// Every set in the workout, both devices, in time order.
+    public var allSets: [LoggedSet] { LoggedSet.merged(own: sets, foreign: phoneSets) }
     /// Sets the owner can still see (soft-deleted ones still travel so the server deletes them).
     public var visibleSets: [LoggedSet] { sets.filter { !$0.deleted } }
 
@@ -314,7 +326,15 @@ public struct WatchCatalogInfo: Codable, Sendable, Equatable {
     public init(etag: String?, count: Int) { self.etag = etag; self.count = count }
 }
 
-/// Lets the phone disable iPhone logging while the Watch logs (20 §4).
+/// The phone's own sets in a Watch-owned workout, the whole list each time (20 §4 shared workout).
+public struct WatchPhoneSets: Codable, Sendable, Equatable {
+    public var sessionID: UUID
+    public var sets: [LoggedSet]
+    public init(sessionID: UUID, sets: [LoggedSet]) { self.sessionID = sessionID; self.sets = sets }
+    private enum CodingKeys: String, CodingKey { case sets, sessionID = "session_id" }
+}
+
+/// Tells the phone a Watch workout is live, so it offers to join it (20 §4).
 public struct WatchSessionState: Codable, Sendable, Equatable {
     public enum State: String, Codable, Sendable { case live, ended }
     public var sessionID: UUID
@@ -332,9 +352,10 @@ public enum WatchMessage: Sendable, Equatable {
     case plan(WatchPlan)
     case sessionState(WatchSessionState)
     case today(TodaySnapshot)
+    case phoneSets(WatchPhoneSets)
 
     public enum Kind: String, Codable, Sendable, CaseIterable {
-        case session, ack, result, pack, catalog, plan, sessionState = "session_state", today
+        case session, ack, result, pack, catalog, plan, sessionState = "session_state", today, phoneSets = "phone_sets"
     }
 
     public var kind: Kind {
@@ -347,6 +368,7 @@ public enum WatchMessage: Sendable, Equatable {
         case .plan: .plan
         case .sessionState: .sessionState
         case .today: .today
+        case .phoneSets: .phoneSets
         }
     }
 }
@@ -366,6 +388,7 @@ extension WatchMessage: Codable {
         case .plan: self = .plan(try c.decode(WatchPlan.self, forKey: .body))
         case .sessionState: self = .sessionState(try c.decode(WatchSessionState.self, forKey: .body))
         case .today: self = .today(try c.decode(TodaySnapshot.self, forKey: .body))
+        case .phoneSets: self = .phoneSets(try c.decode(WatchPhoneSets.self, forKey: .body))
         }
     }
 
@@ -381,6 +404,7 @@ extension WatchMessage: Codable {
         case .plan(let v): try c.encode(v, forKey: .body)
         case .sessionState(let v): try c.encode(v, forKey: .body)
         case .today(let v): try c.encode(v, forKey: .body)
+        case .phoneSets(let v): try c.encode(v, forKey: .body)
         }
     }
 }

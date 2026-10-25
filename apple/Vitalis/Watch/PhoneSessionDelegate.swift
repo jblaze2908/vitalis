@@ -48,6 +48,8 @@ final class PhoneSessionDelegate {
         var deliveredBody: @MainActor (UUID) async -> Data? = { _ in nil }
         var fetchSession: @MainActor (String) async throws -> SessionDetail
         var setWatchLive: @MainActor (Bool) -> Void
+        /// Every Watch record, so the phone can show and join the live workout (20 §4).
+        var watchRecord: @MainActor (WorkoutSessionRecord) -> Void = { _ in }
         var stateURL: URL?
         /// Re-check undelivered results this often while any are outstanding; nil in tests.
         var retryEvery: Duration?
@@ -98,6 +100,7 @@ final class PhoneSessionDelegate {
         session.delegate = bridge
         channel = LiveWatchChannel(session: session)
         session.activate()
+        LiveSessionStore.shared.sendToWatch = { PhoneSessionDelegate.shared.sendPhoneSets($0) }
         Task { await Services.shared.outbox?.setOnDelivered { d in Task { @MainActor in PhoneSessionDelegate.shared.noteDelivery(d) } } }
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { _ = Task { await PhoneSessionDelegate.shared.wake() } }
@@ -135,6 +138,7 @@ final class PhoneSessionDelegate {
     private func receive(_ record: WorkoutSessionRecord) async {
         // `sendMessage` is best effort, so the session itself also says whether the Watch is logging.
         deps.setWatchLive(record.isLive)
+        deps.watchRecord(record)
         parkedPlan = nil
         if let known = relays[record.id], known.revision >= record.revision {
             sendAck(record.id, relay: known)
@@ -317,6 +321,9 @@ final class PhoneSessionDelegate {
         pack = lastPack
     }
 
+    /// A joined workout's phone sets, the whole list each time; durable like `ack`, so a Watch out of range gets it later.
+    func sendPhoneSets(_ sets: WatchPhoneSets) { send(.phoneSets(sets)) }
+
     private func send(_ message: WatchMessage) {
         guard let dict = try? message.dictionary() else { return }
         channel?.queueUserInfo(dict)
@@ -363,6 +370,7 @@ extension PhoneSessionDelegate.Dependencies {
                 return try await api.session(id: id).value
             },
             setWatchLive: { LiveSessionStore.shared.watchSessionLive = $0 },
+            watchRecord: { LiveSessionStore.shared.watchRecord($0) },
             stateURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
                 .appendingPathComponent("Vitalis/watch-relay.json"),
             retryEvery: .seconds(30))

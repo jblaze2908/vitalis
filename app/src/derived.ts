@@ -258,7 +258,7 @@ export function trainingSets(fromMs: number, toMs: number): TrainingSet[] {
 }
 
 const sessionExercises = (id: string) =>
-  [...new Set(all<{ exercise_id: string }>("SELECT exercise_id FROM sets WHERE session_id=? AND deleted_at IS NULL ORDER BY ord", id).map((r) => r.exercise_id))];
+  [...new Set(all<{ exercise_id: string }>("SELECT exercise_id FROM sets WHERE session_id=? AND deleted_at IS NULL ORDER BY performed_at, ord", id).map((r) => r.exercise_id))];
 const GENERIC = new Set(["", "workout", "strength", "traditional strength training"]);
 
 /**
@@ -281,7 +281,7 @@ export function splitCandidates(at = Date.now()): SplitCandidate[] {
     const s = latest("lower(trim(s.title))=lower(?)", n.name);
     if (!s) return [];
     const sets = all<SetRow>(`SELECT t.session_id, t.exercise_id, t.kind, t.performed_at, s.tz_offset_min, t.weight_kg, t.reps FROM sets t
-      JOIN sessions s ON s.id=t.session_id WHERE t.session_id=? AND t.deleted_at IS NULL ORDER BY t.ord`, s.id).map(withMuscles);
+      JOIN sessions s ON s.id=t.session_id WHERE t.session_id=? AND t.deleted_at IS NULL ORDER BY t.performed_at, t.ord`, s.id).map(withMuscles);
     return [{ id: `history:${n.name.toLowerCase()}`, name: n.name, source: "history" as const, muscles: sessionMuscles(sets), exercises: sessionExercises(s.id) }];
   });
   return [...defined, ...history];

@@ -16,6 +16,7 @@ export const SESSION_GAP_H = 3;
 export type SetInput = { id?: string; exercise: string; kind?: Kind; weight_kg?: number | null; reps?: number | null; duration_s?: number | null;
   distance_m?: number | null; rpe?: number | null; rir?: number | null; target_weight_kg?: number | null; target_reps?: number | null;
   performed_at?: string; note?: string | null };
+// Sets read in performed_at order: the Watch and the phone upload separately, so arrival order (ord) can lag time order.
 export type SetRow = { id: string; session_id: string; exercise_id: string; ord: number; kind: Kind; weight_kg: number | null; reps: number | null;
   duration_s: number | null; distance_m: number | null; rpe: number | null; rir: number | null; target_weight_kg: number | null;
   target_reps: number | null; performed_at: number; note: string | null; deleted_at: number | null };
@@ -139,7 +140,7 @@ const setView = (s: SetRow, off: number) => ({
 });
 
 export const liveSets = (sessionIds: string[]) => sessionIds.length
-  ? all<SetRow>(`SELECT * FROM sets WHERE session_id IN (${marks(sessionIds.length)}) AND deleted_at IS NULL ORDER BY session_id, ord`, ...sessionIds) : [];
+  ? all<SetRow>(`SELECT * FROM sets WHERE session_id IN (${marks(sessionIds.length)}) AND deleted_at IS NULL ORDER BY session_id, performed_at, ord`, ...sessionIds) : [];
 
 /** Session ids, exercises and sets in one shape for every read. */
 export function sessionView(s: SessionRow, sets: SetRow[], detail: boolean) {
@@ -216,7 +217,7 @@ export function exerciseRecord(nameOrId: string, limit = 5) {
   if ("candidates" in r) throw httpErr(422, `"${nameOrId}" is unclear: ${r.candidates.map((c) => `${c.name} (${c.id})`).join(", ") || "no match; try find_exercises"}`);
   const ex = r.exercise;
   const rows = all<SetRow & { started_at: number; tz_offset_min: number; title: string | null }>(`SELECT t.*, s.started_at, s.tz_offset_min, s.title FROM sets t
-    JOIN sessions s ON s.id=t.session_id WHERE t.exercise_id=? AND t.deleted_at IS NULL AND s.deleted_at IS NULL ORDER BY s.started_at DESC, t.ord`, ex.id);
+    JOIN sessions s ON s.id=t.session_id WHERE t.exercise_id=? AND t.deleted_at IS NULL AND s.deleted_at IS NULL ORDER BY s.started_at DESC, t.performed_at, t.ord`, ex.id);
   const bySession = new Map<string, typeof rows>();
   for (const x of rows) bySession.set(x.session_id, [...(bySession.get(x.session_id) ?? []), x]);
   const perfs: Perf[] = [...bySession].map(([sid, xs]) => {

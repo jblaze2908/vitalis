@@ -81,6 +81,7 @@ import WidgetKit
         case .plan(let plan): model.apply(plan: plan)
         case .catalog: Task { await catalog.reload() }
         case .today(let snapshot): Self.store(snapshot)
+        case .phoneSets(let sets): model.apply(phoneSets: sets)
         case .session, .sessionState: break
         }
     }

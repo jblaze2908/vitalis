@@ -57,6 +57,8 @@ import VitalisKit
             .sessionState(WatchSessionState(sessionID: UUID(), state: .live)),
             .sessionState(WatchSessionState(sessionID: UUID(), state: .ended)),
             .today(snapshot),
+            .phoneSets(WatchPhoneSets(sessionID: UUID(), sets: [LoggedSet(exerciseID: "barbell-squat", weightKg: 100, reps: 5,
+                                                                       performedAt: t0.addingTimeInterval(900))])),
         ]
     }
 

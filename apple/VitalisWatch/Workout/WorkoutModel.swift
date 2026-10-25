@@ -140,7 +140,8 @@ import VitalisUI
     func exercise(_ id: String) -> WatchPack.Exercise? { pack?.exercises[id] }
     func name(of id: String) -> String { exercise(id)?.name ?? WatchFormat.name(forID: id) }
 
-    private func sets(for id: String) -> [LoggedSet] { record?.visibleSets.filter { $0.exerciseID == id } ?? [] }
+    // Counts include sets the phone added to this workout, so "2/4" matches what was actually done.
+    private func sets(for id: String) -> [LoggedSet] { record?.allSets.filter { $0.exerciseID == id } ?? [] }
     private func loggedAny(_ id: String) -> Bool { !sets(for: id).isEmpty }
     private func workingCount(_ id: String) -> Int { sets(for: id).filter { $0.kind == .normal }.count }
 
@@ -299,7 +300,7 @@ import VitalisUI
     var summaryHeat: [String: Int] {
         if let result, result.sessionID == record?.id { return result.heat }
         var heat: [String: Int] = [:]
-        let ids = Array(Set(record?.visibleSets.map(\.exerciseID) ?? []))
+        let ids = Array(Set(record?.allSets.map(\.exerciseID) ?? []))
         for id in ids {
             guard let info = exercise(id) else { continue }
             let lit = MuscleMap.catalogLighting(primary: Self.muscles(info.primary), secondary: Self.muscles(info.secondary))
@@ -316,7 +317,7 @@ import VitalisUI
         guard let r = record else { return WatchFormat.missing }
         let serverResult = hasServerResult ? result : nil
         let minutes = serverResult?.durationMin ?? Int((r.endedAt ?? now()).timeIntervalSince(r.startedAt) / 60)
-        let count = serverResult?.workingSets ?? r.visibleSets.filter { $0.kind == .normal }.count
+        let count = serverResult?.workingSets ?? r.allSets.filter { $0.kind == .normal }.count
         return "\(minutes) min · \(count) sets"
     }
 
@@ -336,6 +337,16 @@ import VitalisUI
     func apply(ack: WatchAck) {
         guard let updated = try? store?.applyAck(ack) else { return }
         if record?.id == updated.id, record?.revision == updated.revision { record?.delivery = updated.delivery }
+    }
+
+    /// The phone's sets in this workout (20 §4 shared workout). Saved without a revision bump or delivery: they are
+    /// the phone's to post, so they never enter this record's upsert. New exercises join the end of the list.
+    func apply(phoneSets: WatchPhoneSets) {
+        guard var r = record, r.id == phoneSets.sessionID, r.isLive else { return }
+        r.phoneSets = phoneSets.sets
+        for id in phoneSets.sets.map(\.exerciseID) where !r.exerciseIDs.contains(id) { r.exerciseIDs.append(id) }
+        guard persist(r) else { return }
+        record = r
     }
 
     /// Swaps the summary to server heat and PRs, even while it is open.
