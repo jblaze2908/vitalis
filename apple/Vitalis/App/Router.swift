@@ -21,6 +21,8 @@ final class Router {
     /// The full-screen iPhone logger (I-12); the tab bar hides while it shows.
     var showsLiveWorkout = false
     var settingsPath: [SettingsPage] = []
+    /// When a URL last opened the app: the morning digest waits so it doesn't cover where the link (Siri, a widget) went.
+    private(set) var linkedAt: Date?
 
     func open(_ route: Route) {
         switch route {
@@ -33,7 +35,15 @@ final class Router {
         }
     }
 
-    func open(_ url: URL) { if let r = DeepLinks.parse(url) { open(r) } }
+    func open(_ url: URL, at now: Date = Date()) {
+        guard let r = DeepLinks.parse(url) else { return }
+        linkedAt = now
+        open(r)
+    }
+
+    func openedByLink(within seconds: TimeInterval = 10, now: Date = Date()) -> Bool {
+        linkedAt.map { now.timeIntervalSince($0) < seconds } ?? false
+    }
 
     /// Leave the start-choice sheet for the iPhone logger.
     func startLoggingOnPhone() { sheet = nil; showsLiveWorkout = true }

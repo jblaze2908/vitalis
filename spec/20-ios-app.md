@@ -68,7 +68,7 @@ Custom five-tab shell (`TODAY · SLEEP · BODY · TRAIN · EAT`), replacing the 
 | Sync, token rejected | `25-state-sync-token-rejected.png` | local exporter + Outbox state | 03 → Sync |
 | Widgets | `29-widgets-home-lock.png` | `TodaySnapshot` from App Group (§9) | 03 → Widgets |
 
-Deep links (register `CFBundleURLTypes` scheme `vitalis`): `vitalis://today`, `vitalis://digest`, `vitalis://sleep`, `vitalis://body`, `vitalis://train`, `vitalis://eat`, `vitalis://eat/add?slot=lunch`, `vitalis://workout/start`, `vitalis://settings`, `vitalis://settings/sync`.
+Deep links (register `CFBundleURLTypes` scheme `vitalis`): `vitalis://today`, `vitalis://digest`, `vitalis://sleep`, `vitalis://body`, `vitalis://train`, `vitalis://eat`, `vitalis://eat/add?slot=lunch`, `vitalis://workout/start`, `vitalis://settings`, `vitalis://settings/sync`. A link that opened the app holds back the automatic morning digest for 10 s, so Siri or a widget lands where it pointed; the digest shows on the next foreground.
 
 ## 4. Behaviour per screen (data and interactions)
 

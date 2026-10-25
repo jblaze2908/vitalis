@@ -181,7 +181,8 @@ final class TodayStore {
     func presentDigestIfDue(router: Router) {
         guard today.error == nil, let day = today.value?.day,
               Self.shouldPresentDigest(today.value, dismissedDay: defaults.string(forKey: Self.digestDismissedKey)),
-              !router.showsDigest, router.sheet == nil, !router.showsSettings, !router.showsLiveWorkout else { return }
+              !router.showsDigest, router.sheet == nil, !router.showsSettings, !router.showsLiveWorkout,
+              !router.openedByLink(now: now()) else { return }
         autoDigestDay = day
         router.showsDigest = true
     }

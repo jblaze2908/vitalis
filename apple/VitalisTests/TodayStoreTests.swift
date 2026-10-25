@@ -81,6 +81,15 @@ private actor FakeReminders: ReminderScheduling {
         #expect(router.showsDigest)
     }
 
+    @Test func aLinkWinsOverTheMorningDigest() throws {
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let router = Router()
+        router.open(try #require(URL(string: "vitalis://train")), at: now)
+        makeStore(fixture).presentDigestIfDue(router: router)
+        #expect(router.tab == .train && !router.showsDigest)
+        #expect(!router.openedByLink(now: now.addingTimeInterval(11)), "the digest can show on a later foreground")
+    }
+
     @Test func digestWaitsWhileAnotherSheetIsUp() {
         defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
         let router = Router()
