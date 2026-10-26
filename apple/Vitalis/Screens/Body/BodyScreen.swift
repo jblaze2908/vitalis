@@ -6,6 +6,7 @@ import VitalisUI
 struct BodyScreen: View {
     @State private var store: BodyStore
     @State private var showsLogWeight = false
+    @State private var path = Detail.launchPath("body")
     @Environment(Services.self) private var services: Services?
     private let live: Bool
     @Environment(Router.self) private var router
@@ -19,6 +20,12 @@ struct BodyScreen: View {
     private var v: BodyResponse? { store.value }
 
     var body: some View {
+        NavigationStack(path: $path) {
+            page.toolbar(.hidden, for: .navigationBar).detailDestinations()
+        }
+    }
+
+    private var page: some View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -29,17 +36,20 @@ struct BodyScreen: View {
                     }
                     .buttonStyle(.plain).accessibilityLabel("Log weight")
                 }
-                .padding(.top, 2).padding(.horizontal, 4)
+                .padding(.top, 2).padding(.horizontal, 20)
                 VStack(alignment: .leading, spacing: 0) {
                     if v == nil, store.body.error != nil, !store.body.isLoading {
                         unreachable
                     } else {
                         HeadlineLines(BodyCopy.headline(v?.weight), size: 36, colors: v == nil ? [VColor.steel] : []).padding(.top, 9)
                         weightHero.id(BodySection.weight)
+                        Text("Heart").vLabel().padding(.top, 22).padding(.bottom, 8)
+                        HeartTodayCard(store: .shared, live: live)
                         Text("Vitals vs usual").vLabel().padding(.top, 22).padding(.bottom, 8).id(BodySection.vitals)
                         vitalsCard
-                        Text("Activity · today").vLabel().padding(.top, 22).padding(.bottom, 4).id(BodySection.activity)
-                        ReadoutRow(BodyCopy.activity(v?.activity))
+                        Text("Activity · today").vLabel().padding(.top, 22).padding(.bottom, 8).id(BodySection.activity)
+                        activityCard
+                        RowsCard { DrillRow(.allData, value: "Every metric") { Text("All health data").vUI(15, weight: 600) } }.padding(.top, 22)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -72,6 +82,7 @@ struct BodyScreen: View {
             Figure(SleepBodyFormat.kg(w?.latest?.kg ?? w?.trendKg), unit: w?.latest == nil ? "kg trend" : "kg", size: 52,
                    color: w?.latest == nil && w?.trendKg == nil ? VColor.steel : nil).padding(.top, 16)
             WeightTrendChart(series: w?.series ?? [], goal: w?.goalKg).frame(height: 160)
+            RowsCard { DrillRow("Weight history", route: .metric(key: "weight_kg"), value: "90 days · 1 year") }
             ReadoutRow([
                 Readout("30 days", SleepBodyFormat.signedKg(w?.monthChangeKg),
                         status: w?.monthChangeKg == nil ? nil : w?.towardGoal == true ? ("Toward goal", .good) : ("Away from goal", .watch)),
@@ -86,16 +97,20 @@ struct BodyScreen: View {
             VStack(spacing: 0) {
                 let rows = v?.vitals ?? []
                 ForEach(Array(rows.enumerated()), id: \.element.key) { i, vital in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(BodyCopy.label(vital)).vUI(15, weight: 500).lineLimit(1)
-                            Text([SleepBodyFormat.vital(vital.value), vital.unit].compactMap { $0 }.joined(separator: " ")).vUI(13, weight: 400, color: VColor.muted)
+                    NavigationLink(value: Detail.metric(key: vital.key)) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(BodyCopy.label(vital)).vUI(15, weight: 500).lineLimit(1)
+                                Text([SleepBodyFormat.vital(vital.value), vital.unit].compactMap { $0 }.joined(separator: " ")).vUI(13, weight: 400, color: VColor.muted)
+                            }
+                            Spacer(minLength: 8)
+                            RangeDot(value: vital.value, range: vital.usualRange, tone: BodyCopy.tone(vital)).frame(width: 84, height: 12)
+                            StatusWord(BodyCopy.word(vital), tone: BodyCopy.tone(vital)).frame(width: 62, alignment: .trailing)
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color(hex: 0x5A5A5A))
                         }
-                        Spacer(minLength: 8)
-                        RangeDot(value: vital.value, range: vital.usualRange, tone: BodyCopy.tone(vital)).frame(width: 96, height: 12)
-                        StatusWord(BodyCopy.word(vital), tone: BodyCopy.tone(vital)).frame(width: 66, alignment: .trailing)
+                        .padding(.vertical, 12).contentShape(Rectangle())
                     }
-                    .padding(.vertical, 12)
+                    .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
                     if i < rows.count - 1 { Rectangle().fill(Color(hex: 0x232323)).frame(height: 1) }
                 }
@@ -104,6 +119,27 @@ struct BodyScreen: View {
     }
 
     // MARK: Weight
+
+    /// Today's activity; each figure opens its history.
+    private var activityCard: some View {
+        let a = v?.activity
+        return RowsCard {
+            DrillRow(.metric(key: "steps"), value: a?.stepsTarget.map { "of \(SleepBodyFormat.grouped($0))" }) {
+                activityLabel("Steps", SleepBodyFormat.grouped(a?.steps))
+            }
+            DrillRow(.metric(key: "active_kcal"), value: "kcal") { activityLabel("Active energy", a?.activeKcal.map { "\(Int($0.rounded()))" } ?? "–") }
+            DrillRow(.metric(key: "exercise_min"), value: a?.exerciseTargetMin.map { "of \($0) min" } ?? "min") {
+                activityLabel("Exercise", a?.exerciseMin.map(String.init) ?? "–")
+            }
+        }
+    }
+
+    private func activityLabel(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title).vUI(15, weight: 500).frame(width: 112, alignment: .leading)
+            Text(value).vFigure(18, color: value == "–" ? VColor.steel : nil)
+        }
+    }
 
     private var weight: some View {
         let w = v?.weight
@@ -443,12 +479,6 @@ enum BodyCopy {
     }
     static func word(_ v: BodyResponse.Vital) -> String { v.flag == "high" ? "High" : v.flag == "low" ? "Low" : v.value == nil ? "–" : "Usual" }
     static func tone(_ v: BodyResponse.Vital) -> VTone { v.flag == nil ? .usual : .watch }
-    static func activity(_ a: BodyResponse.Activity?) -> [Readout] {
-        [Readout("Steps", SleepBodyFormat.grouped(a?.steps), status: a?.stepsTarget.map { ("of \(SleepBodyFormat.grouped($0))", .quiet) }),
-         Readout("Active", a?.activeKcal.map { "\(Int($0.rounded()))" } ?? "–", status: ("kcal", .quiet)),
-         Readout("Exercise", a?.exerciseMin.map(String.init) ?? "–", status: a?.exerciseTargetMin.map { ("of \($0) min", .quiet) })]
-    }
-    /// "Weighed 08:10" today, else the day it was ("Weighed 24 Oct").
     static func when(_ iso: String) -> String? {
         guard let clock = APIDate.clockText(iso) else { return nil }
         let day = String(iso.prefix(10)), today = EatStore.iso(Date(), calendar: .current).prefix(10)

@@ -18,6 +18,8 @@ import VitalisKit
         "food-search-busy": FoodSearchResponse.self, "barcode": BarcodeResponse.self,
         "barcode-not-found": BarcodeResponse.self, "describe": DescribeResponse.self,
         "error-invalid": APIErrorBody.self, "error-unauthorized": APIErrorBody.self,
+        "heart": HeartDay.self, "metrics": MetricsOverview.self, "metric": MetricHistory.self,
+        "training-exercises": PerformedExercises.self, "training-session-hr": SessionDetail.self, "exercise-history": ExerciseDetail.self,
     ] }
 
     @Test(arguments: models.keys.sorted())

@@ -77,7 +77,7 @@ struct RootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .topLeading) { settingsButton }
+            .overlay(alignment: .topLeading) { if router.detailDepth == 0 { settingsButton } }
             .overlay(alignment: .bottom) {
                 // Eat draws its own toast; elsewhere a food add from Today still gets its Undo.
                 if router.tab != .eat, let toast = EatStore.shared.toast {
@@ -89,6 +89,7 @@ struct RootView: View {
             .animation(.easeOut(duration: 0.2), value: EatStore.shared.toast)
             if LiveSessionStore.shared.isLive, !router.showsLiveWorkout { resumeBar }
             TabBar(selection: $router.tab)
+                .onChange(of: router.tab) { router.detailDepth = 0 }
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .sheet(isPresented: $router.showsSettings) { SettingsScreen(model: model).preferredColorScheme(.dark) }

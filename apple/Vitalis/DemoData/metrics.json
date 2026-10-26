@@ -1,0 +1,685 @@
+{
+ "day": "2026-10-26",
+ "groups": [
+  {
+   "name": "Heart",
+   "metrics": [
+    {
+     "key": "resting_hr",
+     "name": "Resting heart rate",
+     "unit": "bpm",
+     "better": "lower",
+     "spark": [
+      54,
+      56,
+      58,
+      59,
+      58,
+      57,
+      55,
+      54,
+      54,
+      54,
+      56,
+      58,
+      58,
+      58
+     ],
+     "day": "2026-10-26",
+     "value": 58,
+     "usual": 56,
+     "usual_range": [
+      54,
+      58
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "hrv",
+     "name": "HRV",
+     "unit": "ms",
+     "better": "higher",
+     "spark": [
+      58,
+      59,
+      56,
+      49,
+      46,
+      47,
+      53,
+      58,
+      59,
+      56,
+      50,
+      46,
+      47,
+      53
+     ],
+     "day": "2026-10-26",
+     "value": 53,
+     "usual": 52,
+     "usual_range": [
+      45.9,
+      59
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "heart_rate",
+     "name": "Heart rate",
+     "unit": "bpm",
+     "better": "neutral",
+     "spark": [
+      75,
+      72,
+      69,
+      69,
+      72,
+      75,
+      75,
+      72,
+      69,
+      69,
+      72,
+      75,
+      78,
+      72
+     ],
+     "day": "2026-10-26",
+     "value": 72,
+     "usual": 72,
+     "usual_range": [
+      69,
+      75
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "walking_hr",
+     "name": "Walking heart rate",
+     "unit": "bpm",
+     "better": "lower",
+     "spark": [
+      98,
+      100,
+      100,
+      99,
+      97,
+      95,
+      93,
+      92,
+      92,
+      94,
+      96,
+      98,
+      100,
+      100
+     ],
+     "day": "2026-10-26",
+     "value": 100,
+     "usual": 96,
+     "usual_range": [
+      92,
+      100
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "vo2max",
+     "name": "VO₂ max",
+     "unit": "ml/kg/min",
+     "better": "higher",
+     "spark": [
+      null,
+      null,
+      null,
+      null,
+      43.6,
+      null,
+      null,
+      null,
+      null,
+      43.6,
+      null,
+      null,
+      null,
+      null
+     ],
+     "day": "2026-10-22",
+     "value": 43.6,
+     "usual": 43.4,
+     "usual_range": [
+      43.3,
+      43.6
+     ],
+     "flag": "high",
+     "reading": "better"
+    }
+   ]
+  },
+  {
+   "name": "Sleep",
+   "metrics": [
+    {
+     "key": "sleep_h",
+     "name": "Time asleep",
+     "unit": "hours",
+     "better": "higher",
+     "spark": [
+      7.14,
+      6.52,
+      6.14,
+      6.26,
+      6.6,
+      6.94,
+      7.06,
+      6.68,
+      6.06,
+      6.05,
+      6.79,
+      7.26,
+      6.83,
+      6.21
+     ],
+     "day": "2026-10-26",
+     "value": 6.21,
+     "usual": 6.6,
+     "usual_range": [
+      6.14,
+      7.06
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "deep_h",
+     "name": "Deep sleep",
+     "unit": "hours",
+     "better": "higher",
+     "spark": [
+      1.19,
+      1.12,
+      0.88,
+      0.81,
+      1,
+      1.19,
+      1.12,
+      0.88,
+      0.81,
+      1,
+      1.19,
+      1.12,
+      0.88,
+      0.81
+     ],
+     "day": "2026-10-26",
+     "value": 0.81,
+     "usual": 1,
+     "usual_range": [
+      0.81,
+      1.19
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "rem_h",
+     "name": "REM sleep",
+     "unit": "hours",
+     "better": "higher",
+     "spark": [
+      1.6,
+      1.4,
+      1.6,
+      1.8,
+      1.6,
+      1.4,
+      1.6,
+      1.8,
+      1.6,
+      1.4,
+      1.6,
+      1.8,
+      1.6,
+      1.4
+     ],
+     "day": "2026-10-26",
+     "value": 1.4,
+     "usual": 1.6,
+     "usual_range": [
+      1.4,
+      1.8
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "respiratory_rate",
+     "name": "Breathing rate",
+     "unit": "breaths/min",
+     "better": "neutral",
+     "spark": [
+      15.1,
+      14.9,
+      14.5,
+      14.1,
+      13.9,
+      14.1,
+      14.5,
+      14.9,
+      15.1,
+      14.9,
+      14.5,
+      14.1,
+      13.9,
+      14.1
+     ],
+     "day": "2026-10-26",
+     "value": 14.1,
+     "usual": 14.5,
+     "usual_range": [
+      13.9,
+      15.1
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "spo2",
+     "name": "Blood oxygen",
+     "unit": "%",
+     "better": "higher",
+     "spark": [
+      97.1,
+      96.7,
+      95.3,
+      94.9,
+      96,
+      97.1,
+      96.7,
+      95.3,
+      94.9,
+      96,
+      97.1,
+      96.7,
+      95.3,
+      94.9
+     ],
+     "day": "2026-10-26",
+     "value": 94.9,
+     "usual": 96,
+     "usual_range": [
+      94.9,
+      97.1
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "wrist_temp",
+     "name": "Wrist temperature",
+     "unit": "°C",
+     "better": "neutral",
+     "spark": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "day": null,
+     "value": null,
+     "usual": null,
+     "usual_range": null,
+     "flag": null,
+     "reading": null
+    }
+   ]
+  },
+  {
+   "name": "Activity",
+   "metrics": [
+    {
+     "key": "steps",
+     "name": "Steps",
+     "unit": "steps",
+     "better": "higher",
+     "spark": [
+      10499,
+      11132,
+      9856,
+      7731,
+      4955,
+      5588,
+      7752,
+      9916,
+      10549,
+      9273,
+      7148,
+      5872,
+      6505,
+      8669
+     ],
+     "day": "2026-10-26",
+     "value": 8669,
+     "usual": 7877,
+     "usual_range": [
+      5583,
+      10504
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "active_kcal",
+     "name": "Active energy",
+     "unit": "kcal",
+     "better": "higher",
+     "spark": [
+      597,
+      626,
+      545,
+      415,
+      334,
+      363,
+      480,
+      597,
+      626,
+      545,
+      415,
+      334,
+      363,
+      480
+     ],
+     "day": "2026-10-26",
+     "value": 480,
+     "usual": 480,
+     "usual_range": [
+      334,
+      626
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "exercise_min",
+     "name": "Exercise",
+     "unit": "min",
+     "better": "higher",
+     "spark": [
+      50,
+      53,
+      43,
+      25,
+      15,
+      18,
+      34,
+      50,
+      53,
+      43,
+      25,
+      15,
+      18,
+      34
+     ],
+     "day": "2026-10-26",
+     "value": 34,
+     "usual": 34,
+     "usual_range": [
+      15,
+      53
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "stand_hours",
+     "name": "Stand hours",
+     "unit": "hours",
+     "better": "higher",
+     "spark": [
+      12,
+      13,
+      10,
+      11,
+      12,
+      13,
+      10,
+      11,
+      12,
+      13,
+      10,
+      11,
+      12,
+      13
+     ],
+     "day": "2026-10-26",
+     "value": 13,
+     "usual": 12,
+     "usual_range": [
+      10,
+      13
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "distance_km",
+     "name": "Distance",
+     "unit": "km",
+     "better": "higher",
+     "spark": [
+      6.6,
+      7,
+      6,
+      4.4,
+      3.4,
+      3.8,
+      5.2,
+      6.6,
+      7,
+      6,
+      4.4,
+      3.4,
+      3.8,
+      5.2
+     ],
+     "day": "2026-10-26",
+     "value": 5.2,
+     "usual": 5.2,
+     "usual_range": [
+      3.4,
+      7
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "flights",
+     "name": "Flights climbed",
+     "unit": "flights",
+     "better": "higher",
+     "spark": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      6
+     ],
+     "day": "2026-10-26",
+     "value": 6,
+     "usual": 9,
+     "usual_range": [
+      6,
+      12
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "daylight_min",
+     "name": "Time in daylight",
+     "unit": "min",
+     "better": "higher",
+     "spark": [
+      52,
+      69,
+      86,
+      53,
+      70,
+      87,
+      54,
+      71,
+      88,
+      55,
+      72,
+      89,
+      56,
+      73
+     ],
+     "day": "2026-10-26",
+     "value": 73,
+     "usual": 66,
+     "usual_range": [
+      46,
+      86
+     ],
+     "flag": null,
+     "reading": null
+    },
+    {
+     "key": "resting_kcal",
+     "name": "Resting energy",
+     "unit": "kcal",
+     "better": "neutral",
+     "spark": [
+      2108,
+      2116,
+      2124,
+      2132,
+      2100,
+      2108,
+      2116,
+      2124,
+      2132,
+      2100,
+      2108,
+      2116,
+      2124,
+      2132
+     ],
+     "day": "2026-10-26",
+     "value": 2132,
+     "usual": 2116,
+     "usual_range": [
+      2100,
+      2132
+     ],
+     "flag": null,
+     "reading": null
+    }
+   ]
+  },
+  {
+   "name": "Body",
+   "metrics": [
+    {
+     "key": "weight_kg",
+     "name": "Weight",
+     "unit": "kg",
+     "better": "neutral",
+     "spark": [
+      88.1,
+      null,
+      87.5,
+      null,
+      87.7,
+      null,
+      87.9,
+      null,
+      87.3,
+      null,
+      88,
+      null,
+      87.4,
+      null
+     ],
+     "day": "2026-10-25",
+     "value": 87.4,
+     "usual": 88,
+     "usual_range": [
+      87.5,
+      88.4
+     ],
+     "flag": "low",
+     "reading": null
+    },
+    {
+     "key": "body_fat_pct",
+     "name": "Body fat",
+     "unit": "%",
+     "better": "neutral",
+     "spark": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      21.6,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      21.6
+     ],
+     "day": "2026-10-26",
+     "value": 21.6,
+     "usual": 21.8,
+     "usual_range": [
+      21.7,
+      21.9
+     ],
+     "flag": "low",
+     "reading": null
+    }
+   ]
+  }
+ ],
+ "freshness": {
+  "last_sync": "2026-10-26T11:25:11+05:30",
+  "data_through": {
+   "sleep": "2026-10-26",
+   "heart": "2026-10-26",
+   "activity": "2026-10-26",
+   "weight": "2026-10-25",
+   "food": null,
+   "training": "2026-10-25"
+  },
+  "today": "2026-10-26"
+ }
+}

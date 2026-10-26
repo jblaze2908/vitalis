@@ -56,6 +56,7 @@ struct TodayScreen: View {
     @State private var store: TodayStore
     @Environment(Router.self) private var router
     @Environment(\.scenePhase) private var scenePhase
+    @State private var path = Detail.launchPath("today")
     /// False in previews: no network, exporter, notifications or Services.
     private let live: Bool
 
@@ -65,6 +66,7 @@ struct TodayScreen: View {
     var body: some View {
         let status = store.status(now: store.now())
         let stale = status.isStale && store.today.value != nil
+        NavigationStack(path: $path) {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 TabHeader("Today") { headerTrailing(status) }
@@ -91,6 +93,9 @@ struct TodayScreen: View {
             }
         }
         .onChange(of: live ? Services.shared.writesVersion : 0) { Task { await store.refresh() } }
+        .toolbar(.hidden, for: .navigationBar)
+        .detailDestinations()
+        }
     }
 
     /// The date opens the digest; when the phone can't reach the server it says so instead.
@@ -119,8 +124,8 @@ struct TodayScreen: View {
                 recoveryCard(t?.recovery)
                 // Cards in a row share the taller one's height.
                 HStack(spacing: 10) {
-                    vitalCard("HRV", t?.recovery.parts?.hrv, unit: "ms")
-                    vitalCard("Resting HR", t?.recovery.parts?.restingHr, unit: "bpm")
+                    vitalCard("HRV", key: "hrv", t?.recovery.parts?.hrv, unit: "ms")
+                    vitalCard("Resting HR", key: "resting_hr", t?.recovery.parts?.restingHr, unit: "bpm")
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
@@ -160,10 +165,10 @@ struct TodayScreen: View {
         .accessibilityLabel(["Recovery", TodayFormat.number(r?.score) ?? "not available", r?.band].compactMap { $0 }.joined(separator: ", "))
     }
 
-    private func vitalCard(_ title: String, _ part: TodayResponse.VitalPart?, unit: String) -> some View {
+    private func vitalCard(_ title: String, key: String, _ part: TodayResponse.VitalPart?, unit: String) -> some View {
         let tone = VTone.server(part?.tint)
         let usual = part?.usualRange.flatMap { $0.count == 2 ? $0[0]...$0[1] : nil }
-        return tap({ router.showBody(.vitals) }) {
+        return tap({ path.append(.metric(key: key)) }) {
             VCard {
                 VStack(alignment: .leading, spacing: 0) {
                     CardHeader(title, status: part?.value == nil ? nil : (TodayCopy.vitalWord(part), tone))
@@ -207,7 +212,7 @@ struct TodayScreen: View {
 
     private func stepsCard(_ a: TodayResponse.Activity?) -> some View {
         let target = Double(a?.stepsTarget ?? 0), steps = Double(a?.steps ?? 0), expected = a?.stepsExpectedNow.map(Double.init)
-        return tap({ router.showBody(.activity) }) {
+        return tap({ path.append(.metric(key: "steps")) }) {
             VCard {
                 HStack(alignment: .bottom, spacing: 16) {
                     VStack(alignment: .leading, spacing: 14) {

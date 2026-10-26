@@ -150,6 +150,17 @@ public struct VitalisAPI: OutboxTransport {
     public func exercise(id: String) async throws -> APIResponse<ExerciseDetail> {
         try await get(ExerciseDetail.self, "v2/exercises/\(HTTPCore.pathSegment(id))")
     }
+    public func performedExercises() async throws -> APIResponse<PerformedExercises> {
+        try await get(PerformedExercises.self, "v2/training/exercises")
+    }
+    public func heart(date: String? = nil) async throws -> APIResponse<HeartDay> {
+        try await get(HeartDay.self, "v2/heart", query: Self.query(["date": date]))
+    }
+    public func metrics() async throws -> APIResponse<MetricsOverview> { try await get(MetricsOverview.self, "v2/metrics") }
+    /// `days` is one of 7, 30, 90, 365; `end` nil = today.
+    public func metric(key: String, days: Int, end: String? = nil) async throws -> APIResponse<MetricHistory> {
+        try await get(MetricHistory.self, "v2/metrics/\(HTTPCore.pathSegment(key))", query: Self.query(["days": String(days), "end": end]))
+    }
     public func foodDay(date: String? = nil) async throws -> APIResponse<FoodDay> {
         try await get(FoodDay.self, "v2/food/day", query: Self.query(["date": date]))
     }

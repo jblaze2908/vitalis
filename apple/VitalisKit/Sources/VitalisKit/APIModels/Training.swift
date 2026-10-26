@@ -113,6 +113,7 @@ public struct SessionDetail: Codable, Sendable, Equatable {
     public let hrMax: Double?
     public let distanceKm: Double?
     public let source: String?
+    public let hr: WorkoutHeart?
     public let freshness: Freshness?
 
     public var isCardio: Bool { kind == "cardio" }
@@ -182,6 +183,15 @@ public struct ExerciseDetail: Codable, Sendable, Equatable {
         public let day: String
         public let sets: [PlannedSet]
     }
+    public struct Performance: Codable, Sendable, Equatable {
+        public let sessionId: String
+        public let day: String
+        public let title: String?
+        public let bestSet: String?
+        public let e1rmKg: Double?
+        public let volumeKg: Double?
+        public let sets: [PlannedSet]
+    }
     public let exercise: ExerciseInfo
     public let contextLabel: String?
     public let e1rm: E1RM?
@@ -189,6 +199,7 @@ public struct ExerciseDetail: Codable, Sendable, Equatable {
     public let next: Next?
     public let lastSession: LastSession?
     public let sessionsTotal: Int?
+    public let history: [Performance]?
     public let freshness: Freshness?
 }
 

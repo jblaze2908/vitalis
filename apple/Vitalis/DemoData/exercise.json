@@ -1,145 +1,497 @@
 {
-  "exercise": {
-    "id": "barbell-bench-press-medium-grip",
-    "name": "Barbell Bench Press - Medium Grip",
-    "equipment": "barbell",
-    "primary": [
-      "chest"
-    ],
-    "secondary": [
-      "shoulders",
-      "triceps"
-    ]
-  },
-  "context_label": "BARBELL · CHEST, SHOULDERS, TRICEPS",
-  "e1rm": {
-    "current_kg": 78.5,
-    "change_8w_kg": -15.2,
-    "points": [
-      {
-        "day": "2026-08-05",
-        "kg": 81.1,
-        "session_id": "77048f44-b709-4699-9680-56c1c6107a53"
-      },
-      {
-        "day": "2026-08-11",
-        "kg": 88.7,
-        "session_id": "d953fca6-575c-454d-8d07-9159ae9245ff"
-      },
-      {
-        "day": "2026-08-17",
-        "kg": 96.3,
-        "session_id": "29a78d08-6052-40b9-9f96-4747490db00f"
-      },
-      {
-        "day": "2026-08-23",
-        "kg": 78.5,
-        "session_id": "aa1954c0-cc07-4421-aca2-5421e7bcc4b2"
-      },
-      {
-        "day": "2026-08-29",
-        "kg": 86.1,
-        "session_id": "ac691162-bd08-4aaf-8500-39935d419b1f"
-      },
-      {
-        "day": "2026-09-04",
-        "kg": 93.7,
-        "session_id": "71d176d6-c721-48a1-979d-f1787a59e430"
-      },
-      {
-        "day": "2026-09-10",
-        "kg": 76,
-        "session_id": "17251166-a1b8-4b0d-9592-7fe457335e31"
-      },
-      {
-        "day": "2026-09-16",
-        "kg": 83.6,
-        "session_id": "b6a3c40a-6cfe-4af8-8c40-156fc90401a1"
-      },
-      {
-        "day": "2026-09-22",
-        "kg": 91.2,
-        "session_id": "d3acbc9e-f208-4435-8292-905f6fea51d5"
-      },
-      {
-        "day": "2026-09-28",
-        "kg": 98.8,
-        "session_id": "dbbf283e-6c21-4aa6-84ac-06eeb7e18730"
-      },
-      {
-        "day": "2026-10-04",
-        "kg": 81.1,
-        "session_id": "7f248a52-0126-4e31-b16d-416f313b0c9a"
-      },
-      {
-        "day": "2026-10-10",
-        "kg": 88.7,
-        "session_id": "dcd51a0a-4fb2-434f-940c-61b352a2ae99"
-      },
-      {
-        "day": "2026-10-16",
-        "kg": 96.3,
-        "session_id": "c270ad66-b4ff-4578-9d15-da51aaf16d42"
-      },
-      {
-        "day": "2026-10-22",
-        "kg": 78.5,
-        "session_id": "ef7647ca-7072-4dfa-bdd5-48bd91c05e24"
-      }
-    ],
-    "estimate": true
-  },
-  "records": {
-    "best_e1rm_kg": 98.8,
-    "best_set": "78 kg × 8",
-    "on": "2026-09-28",
-    "heaviest_kg": 78
-  },
-  "next": {
-    "rule": "double progression on the top working weight; step 2.5 kg (barbell)",
-    "last_top": "62 kg × 8, 8, 8, 8",
-    "suggestion": "64.5 kg × 8 for 4 sets",
-    "weight_kg": 64.5,
-    "reps": 8,
-    "sets": 4
-  },
-  "last_session": {
-    "session_id": "ef7647ca-7072-4dfa-bdd5-48bd91c05e24",
-    "day": "2026-10-22",
-    "sets": [
-      {
-        "kind": "normal",
-        "weight_kg": 62,
-        "reps": 8
-      },
-      {
-        "kind": "normal",
-        "weight_kg": 62,
-        "reps": 8
-      },
-      {
-        "kind": "normal",
-        "weight_kg": 62,
-        "reps": 8
-      },
-      {
-        "kind": "normal",
-        "weight_kg": 62,
-        "reps": 8
-      }
-    ]
-  },
-  "sessions_total": 61,
-  "freshness": {
-    "last_sync": "2026-10-24T21:44:13+05:30",
-    "data_through": {
-      "sleep": "2026-10-24",
-      "heart": "2026-10-24",
-      "activity": "2026-10-24",
-      "weight": "2026-10-24",
-      "food": "2026-10-24",
-      "training": "2026-10-24"
+ "exercise": {
+  "id": "barbell-bench-press-medium-grip",
+  "name": "Barbell Bench Press - Medium Grip",
+  "equipment": "barbell",
+  "primary": [
+   "chest"
+  ],
+  "secondary": [
+   "shoulders",
+   "triceps"
+  ]
+ },
+ "context_label": "BARBELL · CHEST, SHOULDERS, TRICEPS",
+ "e1rm": {
+  "current_kg": 101.3,
+  "change_8w_kg": 15.8,
+  "points": [
+   {
+    "day": "2026-08-20",
+    "kg": 82.3,
+    "session_id": "D-33"
+   },
+   {
+    "day": "2026-08-26",
+    "kg": 82.3,
+    "session_id": "D-30"
+   },
+   {
+    "day": "2026-09-01",
+    "kg": 85.5,
+    "session_id": "D-27"
+   },
+   {
+    "day": "2026-09-07",
+    "kg": 85.5,
+    "session_id": "D-24"
+   },
+   {
+    "day": "2026-09-13",
+    "kg": 88.7,
+    "session_id": "D-21"
+   },
+   {
+    "day": "2026-09-19",
+    "kg": 91.8,
+    "session_id": "D-18"
+   },
+   {
+    "day": "2026-09-25",
+    "kg": 91.8,
+    "session_id": "D-15"
+   },
+   {
+    "day": "2026-10-01",
+    "kg": 95,
+    "session_id": "D-12"
+   },
+   {
+    "day": "2026-10-07",
+    "kg": 95,
+    "session_id": "D-9"
+   },
+   {
+    "day": "2026-10-13",
+    "kg": 98.2,
+    "session_id": "D-6"
+   },
+   {
+    "day": "2026-10-19",
+    "kg": 98.2,
+    "session_id": "D-3"
+   },
+   {
+    "day": "2026-10-25",
+    "kg": 101.3,
+    "session_id": "D-0"
+   }
+  ],
+  "estimate": true
+ },
+ "records": {
+  "best_e1rm_kg": 101.3,
+  "best_set": "80 kg × 8",
+  "on": "2026-10-25",
+  "heaviest_kg": 80
+ },
+ "next": {
+  "rule": "double progression on the top working weight; step 2.5 kg (barbell)",
+  "last_top": "80 kg × 8, 8, 7",
+  "suggestion": "stay at 80 kg until every set reaches 8 reps",
+  "weight_kg": 80,
+  "reps": 8,
+  "sets": 3
+ },
+ "last_session": {
+  "session_id": "D-0",
+  "day": "2026-10-25",
+  "sets": [
+   {
+    "kind": "warmup",
+    "weight_kg": 47.5,
+    "reps": 10
+   },
+   {
+    "kind": "normal",
+    "weight_kg": 80,
+    "reps": 8
+   },
+   {
+    "kind": "normal",
+    "weight_kg": 80,
+    "reps": 8
+   },
+   {
+    "kind": "normal",
+    "weight_kg": 80,
+    "reps": 7
+   }
+  ]
+ },
+ "sessions_total": 12,
+ "history": [
+  {
+   "session_id": "D-0",
+   "day": "2026-10-25",
+   "title": "Push",
+   "best_set": "80 kg × 8",
+   "e1rm_kg": 101.3,
+   "volume_kg": 1840,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 47.5,
+     "reps": 10
     },
-    "today": "2026-10-24"
+    {
+     "kind": "normal",
+     "weight_kg": 80,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 80,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 80,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-3",
+   "day": "2026-10-19",
+   "title": "Push",
+   "best_set": "77.5 kg × 8",
+   "e1rm_kg": 98.2,
+   "volume_kg": 1783,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 47.5,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 77.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 77.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 77.5,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-6",
+   "day": "2026-10-13",
+   "title": "Push",
+   "best_set": "77.5 kg × 8",
+   "e1rm_kg": 98.2,
+   "volume_kg": 1783,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 47.5,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 77.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 77.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 77.5,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-9",
+   "day": "2026-10-07",
+   "title": "Push",
+   "best_set": "75 kg × 8",
+   "e1rm_kg": 95,
+   "volume_kg": 1725,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 45,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 75,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 75,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 75,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-12",
+   "day": "2026-10-01",
+   "title": "Push",
+   "best_set": "75 kg × 8",
+   "e1rm_kg": 95,
+   "volume_kg": 1725,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 45,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 75,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 75,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 75,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-15",
+   "day": "2026-09-25",
+   "title": "Push",
+   "best_set": "72.5 kg × 8",
+   "e1rm_kg": 91.8,
+   "volume_kg": 1668,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 42.5,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 72.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 72.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 72.5,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-18",
+   "day": "2026-09-19",
+   "title": "Push",
+   "best_set": "72.5 kg × 8",
+   "e1rm_kg": 91.8,
+   "volume_kg": 1668,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 42.5,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 72.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 72.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 72.5,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-21",
+   "day": "2026-09-13",
+   "title": "Push",
+   "best_set": "70 kg × 8",
+   "e1rm_kg": 88.7,
+   "volume_kg": 1610,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 42.5,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 70,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 70,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 70,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-24",
+   "day": "2026-09-07",
+   "title": "Push",
+   "best_set": "67.5 kg × 8",
+   "e1rm_kg": 85.5,
+   "volume_kg": 1553,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 40,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 67.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 67.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 67.5,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-27",
+   "day": "2026-09-01",
+   "title": "Push",
+   "best_set": "67.5 kg × 8",
+   "e1rm_kg": 85.5,
+   "volume_kg": 1553,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 40,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 67.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 67.5,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 67.5,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-30",
+   "day": "2026-08-26",
+   "title": "Push",
+   "best_set": "65 kg × 8",
+   "e1rm_kg": 82.3,
+   "volume_kg": 1495,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 40,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 65,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 65,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 65,
+     "reps": 7
+    }
+   ]
+  },
+  {
+   "session_id": "D-33",
+   "day": "2026-08-20",
+   "title": "Push",
+   "best_set": "65 kg × 8",
+   "e1rm_kg": 82.3,
+   "volume_kg": 1495,
+   "sets": [
+    {
+     "kind": "warmup",
+     "weight_kg": 37.5,
+     "reps": 10
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 65,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 65,
+     "reps": 8
+    },
+    {
+     "kind": "normal",
+     "weight_kg": 65,
+     "reps": 7
+    }
+   ]
   }
+ ],
+ "freshness": {
+  "last_sync": "2026-10-26T11:25:11+05:30",
+  "data_through": {
+   "sleep": "2026-10-26",
+   "heart": "2026-10-26",
+   "activity": "2026-10-26",
+   "weight": "2026-10-25",
+   "food": null,
+   "training": "2026-10-25"
+  },
+  "today": "2026-10-26"
+ }
 }

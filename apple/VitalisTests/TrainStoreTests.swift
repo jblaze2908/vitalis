@@ -31,10 +31,7 @@ import VitalisKit
         let (store, host) = try stubbedStore()
         await store.load()
         let week = ["7ad4a98b-290a-4d12-b99a-c3ab21b20d1d", "ef7647ca-7072-4dfa-bdd5-48bd91c05e24", "5b995e50-20bc-4aa2-9145-b9b49fb7f76f"]
-        #expect(store.sessions.map(\.id) == week)
-
-        // The first history page repeats this week's three sessions.
-        await store.loadMore()
+        // Load also fetches the first history page, which repeats this week's three sessions.
         #expect(store.sessions.map(\.id) == week)
         #expect(store.hasMore)
         #expect(store.nextCursor == "MTc5MjQ5OTQwMDAwMDo1Yjk5NWU1MC0yMGJjLTRhYTItOTE0NS1iOWI0OWZiN2Y3NmY")
@@ -52,7 +49,7 @@ import VitalisKit
 
     @Test func finishPushesTheSessionDetail() {
         let store = TrainStore(api: { nil })
-        store.path = [.exercise(id: "x", back: "Push")]
+        store.path = [.exercise(id: "x")]
         store.showFinished("ABC")
         #expect(store.path == [.session(id: "ABC")])
         #expect(store.isPending("ABC"))

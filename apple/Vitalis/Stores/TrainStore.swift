@@ -29,7 +29,7 @@ final class TrainStore {
     private(set) var isPaging = false
     private(set) var pageError: Error?
     private(set) var pulse: PulsePositions?
-    var path: [TrainRoute] = []
+    var path = Detail.launchPath("train")
     /// Set by Finish: the detail may 404 until the outbox delivers the session, so it shows loading meanwhile.
     private(set) var pendingSessionID: String?
 
@@ -49,6 +49,7 @@ final class TrainStore {
     func load() async {
         guard let api = api() else { return }
         await week.load(cached: { await api.cached(TrainingResponse.self, path: "v2/training") }) { try await api.training() }
+        if history.isEmpty, nextCursor == nil { await loadMore() }
         pulse = await Self.cachedPulse(api: api, now: Date())
     }
 

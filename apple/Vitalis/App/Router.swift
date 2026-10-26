@@ -25,6 +25,8 @@ final class Router {
     var settingsPath: [SettingsPage] = []
     /// Consumed by Body once it has scrolled there.
     var bodySection: BodySection?
+    /// Detail screens on show; the floating Settings gear hides while any is up, since their back button sits in its corner.
+    var detailDepth = 0
     /// When a URL last opened the app: the morning digest waits so it doesn't cover where the link (Siri, a widget) went.
     private(set) var linkedAt: Date?
 

@@ -1,172 +1,425 @@
 {
-  "id": "7ad4a98b-290a-4d12-b99a-c3ab21b20d1d",
-  "kind": "strength",
-  "title": "pull",
-  "template": null,
-  "client_source": null,
-  "start": "2026-10-24T18:00:00+05:30",
-  "end": "2026-10-24T18:30:00+05:30",
-  "duration_min": 30,
-  "context_label": "SAT 24 OCT · 18:00 · 30 MIN",
-  "working_sets": 12,
-  "volume_kg": 6144,
-  "avg_bpm": null,
-  "active_kcal": null,
-  "heat": {
-    "abdominals": 0,
-    "abductors": 0,
-    "adductors": 0,
-    "biceps": 4,
-    "calves": 0,
-    "chest": 0,
-    "forearms": 3,
-    "glutes": 0,
-    "hamstrings": 0,
-    "lats": 4,
-    "lower-back": 0,
-    "middle-back": 4,
-    "neck": 0,
-    "quadriceps": 0,
-    "shoulders": 4,
-    "traps": 0,
-    "triceps": 0
-  },
-  "exercises": [
+ "id": "D-0",
+ "kind": "strength",
+ "title": "Push",
+ "template": null,
+ "client_source": "phone",
+ "start": "2026-10-25T18:00:00+05:30",
+ "end": "2026-10-25T19:00:00+05:30",
+ "duration_min": 60,
+ "context_label": "SUN 25 OCT · 18:00 · 60 MIN",
+ "working_sets": 9,
+ "volume_kg": 3105,
+ "avg_bpm": null,
+ "active_kcal": null,
+ "heat": {
+  "abdominals": 0,
+  "abductors": 0,
+  "adductors": 0,
+  "biceps": 0,
+  "calves": 0,
+  "chest": 3,
+  "forearms": 0,
+  "glutes": 0,
+  "hamstrings": 0,
+  "lats": 0,
+  "lower-back": 0,
+  "middle-back": 0,
+  "neck": 0,
+  "quadriceps": 0,
+  "shoulders": 4,
+  "traps": 0,
+  "triceps": 4
+ },
+ "exercises": [
+  {
+   "id": "barbell-bench-press-medium-grip",
+   "name": "Barbell Bench Press - Medium Grip",
+   "working_sets": 3,
+   "top_set": {
+    "weight_kg": 80,
+    "reps": 8
+   },
+   "summary": "3 SETS · TOP 80 X 8",
+   "pr": true,
+   "sets": [
     {
-      "id": "wide-grip-lat-pulldown",
-      "name": "Wide-Grip Lat Pulldown",
-      "working_sets": 4,
-      "top_set": {
-        "weight_kg": 64,
-        "reps": 8
-      },
-      "summary": "4 SETS · TOP 64 X 8",
-      "pr": false,
-      "sets": [
-        {
-          "id": "s-2026-10-24-0-0",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:00:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-0-1",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:02:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-0-2",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:04:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-0-3",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:06:00+05:30"
-        }
-      ]
+     "id": "D-0-0-0",
+     "kind": "warmup",
+     "weight_kg": 47.5,
+     "reps": 10,
+     "at": "2026-10-25T18:01:00+05:30"
     },
     {
-      "id": "bent-over-barbell-row",
-      "name": "Bent Over Barbell Row",
-      "working_sets": 4,
-      "top_set": {
-        "weight_kg": 64,
-        "reps": 8
-      },
-      "summary": "4 SETS · TOP 64 X 8",
-      "pr": false,
-      "sets": [
-        {
-          "id": "s-2026-10-24-1-0",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:12:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-1-1",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:14:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-1-2",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:16:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-1-3",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:18:00+05:30"
-        }
-      ]
+     "id": "D-0-0-1",
+     "kind": "normal",
+     "weight_kg": 80,
+     "reps": 8,
+     "at": "2026-10-25T18:05:00+05:30"
     },
     {
-      "id": "barbell-curl",
-      "name": "Barbell Curl",
-      "working_sets": 4,
-      "top_set": {
-        "weight_kg": 64,
-        "reps": 8
-      },
-      "summary": "4 SETS · TOP 64 X 8",
-      "pr": false,
-      "sets": [
-        {
-          "id": "s-2026-10-24-2-0",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:24:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-2-1",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:26:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-2-2",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:28:00+05:30"
-        },
-        {
-          "id": "s-2026-10-24-2-3",
-          "kind": "normal",
-          "weight_kg": 64,
-          "reps": 8,
-          "at": "2026-10-24T18:30:00+05:30"
-        }
-      ]
+     "id": "D-0-0-2",
+     "kind": "normal",
+     "weight_kg": 80,
+     "reps": 8,
+     "at": "2026-10-25T18:09:00+05:30"
+    },
+    {
+     "id": "D-0-0-3",
+     "kind": "normal",
+     "weight_kg": 80,
+     "reps": 7,
+     "at": "2026-10-25T18:13:00+05:30"
     }
-  ],
-  "watch": null,
-  "freshness": {
-    "last_sync": "2026-10-24T21:44:13+05:30",
-    "data_through": {
-      "sleep": "2026-10-24",
-      "heart": "2026-10-24",
-      "activity": "2026-10-24",
-      "weight": "2026-10-24",
-      "food": "2026-10-24",
-      "training": "2026-10-24"
+   ]
+  },
+  {
+   "id": "dumbbell-shoulder-press",
+   "name": "Dumbbell Shoulder Press",
+   "working_sets": 3,
+   "top_set": {
+    "weight_kg": 25,
+    "reps": 8
+   },
+   "summary": "3 SETS · TOP 25 X 8",
+   "pr": false,
+   "sets": [
+    {
+     "id": "D-0-1-0",
+     "kind": "warmup",
+     "weight_kg": 15,
+     "reps": 10,
+     "at": "2026-10-25T18:19:00+05:30"
     },
-    "today": "2026-10-24"
+    {
+     "id": "D-0-1-1",
+     "kind": "normal",
+     "weight_kg": 25,
+     "reps": 8,
+     "at": "2026-10-25T18:23:00+05:30"
+    },
+    {
+     "id": "D-0-1-2",
+     "kind": "normal",
+     "weight_kg": 25,
+     "reps": 8,
+     "at": "2026-10-25T18:27:00+05:30"
+    },
+    {
+     "id": "D-0-1-3",
+     "kind": "normal",
+     "weight_kg": 25,
+     "reps": 7,
+     "at": "2026-10-25T18:31:00+05:30"
+    }
+   ]
+  },
+  {
+   "id": "triceps-pushdown",
+   "name": "Triceps Pushdown",
+   "working_sets": 3,
+   "top_set": {
+    "weight_kg": 30,
+    "reps": 8
+   },
+   "summary": "3 SETS · TOP 30 X 8",
+   "pr": false,
+   "sets": [
+    {
+     "id": "D-0-2-0",
+     "kind": "warmup",
+     "weight_kg": 17.5,
+     "reps": 10,
+     "at": "2026-10-25T18:37:00+05:30"
+    },
+    {
+     "id": "D-0-2-1",
+     "kind": "normal",
+     "weight_kg": 30,
+     "reps": 8,
+     "at": "2026-10-25T18:41:00+05:30"
+    },
+    {
+     "id": "D-0-2-2",
+     "kind": "normal",
+     "weight_kg": 30,
+     "reps": 8,
+     "at": "2026-10-25T18:45:00+05:30"
+    },
+    {
+     "id": "D-0-2-3",
+     "kind": "normal",
+     "weight_kg": 30,
+     "reps": 7,
+     "at": "2026-10-25T18:49:00+05:30"
+    }
+   ]
   }
+ ],
+ "watch": null,
+ "hr": {
+  "bucket_s": 15,
+  "points": [
+   {
+    "s": 0,
+    "bpm": 132
+   },
+   {
+    "s": 60,
+    "bpm": 140
+   },
+   {
+    "s": 120,
+    "bpm": 118
+   },
+   {
+    "s": 180,
+    "bpm": 96
+   },
+   {
+    "s": 240,
+    "bpm": 132
+   },
+   {
+    "s": 300,
+    "bpm": 140
+   },
+   {
+    "s": 360,
+    "bpm": 118
+   },
+   {
+    "s": 420,
+    "bpm": 96
+   },
+   {
+    "s": 480,
+    "bpm": 132
+   },
+   {
+    "s": 540,
+    "bpm": 140
+   },
+   {
+    "s": 600,
+    "bpm": 118
+   },
+   {
+    "s": 660,
+    "bpm": 96
+   },
+   {
+    "s": 720,
+    "bpm": 132
+   },
+   {
+    "s": 780,
+    "bpm": 140
+   },
+   {
+    "s": 840,
+    "bpm": 118
+   },
+   {
+    "s": 900,
+    "bpm": 96
+   },
+   {
+    "s": 960,
+    "bpm": 132
+   },
+   {
+    "s": 1020,
+    "bpm": 140
+   },
+   {
+    "s": 1080,
+    "bpm": 118
+   },
+   {
+    "s": 1140,
+    "bpm": 96
+   },
+   {
+    "s": 1200,
+    "bpm": 132
+   },
+   {
+    "s": 1260,
+    "bpm": 140
+   },
+   {
+    "s": 1320,
+    "bpm": 118
+   },
+   {
+    "s": 1380,
+    "bpm": 96
+   },
+   {
+    "s": 1440,
+    "bpm": 132
+   },
+   {
+    "s": 1500,
+    "bpm": 140
+   },
+   {
+    "s": 1560,
+    "bpm": 118
+   },
+   {
+    "s": 1620,
+    "bpm": 96
+   },
+   {
+    "s": 1680,
+    "bpm": 132
+   },
+   {
+    "s": 1740,
+    "bpm": 140
+   },
+   {
+    "s": 1800,
+    "bpm": 118
+   },
+   {
+    "s": 1860,
+    "bpm": 96
+   },
+   {
+    "s": 1920,
+    "bpm": 132
+   },
+   {
+    "s": 1980,
+    "bpm": 140
+   },
+   {
+    "s": 2040,
+    "bpm": 118
+   },
+   {
+    "s": 2100,
+    "bpm": 96
+   },
+   {
+    "s": 2160,
+    "bpm": 132
+   },
+   {
+    "s": 2220,
+    "bpm": 140
+   },
+   {
+    "s": 2280,
+    "bpm": 118
+   },
+   {
+    "s": 2340,
+    "bpm": 96
+   },
+   {
+    "s": 2400,
+    "bpm": 132
+   },
+   {
+    "s": 2460,
+    "bpm": 140
+   },
+   {
+    "s": 2520,
+    "bpm": 118
+   },
+   {
+    "s": 2580,
+    "bpm": 96
+   },
+   {
+    "s": 2640,
+    "bpm": 132
+   },
+   {
+    "s": 2700,
+    "bpm": 140
+   },
+   {
+    "s": 2760,
+    "bpm": 118
+   },
+   {
+    "s": 2820,
+    "bpm": 96
+   },
+   {
+    "s": 2880,
+    "bpm": 132
+   },
+   {
+    "s": 2940,
+    "bpm": 140
+   },
+   {
+    "s": 3000,
+    "bpm": 118
+   },
+   {
+    "s": 3060,
+    "bpm": 96
+   },
+   {
+    "s": 3120,
+    "bpm": 132
+   },
+   {
+    "s": 3180,
+    "bpm": 140
+   },
+   {
+    "s": 3240,
+    "bpm": 118
+   },
+   {
+    "s": 3300,
+    "bpm": 96
+   },
+   {
+    "s": 3360,
+    "bpm": 132
+   },
+   {
+    "s": 3420,
+    "bpm": 140
+   },
+   {
+    "s": 3480,
+    "bpm": 118
+   },
+   {
+    "s": 3540,
+    "bpm": 96
+   },
+   {
+    "s": 3600,
+    "bpm": 65
+   }
+  ],
+  "min": 65,
+  "avg": 121,
+  "max": 140,
+  "start": "2026-10-25T18:00:00+05:30"
+ },
+ "freshness": {
+  "last_sync": "2026-10-26T11:25:11+05:30",
+  "data_through": {
+   "sleep": "2026-10-26",
+   "heart": "2026-10-26",
+   "activity": "2026-10-26",
+   "weight": "2026-10-25",
+   "food": null,
+   "training": "2026-10-25"
+  },
+  "today": "2026-10-26"
+ }
 }

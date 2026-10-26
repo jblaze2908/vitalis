@@ -1,0 +1,314 @@
+{
+ "count": 9,
+ "exercises": [
+  {
+   "id": "barbell-bench-press-medium-grip",
+   "name": "Barbell Bench Press - Medium Grip",
+   "equipment": "barbell",
+   "primary": [
+    "chest"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-25",
+   "last_top": {
+    "weight_kg": 80,
+    "reps": 8
+   },
+   "heaviest_kg": 80,
+   "best_e1rm_kg": 101.3,
+   "e1rm_kg": 101.3,
+   "change_8w_kg": 15.8,
+   "spark": [
+    82.3,
+    82.3,
+    85.5,
+    85.5,
+    88.7,
+    91.8,
+    91.8,
+    95,
+    95,
+    98.2,
+    98.2,
+    101.3
+   ]
+  },
+  {
+   "id": "dumbbell-shoulder-press",
+   "name": "Dumbbell Shoulder Press",
+   "equipment": "dumbbell",
+   "primary": [
+    "shoulders"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-25",
+   "last_top": {
+    "weight_kg": 25,
+    "reps": 8
+   },
+   "heaviest_kg": 25,
+   "best_e1rm_kg": 31.7,
+   "e1rm_kg": 31.7,
+   "change_8w_kg": 3.2,
+   "spark": [
+    25.3,
+    28.5,
+    28.5,
+    28.5,
+    28.5,
+    28.5,
+    28.5,
+    31.7,
+    31.7,
+    31.7,
+    31.7,
+    31.7
+   ]
+  },
+  {
+   "id": "triceps-pushdown",
+   "name": "Triceps Pushdown",
+   "equipment": "cable",
+   "primary": [
+    "triceps"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-25",
+   "last_top": {
+    "weight_kg": 30,
+    "reps": 8
+   },
+   "heaviest_kg": 30,
+   "best_e1rm_kg": 38,
+   "e1rm_kg": 38,
+   "change_8w_kg": 6.3,
+   "spark": [
+    31.7,
+    31.7,
+    31.7,
+    31.7,
+    31.7,
+    34.8,
+    34.8,
+    34.8,
+    34.8,
+    38,
+    38,
+    38
+   ]
+  },
+  {
+   "id": "wide-grip-lat-pulldown",
+   "name": "Wide-Grip Lat Pulldown",
+   "equipment": "cable",
+   "primary": [
+    "lats"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-23",
+   "last_top": {
+    "weight_kg": 60,
+    "reps": 8
+   },
+   "heaviest_kg": 60,
+   "best_e1rm_kg": 76,
+   "e1rm_kg": 76,
+   "change_8w_kg": 12.7,
+   "spark": [
+    60.2,
+    63.3,
+    63.3,
+    63.3,
+    66.5,
+    66.5,
+    69.7,
+    69.7,
+    72.8,
+    72.8,
+    72.8,
+    76
+   ]
+  },
+  {
+   "id": "bent-over-barbell-row",
+   "name": "Bent Over Barbell Row",
+   "equipment": "barbell",
+   "primary": [
+    "middle-back"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-23",
+   "last_top": {
+    "weight_kg": 70,
+    "reps": 8
+   },
+   "heaviest_kg": 70,
+   "best_e1rm_kg": 88.7,
+   "e1rm_kg": 88.7,
+   "change_8w_kg": 12.7,
+   "spark": [
+    69.7,
+    72.8,
+    72.8,
+    76,
+    76,
+    79.2,
+    79.2,
+    82.3,
+    82.3,
+    85.5,
+    85.5,
+    88.7
+   ]
+  },
+  {
+   "id": "barbell-curl",
+   "name": "Barbell Curl",
+   "equipment": "barbell",
+   "primary": [
+    "biceps"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-23",
+   "last_top": {
+    "weight_kg": 32.5,
+    "reps": 8
+   },
+   "heaviest_kg": 32.5,
+   "best_e1rm_kg": 41.2,
+   "e1rm_kg": 41.2,
+   "change_8w_kg": 6.4,
+   "spark": [
+    31.7,
+    31.7,
+    34.8,
+    34.8,
+    34.8,
+    34.8,
+    38,
+    38,
+    38,
+    38,
+    38,
+    41.2
+   ]
+  },
+  {
+   "id": "barbell-squat",
+   "name": "Barbell Squat",
+   "equipment": "barbell",
+   "primary": [
+    "quadriceps"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-20",
+   "last_top": {
+    "weight_kg": 107.5,
+    "reps": 8
+   },
+   "heaviest_kg": 107.5,
+   "best_e1rm_kg": 136.2,
+   "e1rm_kg": 136.2,
+   "change_8w_kg": 19,
+   "spark": [
+    110.8,
+    114,
+    114,
+    117.2,
+    120.3,
+    123.5,
+    126.7,
+    126.7,
+    129.8,
+    133,
+    136.2,
+    136.2
+   ]
+  },
+  {
+   "id": "romanian-deadlift",
+   "name": "Romanian Deadlift",
+   "equipment": "barbell",
+   "primary": [
+    "hamstrings"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-20",
+   "last_top": {
+    "weight_kg": 90,
+    "reps": 8
+   },
+   "heaviest_kg": 90,
+   "best_e1rm_kg": 114,
+   "e1rm_kg": 114,
+   "change_8w_kg": 19,
+   "spark": [
+    88.7,
+    91.8,
+    95,
+    95,
+    98.2,
+    101.3,
+    101.3,
+    104.5,
+    107.7,
+    107.7,
+    110.8,
+    114
+   ]
+  },
+  {
+   "id": "leg-press",
+   "name": "Leg Press",
+   "equipment": "machine",
+   "primary": [
+    "quadriceps"
+   ],
+   "sessions": 12,
+   "working_sets": 36,
+   "last_day": "2026-10-20",
+   "last_top": {
+    "weight_kg": 177.5,
+    "reps": 8
+   },
+   "heaviest_kg": 177.5,
+   "best_e1rm_kg": 224.8,
+   "e1rm_kg": 224.8,
+   "change_8w_kg": 31.6,
+   "spark": [
+    180.5,
+    183.7,
+    186.8,
+    193.2,
+    196.3,
+    199.5,
+    205.8,
+    209,
+    212.2,
+    218.5,
+    221.7,
+    224.8
+   ]
+  }
+ ],
+ "freshness": {
+  "last_sync": "2026-10-26T11:25:11+05:30",
+  "data_through": {
+   "sleep": "2026-10-26",
+   "heart": "2026-10-26",
+   "activity": "2026-10-26",
+   "weight": "2026-10-25",
+   "food": null,
+   "training": "2026-10-25"
+  },
+  "today": "2026-10-26"
+ }
+}

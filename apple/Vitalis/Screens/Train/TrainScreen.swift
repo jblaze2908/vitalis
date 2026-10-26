@@ -16,12 +16,7 @@ struct TrainScreen: View {
         NavigationStack(path: $store.path) {
             TrainWeekView(store: store, live: live.session, start: start)
                 .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(for: TrainRoute.self) { route in
-                    switch route {
-                    case .session(let id): SessionDetailScreen(store: store, id: id)
-                    case .exercise(let id, let back): ExerciseDetailScreen(store: store, id: id, back: back)
-                    }
-                }
+                .detailDestinations()
         }
         .task(id: Services.shared.writesVersion) { await store.load() }
     }
@@ -42,7 +37,7 @@ struct TrainWeekView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 TabHeader("Train") { if let e = t?.weekEnd { Text(SleepCopy.weekTitle(end: e)).vUI(13, weight: 600, color: VColor.muted) } }.padding(.horizontal, 20).padding(.top, 2)
-                if let t, t.empty { TrainEmptyBody(heat: t.heat, start: start).padding(.horizontal, VSpace.gutter) } else { week(t) }
+                if let t, t.empty, store.sessions.isEmpty { TrainEmptyBody(heat: t.heat, start: start).padding(.horizontal, VSpace.gutter) } else { week(t) }
             }
             .padding(.bottom, VSpace.gutter)
         }
@@ -74,6 +69,15 @@ struct TrainWeekView: View {
             .background(VColor.pulse, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain).padding(.horizontal, 16).padding(.top, 16)
+        RowsCard {
+            DrillRow(.exercises, value: "Progress") {
+                HStack(spacing: 10) {
+                    Image(systemName: "chart.line.uptrend.xyaxis").font(.system(size: 14, weight: .semibold)).foregroundStyle(VColor.muted).frame(width: 20)
+                    Text("Exercises").vUI(15, weight: 500)
+                }
+            }
+        }
+        .padding(.horizontal, 16).padding(.top, 10)
         HStack {
             Text("This week").vLabel()
             Spacer()
@@ -90,19 +94,28 @@ struct TrainWeekView: View {
     }
 
     @ViewBuilder private var sessionsCard: some View {
-        Text("Sessions").vLabel().padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 8)
+        Text("All workouts").vLabel()
+        .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 8)
         VCard(padding: EdgeInsets(top: 2, leading: 14, bottom: 2, trailing: 14)) {
             VStack(spacing: 0) {
+                if store.sessions.isEmpty, !store.isPaging {
+                    Text("No workouts yet").vUI(14, weight: 500, color: VColor.muted).frame(maxWidth: .infinity, minHeight: 48)
+                }
                 ForEach(Array(store.sessions.enumerated()), id: \.element.id) { i, row in
                     if i > 0 { Rectangle().fill(Color(hex: 0x232323)).frame(height: 1) }
-                    NavigationLink(value: TrainRoute.session(id: row.id)) {
+                    NavigationLink(value: Detail.session(id: row.id)) {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(row.title ?? "Workout").vUI(15, weight: 500)
+                                Text(row.kind == "strength" ? (row.title ?? "Workout") : WorkoutCopy.name(row.title ?? "Workout")).vUI(15, weight: 500)
                                 Text(TrainCopy.sessionLine(row)).vUI(13, weight: 400, color: VColor.muted)
                             }
                             Spacer()
-                            Figure(row.workingSets.map(String.init) ?? "–", unit: "sets", size: 17)
+                            if row.kind == "strength" {
+                                Figure(row.workingSets.map(String.init) ?? "–", unit: "sets", size: 17)
+                            } else {
+                                Figure(row.hrAvg.map { String(Int($0.rounded())) } ?? "–", unit: "avg bpm", size: 17)
+                            }
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color(hex: 0x5A5A5A))
                         }
                         .padding(.vertical, 12).contentShape(Rectangle())
                     }
@@ -110,7 +123,7 @@ struct TrainWeekView: View {
                 }
                 if store.hasMore {
                     Button { Task { await store.loadMore() } } label: {
-                        Text(store.isPaging ? "Loading…" : "Earlier sessions").vUI(14, weight: 600, color: VColor.muted).frame(maxWidth: .infinity, minHeight: 44)
+                        Text(store.isPaging ? "Loading…" : "Earlier workouts").vUI(14, weight: 600, color: VColor.muted).frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.plain).disabled(store.isPaging)
                 }
@@ -120,37 +133,13 @@ struct TrainWeekView: View {
         if let error = store.pageError as? APIError { MonoLabel(error.statusLine, tint: .watch).padding(.horizontal, 20) }
     }
 
-    /// "Fresh · Push · Lower" or "All splits loaded"; the start sheet is where one gets picked.
     static func readyLine(_ splits: [Split]) -> String {
         let ready = splits.filter(\.ready).map(\.name)
         return ready.isEmpty ? "All splits loaded" : "Fresh · " + ready.joined(separator: " · ")
     }
 
-    @ViewBuilder private var sessions: some View {
-        VSection {
-            MonoLabel("Sessions")
-            VStack(spacing: 0) {
-                ForEach(Array(store.sessions.enumerated()), id: \.element.id) { i, row in
-                    if i > 0 { Rule() }
-                    NavigationLink(value: TrainRoute.session(id: row.id)) { SessionRowView(row: row) }
-                        .buttonStyle(.plain)
-                }
-            }
-            if store.hasMore {
-                Button { Task { await store.loadMore() } } label: {
-                    MonoLabel(store.isPaging ? "Loading…" : "Earlier sessions", tint: .bone)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(store.isPaging)
-            }
-            if let error = store.pageError as? APIError { MonoLabel(error.statusLine, tint: .watch) }
-        }
-    }
 }
 
-/// FRESH / RECOVERING / LOADED with 8 pt squares in the heat colours.
 struct HeatLegend: View {
     var body: some View {
         HStack(spacing: 18) {
@@ -168,39 +157,6 @@ struct HeatLegend: View {
 }
 
 /// Sessions list row (52): day + date, title + duration line, PR / CARDIO tag.
-struct SessionRowView: View {
-    let row: SessionRow
-
-    var body: some View {
-        let day = TrainFormat.day(row.day)
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                MonoLabel(day.map { TrainFormat.dayText($0, "EEE") } ?? TrainFormat.dash)
-                Text(day.map { TrainFormat.dayText($0, "d") } ?? TrainFormat.dash).vNumber(20)
-            }
-            .frame(width: 48, alignment: .leading)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(row.title ?? "Workout").vHeadline(21).lineLimit(1).minimumScaleFactor(0.7)
-                MonoLabel(detail, size: .small)
-            }
-            Spacer(minLength: 12)
-            if let tag = row.tag { MonoLabel(tag.label, tint: tag.kind == "pr" ? .good : .steel) }
-        }
-        .frame(minHeight: 52)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-    }
-
-    private var detail: String {
-        let minutes = "\(TrainFormat.int(row.durationMin)) min"
-        if row.kind == "cardio" { return "\(minutes) · avg \(TrainFormat.int(row.hrAvg.map { Int($0.rounded()) })) bpm" }
-        return "\(minutes) · \(TrainFormat.int(row.workingSets)) sets"
-    }
-}
-
-/// This week's working sets per muscle against the owner's weekly range; tint from the server's `status`.
 struct WeeklySetsSection: View {
     let muscles: [TrainingResponse.Muscle]
     let weekly: TrainingResponse.WeeklySets
