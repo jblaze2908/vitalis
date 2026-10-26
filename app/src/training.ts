@@ -26,7 +26,7 @@ export type SetInput = { id?: string; exercise: string; kind?: Kind; weight_kg?:
 // Sets read in performed_at order: the Watch and the phone upload separately, so arrival order (ord) can lag time order.
 export type SetRow = { id: string; session_id: string; exercise_id: string; ord: number; kind: Kind; weight_kg: number | null; reps: number | null;
   duration_s: number | null; distance_m: number | null; rpe: number | null; rir: number | null; target_weight_kg: number | null;
-  target_reps: number | null; performed_at: number; note: string | null; deleted_at: number | null };
+  target_reps: number | null; performed_at: number; note: string | null; deleted_at: number | null; client_json?: string | null };
 export type SessionRow = { id: string; title: string | null; started_at: number; ended_at: number | null; tz_offset_min: number; notes: string | null;
   source: string; deleted_at: number | null; hk_workout_uuid?: string | null; template?: string | null; client_source?: string | null };
 
@@ -102,7 +102,11 @@ function sessionFor(id: string | undefined, title: string | undefined, at: { ms:
 export function editSet(input: { id: string; delete?: boolean; restore?: boolean } & Partial<Omit<SetInput, "id">>) {
   const s = one<SetRow>("SELECT * FROM sets WHERE id=?", input.id);
   if (!s) throw httpErr(404, `No set ${input.id}`);
-  if (input.delete) { run("UPDATE sets SET deleted_at=?,updated_at=? WHERE id=?", now(), now(), s.id); markDirty([]); return { id: s.id, deleted: true }; }
+  if (input.delete) {
+    run("UPDATE sets SET deleted_at=?,updated_at=? WHERE id=?", now(), now(), s.id); markDirty([]);
+    if (readBack(s.session_id, s.id)) throw httpErr(500, `Set ${s.id} still reads back after delete`);
+    return { id: s.id, session_id: s.session_id, deleted: true, undo: "edit_set with restore: true" };
+  }
   const fields: Record<string, unknown> = {};
   if (input.exercise !== undefined) {
     const r = resolveExercise(input.exercise);
@@ -120,7 +124,14 @@ export function editSet(input: { id: string; delete?: boolean; restore?: boolean
   run(`UPDATE sets SET ${keys.map((k) => `${k}=?`).join(",")},updated_at=? WHERE id=?`, ...(keys.map((k) => fields[k]) as (string | number | null)[]), now(), s.id);
   markDirty([]);
   const sess = one<SessionRow>("SELECT * FROM sessions WHERE id=?", s.session_id)!;
-  return setView(one<SetRow>("SELECT * FROM sets WHERE id=?", s.id)!, sess.tz_offset_min);
+  const after = one<SetRow>("SELECT * FROM sets WHERE id=?", s.id)!, view = setView(after, sess.tz_offset_min);
+  // Success means get_workout now shows it: the set under its exercise with these values (a deleted set shows nowhere).
+  if (after.deleted_at === null) {
+    const got = readBack(s.session_id, s.id);
+    if (got?.exercise_id !== after.exercise_id || JSON.stringify(got.set) !== JSON.stringify(view)) throw httpErr(500, `Set ${s.id} did not read back as written`);
+  }
+  return { ...view, session_id: s.session_id, exercise: { id: after.exercise_id, name: getExercise(after.exercise_id)?.name ?? after.exercise_id },
+    changed: keys, ...(after.deleted_at !== null && { deleted: true }) };
 }
 
 export function editWorkout(input: { id: string; title?: string | null; notes?: string | null; ended_at?: string | null; delete?: boolean; restore?: boolean }) {
@@ -246,6 +257,16 @@ export function getWorkout(id: string) {
   const w = one<Record<string, unknown>>("SELECT id,name,start,end,day,duration_s,active_kcal,hr_min,hr_avg,hr_max,distance_km,source FROM hk_workouts WHERE id=?", id);
   if (!w) throw httpErr(404, `No workout ${id}`);
   return { ...w, type: "watch" };
+}
+
+/** A set as get_workout shows it (exercise and values), or null when it doesn't show. One session read per call. */
+function readBack(sessionId: string, setId: string) {
+  const sess = one<SessionRow>("SELECT * FROM sessions WHERE id=?", sessionId)!;
+  for (const e of sessionView(sess, liveSets([sessionId]), true).exercises) {
+    const set = (e.sets as ReturnType<typeof setView>[]).find((x) => x.id === setId);
+    if (set) return { exercise_id: e.exercise_id, set };
+  }
+  return null;
 }
 
 type Perf = { session_id: string; day: string; title: string | null; sets: ReturnType<typeof setView>[]; best_set: string | null; e1rm_kg_estimate: number | null };
@@ -415,33 +436,43 @@ export function upsertWorkout(input: WorkoutInput, tokenName: string) {
     for (const x of input.sets) {
       const prior = one<SetRow>("SELECT * FROM sets WHERE id=?", x.id);
       if (prior && prior.session_id !== s.client_id) throw httpErr(409, `Set ${x.id} already belongs to another session`);
+      // Devices post whole sessions, so a field equal to what this device last sent is an echo, not an edit: an agent or
+      // the app may have changed it since, and that change stands. A row with no base (never device-posted) compares to itself.
+      const base = prior?.client_json ? JSON.parse(prior.client_json) as Record<string, unknown> : null;
+      const posted: Record<string, unknown> = { deleted: x.deleted === true };
+      if (!x.deleted) for (const k of MUTABLE) {
+        const v = k === "exercise_id" ? (x.exercise === undefined ? undefined : resolved.get(x.exercise))
+          : k === "performed_at" ? (x.performed_at === undefined ? undefined : stampOrNow(x.performed_at).ms) : x[k];
+        if (v !== undefined) posted[k] = v;
+      }
+      const sent = JSON.stringify({ ...base, ...posted });
+      const edited = (k: string) => (base ? posted[k] !== base[k] : true);
       if (x.deleted) {
-        if (prior && prior.deleted_at === null) { run("UPDATE sets SET deleted_at=?,updated_at=? WHERE id=?", now(), now(), x.id); accepted.deleted++; }
+        if (prior && prior.deleted_at === null && edited("deleted")) { run("UPDATE sets SET deleted_at=?,updated_at=? WHERE id=?", now(), now(), x.id); accepted.deleted++; }
         else accepted.unchanged++;
+        if (prior) run("UPDATE sets SET client_json=? WHERE id=?", sent, x.id);
         continue;
       }
       if (!prior) {
         if (x.exercise === undefined) throw httpErr(422, `sets: set ${x.id} needs an exercise`);
         checkSet({ ...x, exercise: x.exercise });
-        run(`INSERT INTO sets(id,session_id,exercise_id,ord,kind,weight_kg,reps,duration_s,distance_m,rpe,rir,target_weight_kg,target_reps,performed_at,note,created_at,updated_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, x.id, s.client_id, resolved.get(x.exercise)!, ++ord, x.kind ?? "normal", x.weight_kg ?? null, x.reps ?? null,
+        run(`INSERT INTO sets(id,session_id,exercise_id,ord,kind,weight_kg,reps,duration_s,distance_m,rpe,rir,target_weight_kg,target_reps,performed_at,note,created_at,updated_at,client_json)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, x.id, s.client_id, resolved.get(x.exercise)!, ++ord, x.kind ?? "normal", x.weight_kg ?? null, x.reps ?? null,
           x.duration_s ?? null, x.distance_m ?? null, x.rpe ?? null, x.rir ?? null, x.target_weight_kg ?? null, x.target_reps ?? null,
-          stampOrNow(x.performed_at).ms, x.note ?? null, now(), now());
+          stampOrNow(x.performed_at).ms, x.note ?? null, now(), now(), sent);
         accepted.inserted++;
         continue;
       }
       const next: Record<string, unknown> = {};
-      for (const k of MUTABLE) {
-        const v = k === "exercise_id" ? (x.exercise === undefined ? undefined : resolved.get(x.exercise))
-          : k === "performed_at" ? (x.performed_at === undefined ? undefined : stampOrNow(x.performed_at).ms) : x[k];
-        if (v !== undefined && v !== (prior as Record<string, unknown>)[k]) next[k] = v;
-      }
-      // A repost of an unchanged set never revives one deleted earlier; a changed one does.
-      if (!Object.keys(next).length) { accepted.unchanged++; continue; }
+      for (const k of MUTABLE) if (k in posted && edited(k) && posted[k] !== (prior as Record<string, unknown>)[k]) next[k] = posted[k];
+      // An unchanged repost never revives a set deleted elsewhere; the device undeleting it, or editing it, does.
+      const revive = prior.deleted_at !== null && (Object.keys(next).length > 0 || base?.deleted === true);
+      if (!Object.keys(next).length && !revive) { accepted.unchanged++; run("UPDATE sets SET client_json=? WHERE id=?", sent, x.id); continue; }
       const merged = { ...prior, ...next } as SetRow;
       checkSet({ ...merged, exercise: merged.exercise_id } as unknown as SetInput);
       const keys = Object.keys(next);
-      run(`UPDATE sets SET ${keys.map((k) => `${k}=?`).join(",")},deleted_at=NULL,updated_at=? WHERE id=?`, ...(keys.map((k) => next[k]) as (string | number | null)[]), now(), x.id);
+      run(`UPDATE sets SET ${keys.map((k) => `${k}=?,`).join("")}deleted_at=NULL,client_json=?,updated_at=? WHERE id=?`,
+        ...(keys.map((k) => next[k]) as (string | number | null)[]), sent, now(), x.id);
       accepted.updated++;
     }
     markDirty([localDay(start.ms, start.offsetMin)]);

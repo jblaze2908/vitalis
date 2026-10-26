@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { newExerciseSchema, postExercise } from "../exercise-view.js";
 import { z } from "zod";
 import { ApiError, handle, readJson, setDetail } from "../http.js";
-import { KINDS, upsertWorkout } from "../training.js";
+import { editSet, KINDS, upsertWorkout } from "../training.js";
 import { sessionDetail, sessionPRs } from "../training-view.js";
 import { deleteSplit, putSplit, splitSchema } from "../splits.js";
 import { getTargets, putSchema, putTargets } from "../targets.js";
@@ -63,4 +63,17 @@ writeRoutes.post("/v2/workouts", handle("v2/workouts", "write", async (c, token)
   const prs = sessionPRs(r.id).filter((p) => !p.first_time && p.e1rm_kg_estimate > p.previous_best_estimate!)
     .map(({ first_time: _f, ...p }) => p);
   return c.json({ session: sessionDetail(r.id), accepted: r.accepted, prs });
+}));
+
+const setPatch = z.strictObject({
+  exercise: z.string().min(1).max(120).optional(), kind: z.enum(KINDS).optional(), weight_kg: num(0, 1000),
+  reps: z.number().int().min(0).max(1000).nullable().optional(), rpe: num(1, 10), note: z.string().max(500).nullable().optional(),
+  performed_at: when.optional(), delete: z.boolean().optional(), restore: z.boolean().optional(),
+});
+
+// One set of any session, including finished ones (edit_set's twin). A device's later whole-session post doesn't undo it.
+writeRoutes.patch("/v2/sets/:id", handle("v2/sets:patch", "write", async (c) => {
+  const set = editSet({ id: c.req.param("id") ?? "", ...(await readJson(c, setPatch)) });
+  setDetail(c, "deleted" in set && set.deleted ? "deleted" : (("changed" in set && set.changed) || []).join(","));
+  return c.json({ set, session: sessionDetail(set.session_id) });
 }));

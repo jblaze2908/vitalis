@@ -19,7 +19,7 @@ const PARITY = {
   "GET /v2/sync/status": "get_freshness", "GET /v2/food/day": "get_food_day", "GET /v2/food/quick": "get_food_suggestions",
   "GET /v2/food/search": "search_food", "GET /v2/food/barcode/:code": "lookup_barcode",
   "PUT /v2/targets": "set_targets", "POST /v2/weight": "log_weight", "DELETE /v2/weight/:id": "log_weight", "PUT /v2/splits/:id": "edit_split",
-  "DELETE /v2/splits/:id": "edit_split", "POST /v2/exercises": "create_exercise", "POST /v2/workouts": "log_sets",
+  "DELETE /v2/splits/:id": "edit_split", "POST /v2/exercises": "create_exercise", "POST /v2/workouts": "log_sets", "PATCH /v2/sets/:id": "edit_set",
   "POST /v2/food/entries": "log_food", "DELETE /v2/food/entries/:id": "delete_food", "DELETE /v2/food/meals/:meal_id": "delete_food",
   "POST /v2/food/saved": "save_meal", "DELETE /v2/food/saved/:id": "save_meal", "PUT /v2/food/barcode/:code": "save_barcode",
   // Not agent actions: the agent is the describer (the app's server-side Describe is its stand-in), and the rest is plumbing.

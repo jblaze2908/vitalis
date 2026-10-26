@@ -474,6 +474,7 @@ Rules:
 - Sets join **this** session explicitly (never the 3-hour rule of `logSets`).
 - Each set: new id → insert (same validation as `checkSet()` in `training.ts`; `exercise` is an id or name resolved with `resolveExercise()`; unclear name → 422 listing candidates and nothing is written). Existing id in the same session → update mutable fields (`kind`, `weight_kg`, `reps`, `duration_s`, `distance_m`, `rpe`, `rir`, `target_*`, `performed_at`, `note`, `exercise`). `deleted: true` → soft-delete. Existing id in another session → 409.
 - `ord` = arrival order within the session (existing behaviour).
+- Devices post the whole session each time, so an existing set takes only the fields this post changed against the device's previous post of that set (`sets.client_json`). A field sent unchanged is an echo and never overwrites an edit made elsewhere (`edit_set`, `PATCH /v2/sets/:id`). The same applies to `deleted`: an unchanged deletion marker doesn't re-delete a restored set, and an unchanged repost doesn't revive a deleted one. The device removing `deleted`, or changing any field, revives it.
 - Implement as `upsertWorkout(input, tokenName)` in `training.ts`, inside one `tx()`, then `markDirty([day])`.
 - `source` is `watch` or `phone`; anything else 422. Max 200 sets per request.
 
@@ -489,6 +490,12 @@ Response 200:
 
 `prs` drives the `PR` mark on the Watch summary (`spec/design/33-watch-summary.png`); it is computed server-side with the existing records query. When the Watch is offline the summary shows no PR until the phone has posted and relayed the answer ([21 §6](21-watch-app.md#6-transfer-to-iphone-and-the-server)).
 
+
+### PATCH /v2/sets/:id — write
+
+One set of any session, finished ones included; the app's twin of MCP `edit_set`. Body (all optional): `exercise` (id or name), `kind`, `weight_kg`, `reps`, `rpe`, `note`, `performed_at`, `delete: true`, `restore: true`. 404 for an unknown id, 422 for an invalid value or an unclear exercise.
+
+Response 200: `{ "set": { …set, "session_id", "exercise": { "id", "name" }, "changed": ["exercise_id", …] }, "session": { …as GET /v2/training/sessions/:id } }`. The server reads the set back through the same view as `get_workout` before answering; a mismatch is a 500, never a success. A device's later whole-session post doesn't undo the edit (see the merge rule above).
 ---
 
 ## 7. Food

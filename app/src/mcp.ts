@@ -250,7 +250,7 @@ export function buildServer(token: Token) {
     (r) => `${(r as { logged: unknown[] }).logged.length} sets`));
 
   s.registerTool("edit_set", { title: "Edit or delete a set", annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }, outputSchema: Out,
-    description: "Change one logged set by id (weight, reps, kind, exercise, RPE, targets, note, time), or delete it with delete: true. restore: true brings a deleted set back.",
+    description: "Change one logged set by id (weight, reps, kind, exercise, RPE, targets, note, time), or delete it with delete: true. restore: true brings a deleted set back. Works on finished sessions too, and a phone or Watch re-sending its copy of the session does not undo it. The reply is the set as saved (exercise id and name, changed fields), read back through get_workout; a set that didn't read back is an error, not a success.",
     inputSchema: SetIn.omit({ id: true }).partial().extend({ id: z.string().min(1).max(64), delete: z.boolean().optional(), restore: z.boolean().optional() }) },
   wrap(ctx, "edit_set", (a: Parameters<typeof editSet>[0]) => editSet(a)));
 

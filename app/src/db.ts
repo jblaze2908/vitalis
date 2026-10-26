@@ -213,6 +213,14 @@ addColumn("sleep_nights", "wakeups", "INTEGER");
 addColumn("sessions", "hk_workout_uuid", "TEXT");
 addColumn("sessions", "template", "TEXT");
 addColumn("sessions", "client_source", "TEXT");
+// What a device last posted per set: upsertWorkout's merge base. Seeded from the row for sets devices already sent.
+if (!db.prepare("PRAGMA table_info(sets)").all().some(c => c.name === "client_json")) {
+  addColumn("sets", "client_json", "TEXT");
+  db.exec(`UPDATE sets SET client_json=json_object('kind',kind,'weight_kg',weight_kg,'reps',reps,'duration_s',duration_s,'distance_m',distance_m,
+    'rpe',rpe,'rir',rir,'target_weight_kg',target_weight_kg,'target_reps',target_reps,'performed_at',performed_at,'note',note,'exercise_id',exercise_id,
+    'deleted',CASE WHEN deleted_at IS NULL THEN json('false') ELSE json('true') END)
+    WHERE client_json IS NULL AND session_id IN (SELECT id FROM sessions WHERE source LIKE 'rest:%')`);
+}
 // Owner-defined workout splits; `muscles` is a JSON array of slugs. Exercises come from the last session with that split.
 db.exec(`CREATE TABLE IF NOT EXISTS splits (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, muscles TEXT NOT NULL, ord INTEGER NOT NULL,
