@@ -28,6 +28,7 @@ struct SettingsScreen: View {
         NavigationStack(path: $router.settingsPath) {
             ScrollView { content }
                 .scrollBounceBehavior(.basedOnSize)
+                .refreshable { await load() }
                 .vScreen()
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: SettingsPage.self) { page in
@@ -57,17 +58,14 @@ struct SettingsScreen: View {
     private var content: some View {
         let t = targets.value
         return VStack(alignment: .leading, spacing: 0) {
-            let status = statusLabel
-            StatusRow(status.text, tint: status.tint).padding(.top, VSpace.statusTop)
-            CachedPulseLine().padding(.top, 18)
-            HStack(alignment: .firstTextBaseline) {
-                HeadlineLines(["Settings"], size: 46)
-                Spacer()
-                SecondaryButton("Done", size: .compact) { router.showsSettings = false }
+            SettingsBar(title: "Settings", done: { router.showsSettings = false })
+            FreshnessLine(DataFreshness(fetchedAt: targets.fetchedAt, refreshing: targets.isLoading))
+                .frame(maxWidth: .infinity).padding(.top, VSpace.s1)
+            if sync.tokenRejected {
+                Text("Sync paused").vText(.secondary, color: VColor.watch).frame(maxWidth: .infinity).padding(.top, VSpace.s1)
             }
-            .padding(.top, 8)
             if let error = targets.error as? APIError, t != nil {
-                MonoLabel(error.statusLine, tint: .watch).padding(.top, 12)
+                Text(error.statusLine).vText(.secondary, color: VColor.watch).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
             }
 
             SettingsGroup(title: "Server") {
@@ -96,31 +94,30 @@ struct SettingsScreen: View {
                 SettingsRow(key: "Splits", value: "Edit") { router.settingsPath.append(.splits) }
             }
 
-            SettingsGroup(title: "This phone") {
-                VStack(spacing: 12) {
-                    SecondaryButton("Replace token", size: .full) { replacing = true }
-                    SecondaryButton("Reset local export state", size: .full) { confirmReset = true }
-                }
-                .padding(.top, 16)
-                if let message { MonoLabel(message).padding(.top, 12) }
+            SectionLabel("This phone")
+            VStack(spacing: VSpace.s3) {
+                SecondaryButton("Replace token", size: .full) { replacing = true }
+                SecondaryButton("Reset local export state", size: .full) { confirmReset = true }
+                if let message { Text(message).vText(.secondary).frame(maxWidth: .infinity, alignment: .leading) }
             }
+            .padding(.horizontal, VSpace.edge)
 
             SettingsGroup(title: "Acknowledgements") {
                 ForEach(VAcknowledgements.lines, id: \.title) { line in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(line.title).vReading(13)
-                        Text(line.detail).vBody(12)
+                    VStack(alignment: .leading, spacing: VSpace.s1) {
+                        Text(line.title).vText(.headline)
+                        Text(line.detail).vText(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.vertical, 10)
+                    .padding(.vertical, VSpace.s3)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Rule()
+                    .accessibilityElement(children: .combine)
                 }
             }
 
-            MonoLabel("Vitalis \(Self.version) · Personal build").padding(.top, 24)
+            Text("Vitalis \(Self.version) · Personal build").vText(.secondary)
+                .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
         }
-        .padding(.horizontal, VSpace.gutter)
-        .padding(.bottom, 40)
+        .padding(.bottom, VSpace.s6)
     }
 
     // MARK: Rows
@@ -156,16 +153,6 @@ struct SettingsScreen: View {
 
     private var host: String {
         (try? ServerSettings(SettingsStore.baseURL))?.baseURL.host() ?? "–"
-    }
-
-    private var statusLabel: (text: String, tint: VTint) {
-        if sync.tokenRejected { return ("Sync paused", .watch) }
-        let state = sync.staleState(lastSync: APIDate.parse(targets.value?.freshness?.lastSync),
-                                    cachedAt: targets.fetchedAt, refreshFailed: targets.error != nil)
-        switch state.status {
-        case .synced(let label), .offline(let label): return (label, .steel)
-        case .stale(let label, _, _): return (label, .watch)
-        }
     }
 
     private var syncValue: (text: String, tint: VTint) {
@@ -247,35 +234,33 @@ struct ReplaceTokenSheet: View {
     var body: some View {
         SheetChrome {
             VStack(alignment: .leading, spacing: 0) {
-                HeadlineLines(["Replace token"], size: 30)
+                Text("Replace token").vText(.title)
                 Text("Paste a new write token. It's kept in this phone's Keychain and never shown again.")
-                    .vBody(14).padding(.top, 12)
-                VStack(spacing: 0) {
-                    Rule()
+                    .vText(.body).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s3)
+                ListCard {
                     HStack {
-                        VStack(alignment: .leading, spacing: 8) {
-                            MonoLabel("Write token")
-                            SecureField("", text: $token, prompt: Text("Paste your token").foregroundStyle(VColor.disabled))
-                                .vReading(14)
+                        VStack(alignment: .leading, spacing: VSpace.s1) {
+                            Text("Write token").vText(.secondary)
+                            SecureField("", text: $token, prompt: Text("Paste your token").foregroundStyle(VColor.text3))
+                                .vText(.body)
                                 .textContentType(.password)
                                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                         }
-                        Spacer(minLength: 12)
+                        Spacer(minLength: VSpace.s3)
                         SecondaryButton("Paste") { if let s = UIPasteboard.general.string { token = s } }
                     }
-                    .padding(.vertical, 14)
-                    Rule()
+                    .padding(.vertical, VSpace.s3)
                 }
-                .padding(.top, 20)
-                Text("vitalis token create iphone --scope write").vReading(12.5).padding(.top, 12)
-                if let error { MonoLabel(error, tint: .watch).padding(.top, 12) }
-                Spacer(minLength: 24)
-                SecondaryButton("Remove token", size: .full) { confirmRemove = true }.padding(.bottom, 12)
+                .padding(.top, VSpace.s5)
+                Text("vitalis token create iphone --scope write").vText(.secondary).textSelection(.enabled).padding(.top, VSpace.s3)
+                if let error { Text(error).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s3) }
+                Spacer(minLength: VSpace.s5)
+                SecondaryButton("Remove token", size: .full) { confirmRemove = true }.padding(.bottom, VSpace.s3)
                 PrimaryButton(sync.isWorking ? "Checking" : "Save token") { Task { await save() } }
             }
-            .padding(.horizontal, VSpace.gutter)
-            .padding(.top, 20)
-            .padding(.bottom, VSpace.gutter)
+            .padding(.horizontal, VSpace.edge)
+            .padding(.top, VSpace.s5)
+            .padding(.bottom, VSpace.edge)
         }
         .presentationDetents([.large])
         .confirmationDialog("Remove the token from this phone?", isPresented: $confirmRemove, titleVisibility: .visible) {

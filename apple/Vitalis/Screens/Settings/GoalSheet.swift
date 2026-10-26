@@ -23,12 +23,12 @@ struct GoalSheet: View {
         SheetChrome {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HeadlineLines([saved ? "Your target" : "Your goal"], size: 30)
+                    Text(saved ? "Your target" : "Your goal").vText(.title)
                     if saved, let plan = targets?.plan { result(plan) } else { form }
                 }
-                .padding(.horizontal, VSpace.gutter)
-                .padding(.top, 20)
-                .padding(.bottom, VSpace.gutter)
+                .padding(.horizontal, VSpace.edge)
+                .padding(.top, VSpace.s5)
+                .padding(.bottom, VSpace.edge)
             }
         }
         .presentationDetents([.large])
@@ -40,28 +40,24 @@ struct GoalSheet: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Your calorie target starts from this and adjusts weekly from what you eat and weigh.")
-                .vBody().fixedSize(horizontal: false, vertical: true).padding(.top, 8)
-            MonoLabel("Goal").padding(.top, 24)
-            HStack(spacing: 8) {
+                .vText(.body).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s2)
+            Text("Goal").vText(.secondary).padding(.top, VSpace.s5)
+            HStack(spacing: VSpace.s2) {
                 ForEach(Goal.allCases, id: \.self) { g in
-                    SecondaryButton(g.title, size: .compact) { goal = g; error = nil }
-                        .overlay(goal == g ? RoundedRectangle(cornerRadius: VRadius.button).stroke(VColor.bone, lineWidth: 1.5) : nil)
-                        .accessibilityAddTraits(goal == g ? .isSelected : [])
+                    ChoiceChip(g.title, on: goal == g) { goal = g; error = nil }
                 }
             }
-            .padding(.top, 10)
+            .padding(.top, VSpace.s2)
             if goal != .maintain {
-                MonoLabel("Target weight · KG").padding(.top, 24)
-                TextField("", text: $weight, prompt: Text(nowText ?? "80.0").foregroundStyle(VColor.disabled))
-                    .vNumber(40).keyboardType(.decimalPad).padding(.top, 8)
+                Text("Target weight (kg)").vText(.secondary).padding(.top, VSpace.s5)
+                UnderlinedField(text: $weight, prompt: nowText ?? "80.0").padding(.top, VSpace.s2)
                     .onChange(of: weight) { error = nil }
-                Rule()
-                if let nowText { MonoLabel("Now \(nowText) KG").padding(.top, 8) }
+                if let nowText { Text("Now \(nowText) kg").vText(.secondary).padding(.top, VSpace.s2) }
             }
-            if let error { MonoLabel(error, tint: .watch).padding(.top, 12) }
+            if let error { Text(error).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s3) }
             PrimaryButton(saving ? "Saving" : "Set my target") { Task { await save() } }
                 .disabled(saving || goal == nil)
-                .padding(.top, 28)
+                .padding(.top, VSpace.s5)
         }
     }
 
@@ -71,22 +67,16 @@ struct GoalSheet: View {
 
     private func result(_ plan: TargetsResponse.Plan) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(FoodFormat.kcal(plan.kcal.map(Double.init))).vNumber(72)
-                MonoLabel("KCAL A DAY")
-            }
-            .padding(.top, 16)
-            VStack(spacing: 0) {
+            Figure(FoodFormat.kcal(plan.kcal.map(Double.init)), unit: "kcal a day", size: 56).padding(.top, VSpace.s4)
+            ListCard {
                 ForEach(Self.lines(plan), id: \.self) { line in
-                    Rule()
-                    Text(line).vBody(15, color: VColor.bone).fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, minHeight: 47, alignment: .leading)
+                    Text(line).vText(.body).fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, VSpace.s3)
                 }
-                Rule()
             }
-            .padding(.top, 20)
-            PrimaryButton("Done") { dismiss() }.padding(.top, 28)
-            SecondaryButton("Change goal", size: .full) { saved = false }.padding(.top, 12)
+            .padding(.top, VSpace.s5)
+            PrimaryButton("Done") { dismiss() }.padding(.top, VSpace.s5)
+            SecondaryButton("Change goal", size: .full) { saved = false }.padding(.top, VSpace.s3)
         }
     }
 

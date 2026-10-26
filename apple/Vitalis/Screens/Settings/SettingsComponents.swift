@@ -2,7 +2,8 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
-/// Settings/Sync row: steel key, tinted value, 10 pt vertical padding, rule under (frame 28).
+/// A Settings or Sync row in a `ListCard`: key, value, chevron when it opens something.
+/// A good or watch value shows as a status word so its colour carries.
 struct SettingsRow: View {
     let key: String
     let value: String
@@ -11,76 +12,94 @@ struct SettingsRow: View {
 
     var body: some View {
         if let action {
-            Button(action: action) { content.contentShape(Rectangle()) }.buttonStyle(.plain)
+            Button(action: action) { row }.buttonStyle(.plain)
         } else {
-            content
+            row
         }
     }
 
-    private var content: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(key).vReading(13, tint: .steel).textCase(.uppercase).lineLimit(2)
-                Spacer(minLength: 12)
-                Text(value).vReading(13, tint: tint).textCase(.uppercase).lineLimit(1).minimumScaleFactor(0.7)
-            }
-            .padding(.vertical, 10)
-            .frame(minHeight: 44)
-            Rule()
+    @ViewBuilder private var row: some View {
+        switch tint {
+        case .good: ListRow(key, chevron: action != nil) { StatusWord(value, tone: .good) }
+        case .watch: ListRow(key, chevron: action != nil) { StatusWord(value, tone: .watch) }
+        case .steel, .bone, .pulse: ListRow(key, value: value, chevron: action != nil)
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
-/// Mono group heading over its rows, rule on top of the first row.
+/// A section label over a card of rows, on the gutter.
 struct SettingsGroup<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MonoLabel(title).padding(.bottom, 8)
-            Rule()
-            content
+            SectionLabel(title)
+            ListCard { content }.padding(.horizontal, VSpace.edge)
         }
-        .padding(.top, 28)
     }
 }
 
-/// "‹ SETTINGS" (frame 25).
-struct SettingsBackLink: View {
+/// Top bar of a Settings page: Back on the left when it's a sub-page, the title centred, Done on the right on the root.
+struct SettingsBar: View {
     let title: String
+    var back: (() -> Void)? = nil
+    var done: (() -> Void)? = nil
+    var body: some View {
+        ZStack {
+            Text(title).vText(.title)
+            HStack {
+                if let back {
+                    Button(action: back) {
+                        HStack(spacing: VSpace.s1) {
+                            Image(systemName: "chevron.left").font(.body.weight(.semibold))
+                            Text("Settings").vText(.headline, color: VColor.text2)
+                        }
+                        .foregroundStyle(VColor.text2).frame(minHeight: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back to Settings")
+                }
+                Spacer()
+                if let done {
+                    Button(action: done) { Text("Done").vText(.headline).frame(minHeight: 44).contentShape(Rectangle()) }
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
+    }
+}
+
+/// One choice among several, or one toggle in a set: a chip lit when on.
+struct ChoiceChip: View {
+    let title: String
+    let on: Bool
     let action: () -> Void
+    init(_ title: String, on: Bool, action: @escaping () -> Void) { self.title = title; self.on = on; self.action = action }
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "chevron.left").vLabel(.custom(14))
-                MonoLabel(title)
-            }
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+            Text(title).vText(.headline, color: on ? VColor.text : VColor.text2).lineLimit(1).minimumScaleFactor(0.8)
+                .padding(.horizontal, VSpace.s3).padding(.vertical, VSpace.s2)
+                .frame(maxWidth: .infinity)
+                .background(on ? VColor.segmentOn : VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Back to \(title)")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
-/// The header line: Today's cached pulse when there is one, else a flat line at the time of day.
-struct CachedPulseLine: View {
-    @State private var positions: (events: [Double], now: Double)?
-
+/// A big number or name typed over a hairline.
+struct UnderlinedField: View {
+    @Binding var text: String
+    let prompt: String
+    var style: VText = .numL
+    var keyboard: UIKeyboardType = .decimalPad
     var body: some View {
-        PulseLine(events: positions?.events ?? [], now: positions?.now ?? Self.dayFraction(Date()))
-            .task {
-                guard let pulse = await Services.shared.api?.cached(TodayResponse.self, path: "v2/today")?.value.pulse else { return }
-                positions = PulseLine.positions(windowStart: pulse.window.start, windowEnd: pulse.window.end,
-                                                now: pulse.now, events: pulse.events.map(\.at))
-            }
-    }
-
-    /// Time → x over the local day (formatting only).
-    static func dayFraction(_ date: Date, calendar: Calendar = .current) -> Double {
-        PulseLine.fraction(at: date, start: calendar.startOfDay(for: date),
-                           end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date)
+        VStack(alignment: .leading, spacing: VSpace.s2) {
+            TextField("", text: $text, prompt: Text(prompt).foregroundStyle(VColor.text3))
+                .vText(style).keyboardType(keyboard).tint(VColor.accent)
+            Rectangle().fill(VColor.line).frame(height: 1)
+        }
     }
 }
 
@@ -97,37 +116,32 @@ struct TargetEditSheet: View {
     var body: some View {
         SheetChrome {
             VStack(alignment: .leading, spacing: 0) {
-                HeadlineLines([fields.count == 1 ? fields[0].title : "Weekly sets per muscle"], size: 30)
+                Text(fields.count == 1 ? fields[0].title : "Weekly sets per muscle").vText(.title).padding(.top, VSpace.s3)
                 ForEach(fields) { field in
-                    VStack(alignment: .leading, spacing: 8) {
-                        MonoLabel(fields.count == 1 ? (field.unit ?? "Value") : field.title)
+                    VStack(alignment: .leading, spacing: VSpace.s2) {
+                        Text(fields.count == 1 ? (field.unit ?? "Value") : field.title).vText(.secondary)
                         if let choices = field.choices {
-                            HStack(spacing: 8) {
+                            HStack(spacing: VSpace.s2) {
                                 ForEach(choices, id: \.self) { c in
-                                    let on = texts[field] == field.editText(c)
-                                    SecondaryButton(field.format(c), size: .mini) { texts[field] = field.editText(c) }
-                                        .overlay(on ? RoundedRectangle(cornerRadius: VRadius.mini).stroke(VColor.bone, lineWidth: 1.5) : nil)
+                                    ChoiceChip(field.format(c), on: texts[field] == field.editText(c)) { texts[field] = field.editText(c) }
                                 }
                             }
                         } else {
-                            TextField("", text: binding(field), prompt: Text(field.format(initial[field])).foregroundStyle(VColor.disabled))
-                                .vNumber(40)
-                                .keyboardType(field.isInteger ? .numberPad : .decimalPad)
+                            UnderlinedField(text: binding(field), prompt: field.format(initial[field]),
+                                            keyboard: field.isInteger ? .numberPad : .decimalPad)
                         }
-                        Rule()
                     }
-                    .padding(.top, 24)
+                    .padding(.top, VSpace.s5)
                 }
-                if let error { MonoLabel(error, tint: .watch).padding(.top, 12) }
-                Spacer(minLength: 24)
+                if let error { Text(error).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s3) }
+                Spacer(minLength: VSpace.s5)
                 if let extra {
-                    SecondaryButton(extra.title, size: .full) { extra.action(); dismiss() }.padding(.bottom, 12)
+                    SecondaryButton(extra.title, size: .full) { extra.action(); dismiss() }.padding(.bottom, VSpace.s3)
                 }
                 PrimaryButton("Save") { save() }
             }
-            .padding(.horizontal, VSpace.gutter)
-            .padding(.top, 20)
-            .padding(.bottom, VSpace.gutter)
+            .padding(.horizontal, VSpace.edge)
+            .padding(.bottom, VSpace.edge)
         }
         .presentationDetents([.medium, .large])
         .onAppear { for f in fields where texts[f] == nil { texts[f] = f.editText(initial[f]) } }

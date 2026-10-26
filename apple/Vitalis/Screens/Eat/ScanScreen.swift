@@ -25,16 +25,14 @@ struct ScanScreen: View {
     }
 
     var body: some View {
-        EatChrome(status: "Scanning", pulse: store.todayPulse) {
-            VStack(spacing: 0) {
-                topBar
-                ZStack(alignment: .bottom) {
-                    camera
-                    panel
-                }
+        VStack(spacing: 0) {
+            topBar
+            ZStack(alignment: .bottom) {
+                camera
+                panel
             }
         }
-        .background(VColor.ground.ignoresSafeArea())
+        .vScreen()
         .preferredColorScheme(.dark)
         // Re-checked on return from Settings, where camera access may have just been turned on.
         .task(id: scenePhase) { if scenePhase == .active { access = await CameraAccess.resolve() } }
@@ -75,12 +73,11 @@ struct ScanScreen: View {
 
     private var topBar: some View {
         ZStack {
-            MonoLabel("Adding to \(slot.slotTitle)", tint: .bone)
+            Text("Adding to \(slot.slotTitle)").vText(.title)
             HStack {
                 Button(action: onDone) {
-                    Image(systemName: "xmark").font(.body.weight(.semibold)).foregroundStyle(VColor.bone)
-                        .frame(width: 40, height: 40)
-                        .overlay(RoundedRectangle(cornerRadius: VRadius.button, style: .continuous).inset(by: 0.75).stroke(VColor.future, lineWidth: 1.5))
+                    Image(systemName: "xmark").font(.system(size: 15, weight: .semibold)).foregroundStyle(VColor.text)
+                        .frame(width: 32, height: 32).background(VColor.surface, in: Circle())
                         .frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -88,23 +85,23 @@ struct ScanScreen: View {
                 Spacer()
             }
         }
-        .padding(.horizontal, VSpace.gutter)
-        .padding(.top, 10).padding(.bottom, 16)
+        .padding(.horizontal, VSpace.edge)
+        .padding(.top, VSpace.s2).padding(.bottom, VSpace.s3)
     }
 
     // MARK: Camera
 
     private var camera: some View {
         ZStack(alignment: .top) {
-            VColor.camera
+            VColor.surface
             if case .scanning = barcode.phase, access == .ready {
                 BarcodeScannerView { raw in Task { await barcode.scanned(raw) } }
             }
-            VStack(spacing: 18) {
+            VStack(spacing: VSpace.s4) {
                 viewfinder
-                if let line = codeLine { MonoLabel(line.text, tint: line.tint) }
+                if let line = codeLine { Text(line.text).vText(.secondary, color: line.color) }
             }
-            .padding(.top, 64)
+            .padding(.top, VSpace.s7 + VSpace.s4)
         }
     }
 
@@ -114,17 +111,17 @@ struct ScanScreen: View {
         if notFound {
             Rectangle().stroke(VColor.watch, lineWidth: 2).frame(width: 240, height: 150)
         } else {
-            Brackets().stroke(VColor.bone, style: StrokeStyle(lineWidth: 3)).frame(width: 280, height: 180)
+            Brackets().stroke(VColor.text, style: StrokeStyle(lineWidth: 3)).frame(width: 280, height: 180)
         }
     }
 
-    private var codeLine: (text: String, tint: VTint)? {
+    private var codeLine: (text: String, color: Color)? {
         switch barcode.phase {
-        case .scanning: access == .ready ? ("Point at the barcode", .steel) : nil
-        case .looking(let c): ("Looking up · \(BarcodeStore.grouped(c))", .steel)
-        case .found(let r): ("Found · \(BarcodeStore.grouped(r.code))", .bone)
+        case .scanning: access == .ready ? ("Point at the barcode", VColor.text2) : nil
+        case .looking(let c): ("Looking up · \(BarcodeStore.grouped(c))", VColor.text2)
+        case .found(let r): ("Found · \(BarcodeStore.grouped(r.code))", VColor.text)
         case .notFound: nil
-        case .failed(let c, _): (BarcodeStore.grouped(c), .steel)
+        case .failed(let c, _): (BarcodeStore.grouped(c), VColor.text2)
         }
     }
 
@@ -135,8 +132,8 @@ struct ScanScreen: View {
         case .found(let r): if let item = r.item { foundPanel(r, item) }
         case .notFound(let c): notFoundPanel(c)
         case .failed(_, let line): sheetPanel {
-            MonoLabel(line, tint: .watch)
-            SecondaryButton("Scan again", size: .full) { barcode.rescan() }.padding(.top, 16)
+            Text(line).vText(.secondary, color: VColor.watch)
+            SecondaryButton("Scan again", size: .full) { barcode.rescan() }.padding(.top, VSpace.s4)
         }
         case .scanning:
             switch access {
@@ -150,12 +147,12 @@ struct ScanScreen: View {
 
     private func sheetPanel<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 0) { content() }
-            .padding(.horizontal, VSpace.gutter).padding(.top, 24).padding(.bottom, 38)
+            .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5).padding(.bottom, VSpace.s6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(VColor.sheet, in: UnevenRoundedRectangle(topLeadingRadius: VRadius.sheet, topTrailingRadius: VRadius.sheet, style: .continuous))
             .overlay(alignment: .top) {
                 UnevenRoundedRectangle(topLeadingRadius: VRadius.sheet, topTrailingRadius: VRadius.sheet, style: .continuous)
-                    .stroke(VColor.rule, lineWidth: 1).frame(height: VRadius.sheet * 2, alignment: .top)
+                    .stroke(VColor.line, lineWidth: 1).frame(height: VRadius.sheet * 2, alignment: .top)
             }
             .ignoresSafeArea(.container, edges: .bottom)
     }
@@ -163,74 +160,61 @@ struct ScanScreen: View {
     private func foundPanel(_ r: BarcodeResponse, _ item: BarcodeResponse.Item) -> some View {
         let portion = ScanPortion(item: item, factor: amount)
         return sheetPanel {
-            VStack(alignment: .leading, spacing: 8) {
-                if let label = r.label { MonoLabel(label) }
-                HeadlineLines(HeadlineLines.split(item.name, maxChars: 18), size: 28)
+            VStack(alignment: .leading, spacing: VSpace.s1) {
+                if let label = r.label { Text(label).vText(.secondary) }
+                Text(item.name).vText(.title).lineLimit(2)
             }
             AmountControl(factor: $amount, baseGrams: portion.baseGrams, baseName: portion.baseName, kcal: portion.nutrients.kcal,
                           maxFactor: portion.isPack ? 1 : 3)
-                .padding(.top, 16)
-            MacroColumns(protein: portion.nutrients.proteinG, carbs: portion.nutrients.carbsG, fat: portion.nutrients.fatG).padding(.top, 14)
-            PrimaryButton("Add to \(slot.slotTitle) · \(FoodFormat.kcal(portion.nutrients.kcal)) kcal") {
+                .padding(.top, VSpace.s4)
+            MacroColumns(protein: portion.nutrients.proteinG, carbs: portion.nutrients.carbsG, fat: portion.nutrients.fatG).padding(.top, VSpace.s3)
+            PrimaryButton("Add to \(slot.slotTitle)", value: "\(FoodFormat.kcal(portion.nutrients.kcal)) kcal", fill: VColor.eat, ink: VColor.onEat) {
                 let n = portion.nutrients
                 let draft = FoodDraft(name: item.name, portionText: portion.label, grams: portion.grams, kcal: n.kcal,
                                       proteinG: n.proteinG, carbsG: n.carbsG, fatG: n.fatG)
                 Task { await store.log([draft], slot: slot, source: "barcode", sourceRef: r.code) }
                 onDone()
             }
-            .padding(.top, 18)
+            .padding(.top, VSpace.s4)
         }
     }
 
     private func notFoundPanel(_ c: String) -> some View {
         sheetPanel {
-            MonoLabel("Not found · \(BarcodeStore.grouped(c))", tint: .watch)
-            HeadlineLines(HeadlineLines.split("Not in Open Food Facts yet", maxChars: 16), size: 30).padding(.top, 10)
-            Text("Common for Indian brands. Pick another way and we'll remember this barcode.").vReading(13, tint: .steel)
-                .fixedSize(horizontal: false, vertical: true).padding(.top, 12).padding(.bottom, 14)
-            if reading { MonoLabel("Reading the label").padding(.bottom, 10) }
-            option("camera", "Photograph the label", "Reads calories and macros") { photographing = true }
-            if store.describeAvailable { option("pencil", "Describe it", "\"Mango lassi, 250 ml bottle\"") { onDescribe(c) } }
-            option("keyboard", "Type the numbers", "Per serving") { form = ManualFood(code: c, values: .init(), fromPhoto: false) }
+            Text("Not found · \(BarcodeStore.grouped(c))").vText(.secondary, color: VColor.watch)
+            Text("Not in Open Food Facts yet").vText(.title).padding(.top, VSpace.s2)
+            Text("Common for Indian brands. Pick another way and we'll remember this barcode.").vText(.secondary)
+                .fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s2).padding(.bottom, VSpace.s4)
+            if reading { Text("Reading the label").vText(.secondary).padding(.bottom, VSpace.s2) }
+            ListCard {
+                option("Photograph the label", "Reads calories and macros") { photographing = true }
+                if store.describeAvailable { option("Describe it", "\"Mango lassi, 250 ml bottle\"") { onDescribe(c) } }
+                option("Type the numbers", "Per serving") { form = ManualFood(code: c, values: .init(), fromPhoto: false) }
+            }
         }
     }
 
-    private func option(_ icon: String, _ title: String, _ detail: String, action: @escaping () -> Void) -> some View {
-        VStack(spacing: 0) {
-            Rule()
-            Button(action: action) {
-                HStack(spacing: 16) {
-                    Image(systemName: icon).font(.title3).foregroundStyle(VColor.bone).frame(width: 28)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title).vHeadline(22)
-                        MonoLabel(detail, size: .small)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.body.weight(.semibold)).foregroundStyle(VColor.steel)
-                }
-                .frame(minHeight: 62).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
+    private func option(_ title: String, _ detail: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { ListRow(title, subtitle: detail) }.buttonStyle(.plain)
     }
 
     /// No camera to scan with (simulator, no VisionKit, or access refused): type the digits instead.
     private func typeCodePanel(_ reason: String, settings: Bool) -> some View {
         sheetPanel {
-            MonoLabel(reason)
+            Text(reason).vText(.body)
             if settings, let url = URL(string: UIApplication.openSettingsURLString) {
-                SecondaryButton("Turn on in Settings", size: .full) { UIApplication.shared.open(url) }.padding(.top, 14)
+                SecondaryButton("Turn on in Settings", size: .full) { UIApplication.shared.open(url) }.padding(.top, VSpace.s3)
             }
-            HStack(spacing: 12) {
-                TextField("", text: $typedCode, prompt: Text("Barcode digits").foregroundStyle(VColor.steel))
-                    .vReading(14).keyboardType(.numberPad).tint(VColor.bone)
-                    .padding(.horizontal, 16).frame(height: 48)
-                    .overlay(RoundedRectangle(cornerRadius: VRadius.button, style: .continuous).inset(by: 0.75).stroke(VColor.future, lineWidth: 1.5))
+            HStack(spacing: VSpace.s3) {
+                TextField("", text: $typedCode, prompt: Text("Barcode digits").foregroundStyle(VColor.text3))
+                    .vText(.body).keyboardType(.numberPad).tint(VColor.eat)
+                    .padding(.horizontal, VSpace.s4).frame(minHeight: VSpace.rowMin)
+                    .background(VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
                 SecondaryButton("Look up", enabled: (8...14).contains(typedCode.filter(\.isNumber).count)) {
                     Task { await barcode.scanned(typedCode) }
                 }
             }
-            .padding(.top, 14)
+            .padding(.top, VSpace.s3)
         }
     }
 }

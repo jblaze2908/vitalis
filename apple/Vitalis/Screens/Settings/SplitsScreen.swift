@@ -14,30 +14,31 @@ struct SplitsScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                StatusRow(splits.error == nil ? "Splits" : "Offline", tint: .steel).padding(.top, VSpace.statusTop)
-                CachedPulseLine().padding(.top, 18)
-                SettingsBackLink(title: "Settings") { if !router.settingsPath.isEmpty { router.settingsPath.removeLast() } }
-                    .padding(.top, 4)
-                HeadlineLines(["Splits"], size: 46)
+                SettingsBar(title: "Splits", back: { if !router.settingsPath.isEmpty { router.settingsPath.removeLast() } })
+                FreshnessLine(DataFreshness(fetchedAt: splits.fetchedAt, refreshing: splits.isLoading))
+                    .frame(maxWidth: .infinity).padding(.top, VSpace.s1)
                 Text("Vitalis offers these when you start a workout and never picks one for you. Any other workout name you log is offered too.")
-                    .vBody().fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+                    .vText(.body).fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s4)
 
                 SettingsGroup(title: "Your splits") {
                     ForEach(splits.value?.splits ?? []) { split in
                         SettingsRow(key: split.name, value: Self.summary(split.muscles)) { editing = SplitDraft(split) }
                     }
                     if splits.value?.splits.isEmpty ?? false {
-                        MonoLabel("None yet").padding(.vertical, 14)
+                        Text("None yet").vText(.secondary).frame(maxWidth: .infinity, minHeight: VSpace.rowMin, alignment: .leading)
                     }
                 }
                 SecondaryButton("Add split", systemImage: "plus", size: .full) { editing = SplitDraft() }
-                    .padding(.top, 20)
-                if let error = splits.error as? APIError { MonoLabel(error.statusLine, tint: .watch).padding(.top, 12) }
+                    .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
+                if let error = splits.error as? APIError {
+                    Text(error.statusLine).vText(.secondary, color: VColor.watch).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
+                }
             }
-            .padding(.horizontal, VSpace.gutter)
-            .padding(.bottom, 40)
+            .padding(.bottom, VSpace.s6)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .refreshable { await load() }
         .vScreen()
         .toolbar(.hidden, for: .navigationBar)
         .task { await load() }
@@ -103,35 +104,32 @@ struct SplitEditSheet: View {
         SheetChrome {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HeadlineLines([draft.isNew ? "New split" : "Edit split"], size: 30)
-                    MonoLabel("Name").padding(.top, 24)
-                    TextField("", text: $draft.name, prompt: Text("Push").foregroundStyle(VColor.disabled))
-                        .vNumber(32).textInputAutocapitalization(.words).autocorrectionDisabled()
-                        .padding(.top, 8)
-                    Rule()
-                    MonoLabel("Muscles it needs fresh").padding(.top, 24)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], alignment: .leading, spacing: 8) {
+                    Text(draft.isNew ? "New split" : "Edit split").vText(.title)
+                    Text("Name").vText(.secondary).padding(.top, VSpace.s5)
+                    UnderlinedField(text: $draft.name, prompt: "Push", style: .title, keyboard: .default)
+                        .textInputAutocapitalization(.words).autocorrectionDisabled()
+                        .padding(.top, VSpace.s2)
+                    Text("Muscles it needs fresh").vText(.secondary).padding(.top, VSpace.s5)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: VSpace.s2)], alignment: .leading, spacing: VSpace.s2) {
                         ForEach(Muscle.allCases, id: \.rawValue) { m in
                             let on = draft.muscles.contains(m.rawValue)
-                            SecondaryButton(m.displayName, size: .mini) {
+                            ChoiceChip(m.displayName, on: on) {
                                 if on { draft.muscles.remove(m.rawValue) } else { draft.muscles.insert(m.rawValue) }
                             }
-                            .overlay(on ? RoundedRectangle(cornerRadius: VRadius.mini).stroke(VColor.bone, lineWidth: 1.5) : nil)
-                            .accessibilityAddTraits(on ? .isSelected : [])
                         }
                     }
-                    .padding(.top, 12)
-                    if let error { MonoLabel(error, tint: .watch).padding(.top, 12) }
+                    .padding(.top, VSpace.s3)
+                    if let error { Text(error).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s3) }
                     PrimaryButton(busy ? "Saving" : "Save") { Task { await save() } }
                         .disabled(busy || draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .padding(.top, 28)
+                        .padding(.top, VSpace.s5)
                     if !draft.isNew {
-                        SecondaryButton("Delete split", size: .full) { Task { await delete() } }.padding(.top, 12)
+                        SecondaryButton("Delete split", size: .full) { Task { await delete() } }.padding(.top, VSpace.s3)
                     }
                 }
-                .padding(.horizontal, VSpace.gutter)
-                .padding(.top, 20)
-                .padding(.bottom, VSpace.gutter)
+                .padding(.horizontal, VSpace.edge)
+                .padding(.top, VSpace.s5)
+                .padding(.bottom, VSpace.edge)
             }
         }
         .presentationDetents([.large])

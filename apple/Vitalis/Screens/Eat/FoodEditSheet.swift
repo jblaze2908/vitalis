@@ -18,33 +18,32 @@ struct AmountControl: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .lastTextBaseline) {
                 if let g = baseGrams {
-                    Figure(Self.grams(g * factor), unit: "g", size: 54)
+                    Figure(Self.grams(g * factor), unit: "g", size: 56)
                 } else {
-                    Figure(Self.factorText(factor), unit: baseName, size: 54)
+                    Figure(Self.factorText(factor), unit: baseName, size: 56)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 5) {
-                    Text(FoodFormat.kcal(kcal)).vFigure(30, color: VColor.eat)
-                    Text("kcal").vLabel()
-                }
+                Figure(FoodFormat.kcal(kcal), unit: "kcal", size: 28, color: VColor.eat)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: VSpace.s2) {
                 ForEach(fractions, id: \.0) { f, label in
+                    let on = abs(factor - f) < 0.001
                     Button { factor = f } label: {
-                        Text(f == 1 ? baseName.capitalized : label).vUI(15, weight: 600, color: abs(factor - f) < 0.001 ? Color(hex: 0x1A0C02) : VColor.bone)
+                        Text(f == 1 ? baseName.capitalized : label).vText(.headline, color: on ? VColor.onEat : VColor.text)
                             .lineLimit(1).minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                            .background(abs(factor - f) < 0.001 ? VColor.eat : VColor.cardRaised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .frame(maxWidth: .infinity).padding(.vertical, VSpace.s3)
+                            .background(on ? VColor.eat : VColor.surface2, in: RoundedRectangle(cornerRadius: VRadius.control, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
-            .padding(.top, 20)
-            Slider(value: $factor, in: 0.05...maxFactor, step: 0.05).tint(VColor.eat).padding(.top, 16)
+            .padding(.top, VSpace.s5)
+            Slider(value: $factor, in: 0.05...maxFactor, step: 0.05).tint(VColor.eat).padding(.top, VSpace.s4)
             HStack {
-                Text("0").vLabel()
+                Text("0").vText(.secondary)
                 Spacer()
-                Text(baseGrams.map { "\(Self.grams($0 * maxFactor)) g" } ?? "\(Self.factorText(maxFactor)) \(baseName)").vLabel()
+                Text(baseGrams.map { "\(Self.grams($0 * maxFactor)) g" } ?? "\(Self.factorText(maxFactor)) \(baseName)").vText(.secondary)
             }
         }
         .accessibilityElement(children: .contain)
@@ -80,62 +79,47 @@ struct FoodEditSheet: View {
         SheetChrome {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Button("Cancel") { dismiss() }.buttonStyle(.plain).foregroundStyle(VColor.muted)
-                        Spacer()
-                        Text("Edit food").vUI(15, weight: 600)
-                        Spacer()
-                        Color.clear.frame(width: 50)
-                    }
-                    .font(.system(size: 15, weight: .semibold))
-                    Text(entry.name).vHeadline(28).lineLimit(2).padding(.top, 18)
+                    SheetBar(title: "Edit food") { dismiss() }
+                    Text(entry.name).vText(.headline).lineLimit(2).padding(.top, VSpace.s4)
                     if let p = entry.portionText ?? entry.grams.map({ "\(AmountControl.grams($0)) g" }) {
-                        Text("Logged · \(p)").vLabel().padding(.top, 8)
+                        Text("Logged · \(p)").vText(.secondary).padding(.top, VSpace.s1)
                     }
                     AmountControl(factor: $factor, baseGrams: entry.grams, baseName: entry.grams == nil ? (entry.portionText ?? "portion") : "as logged",
-                                  kcal: scaled).padding(.top, 24)
+                                  kcal: scaled).padding(.top, VSpace.s4)
                     ReadoutRow([
                         Readout("Protein", macro(entry.proteinG)), Readout("Carbs", macro(entry.carbsG)), Readout("Fat", macro(entry.fatG)),
-                    ]).padding(.top, 20)
-                    Text("Meal").vUI(13, weight: 400, color: VColor.muted).padding(.top, 20).padding(.bottom, 8)
+                    ]).padding(.top, VSpace.s5)
+                    SheetLabel("Meal")
                     PillPicker(["breakfast", "lunch", "snack", "dinner"].map { ($0, $0.capitalized) }, selection: $slot)
-                    DatePicker("Eaten at", selection: $time, displayedComponents: .hourAndMinute)
-                        .font(.system(size: 15)).tint(VColor.eat)
-                        .padding(.horizontal, 14).frame(height: 46)
-                        .background(VColor.cardRaised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .padding(.top, 10)
-                    Button {
+                    DatePicker(selection: $time, displayedComponents: .hourAndMinute) { Text("Eaten at").vText(.body) }
+                        .tint(VColor.eat)
+                        .padding(.horizontal, VSpace.s4).frame(minHeight: VSpace.rowMin)
+                        .background(VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
+                        .padding(.top, VSpace.s3)
+                    PrimaryButton("Save", value: "\(FoodFormat.kcal(scaled)) kcal", fill: VColor.eat, ink: VColor.onEat) {
                         Task {
                             await store.update(entry, factor: factor, grams: entry.grams.map { ($0 * factor * 10).rounded() / 10 },
                                                portion: portion, slot: slot, eatenAt: EatStore.iso(time, calendar: .current))
                         }
                         dismiss()
-                    } label: {
-                        Text("Save · \(FoodFormat.kcal(scaled)) kcal").vUI(17, weight: 700, color: Color(hex: 0x1A0C02))
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                            .background(VColor.eat, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain).padding(.top, 24)
+                    .padding(.top, VSpace.s5)
                     let already = savedNow || store.savedMeals.contains { $0.name.caseInsensitiveCompare(entry.name) == .orderedSame }
                     // This food at the amount shown becomes a saved meal: one tap from Eat next time.
-                    Button {
+                    SecondaryButton(already ? "In your saved meals" : "Save for one tap", systemImage: already ? "checkmark" : "bookmark",
+                                    size: .full, enabled: !already) {
                         let f = { (v: Double?) in v.map { ($0 * factor * 10).rounded() / 10 } }
                         Task { await store.saveMeal(name: entry.name, items: [SavedMeal.Item(name: entry.name, portionText: portion, grams: f(entry.grams),
                                                                                               kcal: scaled.rounded(), proteinG: f(entry.proteinG), carbsG: f(entry.carbsG), fatG: f(entry.fatG))]) }
                         savedNow = true
-                    } label: {
-                        Label(already ? "In your saved meals" : "Save for one tap", systemImage: already ? "checkmark" : "bookmark")
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(already ? VColor.muted : VColor.bone)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(VColor.cardRaised, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain).disabled(already).padding(.top, 10)
+                    .padding(.top, VSpace.s3)
                     Button { Task { await store.delete(entry) }; dismiss() } label: {
-                        Text("Delete from \(day == today ? "today" : "this day")").vUI(15, weight: 600, color: VColor.pulse).frame(maxWidth: .infinity, minHeight: 44)
+                        Text("Delete from \(day == today ? "today" : "this day")").vText(.headline, color: VColor.accent).frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .buttonStyle(.plain).padding(.top, 8)
+                    .buttonStyle(.plain).padding(.top, VSpace.s2)
                 }
-                .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 24)
+                .padding(.horizontal, VSpace.edge).padding(.bottom, VSpace.s5)
             }
         }
         .presentationDetents([.large])
@@ -143,7 +127,7 @@ struct FoodEditSheet: View {
 
     private var today: String { EatStore.iso(Date(), calendar: .current).prefix(10).description }
 
-    private func macro(_ g: Double?) -> String { g.map { String(format: "%.1f g", $0 * factor) } ?? "–" }
+    private func macro(_ g: Double?) -> String { g.map { String(format: "%.1f g", $0 * factor) } ?? FoodFormat.dash }
 
     /// Keeps the portion words honest once the amount changes ("½ × 1 bowl").
     private var portion: String? {
@@ -164,12 +148,12 @@ struct SwipeRow<Content: View>: View {
     var body: some View {
         ZStack(alignment: .trailing) {
             HStack(spacing: 0) {
-                action("pencil", "Edit", VColor.bone, Color(hex: 0x3A3A3A)) { offset = 0; onEdit() }
-                action("trash", "Delete", Color(hex: 0x1A0503), VColor.pulse) { offset = 0; onDelete() }
+                action("pencil", "Edit", VColor.text, VColor.segmentOn) { offset = 0; onEdit() }
+                action("trash", "Delete", VColor.onAccent, VColor.accent) { offset = 0; onDelete() }
             }
             .opacity(offset < 0 ? 1 : 0)
             content
-                .background(VColor.card)
+                .background(VColor.surface)
                 .offset(x: offset)
                 .gesture(DragGesture(minimumDistance: 12)
                     .onChanged { v in offset = min(0, max(-reveal - 20, v.translation.width + (offset < -1 ? -reveal : 0))) }
@@ -182,9 +166,9 @@ struct SwipeRow<Content: View>: View {
 
     private func action(_ icon: String, _ title: String, _ fg: Color, _ bg: Color, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            VStack(spacing: 4) {
+            VStack(spacing: VSpace.s1) {
                 Image(systemName: icon).font(.system(size: 16, weight: .medium))
-                Text(title).vUI(13, weight: 600, color: fg)
+                Text(title).vText(.secondary, color: fg)
             }
             .foregroundStyle(fg).frame(width: reveal / 2).frame(maxHeight: .infinity).background(bg)
         }
@@ -202,79 +186,115 @@ struct DayCurve: View {
     @State private var sx: Double?
 
     private static let usualTime: [String: Double] = ["breakfast": 8.5, "lunch": 13.5, "snack": 17.5, "dinner": 21]
+    private static let plotHeight: CGFloat = 112
+
+    /// Hour and running total → a point in a plot of this size.
+    private struct Scale {
+        /// Room above the highest step for its label.
+        static let headroom = VSpace.s5
+        let size: CGSize
+        let maxK: Double
+        func x(_ h: Double) -> CGFloat { size.width * CGFloat(min(max((h - 6) / 18, 0), 1)) }
+        func y(_ k: Double) -> CGFloat { size.height - (size.height - Self.headroom) * CGFloat(k / maxK) }
+    }
+
+    private var maxK: Double { max(target ?? 0, eaten, 1) * 1.02 }
+
+    /// Each meal's step: where it lands and its label (the first meal's total, then "+" what each added).
+    private func steps(_ s: Scale) -> [(point: CGPoint, label: String)] {
+        var total = 0.0
+        return meals.sorted { (Self.hours($0.time) ?? 0) < (Self.hours($1.time) ?? 0) }.compactMap { m in
+            guard let h = Self.hours(m.time) else { return nil }
+            total += m.kcal
+            return (CGPoint(x: s.x(h), y: s.y(total)), total == m.kcal ? FoodFormat.kcal(m.kcal) : "+\(FoodFormat.kcal(m.kcal))")
+        }
+    }
 
     var body: some View {
-        Canvas { ctx, size in
-            let top: CGFloat = 20, bottom = size.height - 20
-            let maxK = max(target ?? 0, eaten, 1) * 1.02
-            let x = { (h: Double) in size.width * CGFloat(min(max((h - 6) / 18, 0), 1)) }
-            let y = { (k: Double) in bottom - (bottom - top) * CGFloat(k / maxK) }
-            for h in [12.0, 18.0] {
-                var p = Path(); p.move(to: CGPoint(x: x(h), y: top - 6)); p.addLine(to: CGPoint(x: x(h), y: bottom))
-                ctx.stroke(p, with: .color(Color(hex: 0x1C1C1C)), lineWidth: 1)
-            }
-            if let target {
-                var p = Path(); p.move(to: CGPoint(x: 0, y: y(target))); p.addLine(to: CGPoint(x: size.width, y: y(target)))
-                ctx.stroke(p, with: .color(Color(hex: 0x3A3A3A)), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            }
-            var step = Path(), area = Path(), total = 0.0, last = CGPoint(x: 0, y: bottom)
-            step.move(to: last); area.move(to: last)
-            var dots: [(CGPoint, String)] = []
-            for m in meals.sorted(by: { (Self.hours($0.time) ?? 0) < (Self.hours($1.time) ?? 0) }) {
-                guard let h = Self.hours(m.time) else { continue }
-                let px = x(h)
-                step.addLine(to: CGPoint(x: px, y: last.y)); area.addLine(to: CGPoint(x: px, y: last.y))
-                total += m.kcal
-                last = CGPoint(x: px, y: y(total))
-                step.addLine(to: last); area.addLine(to: last)
-                dots.append((last, total == m.kcal ? FoodFormat.kcal(m.kcal) : "+\(FoodFormat.kcal(m.kcal))"))
-            }
-            let nowH = isToday ? Self.nowHours() : 24
-            let end = CGPoint(x: x(nowH), y: last.y)
-            step.addLine(to: end); area.addLine(to: end); area.addLine(to: CGPoint(x: end.x, y: bottom)); area.closeSubpath()
-            ctx.fill(area, with: .color(VColor.eat.opacity(0.14)))
-            ctx.stroke(step, with: .color(VColor.eat), style: StrokeStyle(lineWidth: 2.2, lineJoin: .round))
-            if isToday, let target, total < target {
-                let rest = ["breakfast", "lunch", "snack", "dinner"].compactMap { s -> Double? in
-                    guard let t = Self.usualTime[s], t > nowH, !meals.contains(where: { $0.slot == s }) else { return nil }; return t
-                }
-                if let lastT = rest.last {
-                    var ghost = Path(); ghost.move(to: end)
-                    for (i, t) in rest.enumerated() {
-                        let k = total + (target - total) * Double(i + 1) / Double(rest.count)
-                        ghost.addLine(to: CGPoint(x: x(t), y: y(k)))
-                        ctx.stroke(Path(ellipseIn: CGRect(x: x(t) - 4, y: y(k) - 4, width: 8, height: 8)), with: .color(Color(hex: 0x6E6E6E)), lineWidth: 1.5)
-                    }
-                    _ = lastT
-                    ctx.stroke(ghost, with: .color(Color(hex: 0x6E6E6E)), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
-                }
-            }
-            for (pt, label) in dots {
-                ctx.fill(Path(ellipseIn: CGRect(x: pt.x - 5, y: pt.y - 5, width: 10, height: 10)), with: .color(VColor.eat))
-                ctx.draw(Text(label).font(VFont.mono(11, weight: 600)).foregroundStyle(VColor.bone), at: CGPoint(x: pt.x - 4, y: pt.y - 12), anchor: .bottomTrailing)
-            }
-            if isToday {
-                var now = Path(); now.move(to: CGPoint(x: end.x, y: top - 8)); now.addLine(to: CGPoint(x: end.x, y: bottom))
-                ctx.stroke(now, with: .color(VColor.bone), lineWidth: 1.2)
-            }
-            for (h, label) in [(6.0, "06"), (12.0, "12"), (18.0, "18"), (24.0, "24")] {
-                let anchor: UnitPoint = h == 6 ? .leading : h == 24 ? .trailing : .center
-                ctx.draw(Text(label).font(VFont.mono(11, weight: 600)).foregroundStyle(Color(hex: 0x7A7A7A)), at: CGPoint(x: x(h), y: size.height - 6), anchor: anchor)
-            }
-        }
-        .overlay {
+        VStack(spacing: VSpace.s2) {
             GeometryReader { g in
-                if let sx {
-                    let h = 6 + 18 * sx
-                    let k = meals.filter { (Self.hours($0.time) ?? 99) <= h }.reduce(0) { $0 + $1.kcal }
-                    Rectangle().fill(VColor.bone.opacity(0.5)).frame(width: 1, height: g.size.height - 20).offset(x: g.size.width * sx)
-                    ChartCallout(String(format: "%02d:%02d", Int(h), Int((h - floor(h)) * 60)) + " · \(FoodFormat.kcal(k)) kcal")
-                        .position(x: min(max(g.size.width * sx, 70), g.size.width - 70), y: 6)
+                let s = Scale(size: g.size, maxK: maxK)
+                ZStack(alignment: .topLeading) {
+                    Canvas { ctx, _ in draw(ctx, s) }
+                    ForEach(Array(steps(s).enumerated()), id: \.offset) { _, step in
+                        Text(step.label).vText(.secondary, color: VColor.text).fixedSize()
+                            .frame(width: 0, height: 0, alignment: .bottomTrailing)
+                            .position(x: step.point.x - VSpace.s1, y: step.point.y - VSpace.s2)
+                    }
+                    if let sx {
+                        let h = 6 + 18 * sx
+                        let k = meals.filter { (Self.hours($0.time) ?? 99) <= h }.reduce(0) { $0 + $1.kcal }
+                        Rectangle().fill(VColor.text.opacity(0.5)).frame(width: 1, height: g.size.height).offset(x: g.size.width * sx)
+                        ChartCallout(String(format: "%02d:%02d", Int(h), Int((h - floor(h)) * 60)) + " · \(FoodFormat.kcal(k)) kcal")
+                            .position(x: min(max(g.size.width * sx, 70), g.size.width - 70), y: VSpace.s1)
+                    }
                 }
             }
+            .frame(height: Self.plotHeight)
+            .scrub($sx)
+            axis
         }
-        .scrub($sx)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Calories through the day")
+    }
+
+    private var axis: some View {
+        GeometryReader { g in
+            let s = Scale(size: g.size, maxK: maxK)
+            ForEach([(6.0, "06"), (12.0, "12"), (18.0, "18"), (24.0, "24")], id: \.0) { h, label in
+                Text(label).vText(.axis).fixedSize()
+                    .frame(width: 0, alignment: h == 6 ? .leading : h == 24 ? .trailing : .center)
+                    .position(x: s.x(h), y: g.size.height / 2)
+            }
+        }
+        .frame(height: VSpace.s3)
+    }
+
+    private func draw(_ ctx: GraphicsContext, _ s: Scale) {
+        let bottom = s.size.height, top = Scale.headroom
+        for h in [12.0, 18.0] {
+            var p = Path(); p.move(to: CGPoint(x: s.x(h), y: top - 6)); p.addLine(to: CGPoint(x: s.x(h), y: bottom))
+            ctx.stroke(p, with: .color(VColor.grid), lineWidth: 1)
+        }
+        if let target {
+            var p = Path(); p.move(to: CGPoint(x: 0, y: s.y(target))); p.addLine(to: CGPoint(x: s.size.width, y: s.y(target)))
+            ctx.stroke(p, with: .color(VColor.dashed), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+        }
+        var step = Path(), area = Path(), last = CGPoint(x: 0, y: bottom)
+        step.move(to: last); area.move(to: last)
+        let dots = steps(s)
+        for d in dots {
+            step.addLine(to: CGPoint(x: d.point.x, y: last.y)); area.addLine(to: CGPoint(x: d.point.x, y: last.y))
+            last = d.point
+            step.addLine(to: last); area.addLine(to: last)
+        }
+        let total = meals.filter { Self.hours($0.time) != nil }.reduce(0) { $0 + $1.kcal }
+        let nowH = isToday ? Self.nowHours() : 24
+        let end = CGPoint(x: s.x(nowH), y: last.y)
+        step.addLine(to: end); area.addLine(to: end); area.addLine(to: CGPoint(x: end.x, y: bottom)); area.closeSubpath()
+        ctx.fill(area, with: .color(VColor.eat.opacity(0.14)))
+        ctx.stroke(step, with: .color(VColor.eat), style: StrokeStyle(lineWidth: 2.2, lineJoin: .round))
+        if isToday, let target, total < target {
+            let rest = ["breakfast", "lunch", "snack", "dinner"].compactMap { slot -> Double? in
+                guard let t = Self.usualTime[slot], t > nowH, !meals.contains(where: { $0.slot == slot }) else { return nil }; return t
+            }
+            if !rest.isEmpty {
+                var ghost = Path(); ghost.move(to: end)
+                for (i, t) in rest.enumerated() {
+                    let k = total + (target - total) * Double(i + 1) / Double(rest.count)
+                    ghost.addLine(to: CGPoint(x: s.x(t), y: s.y(k)))
+                    ctx.stroke(Path(ellipseIn: CGRect(x: s.x(t) - 4, y: s.y(k) - 4, width: 8, height: 8)), with: .color(VColor.text3), lineWidth: 1.5)
+                }
+                ctx.stroke(ghost, with: .color(VColor.text3), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+            }
+        }
+        for d in dots {
+            ctx.fill(Path(ellipseIn: CGRect(x: d.point.x - 5, y: d.point.y - 5, width: 10, height: 10)), with: .color(VColor.eat))
+        }
+        if isToday {
+            var now = Path(); now.move(to: CGPoint(x: end.x, y: top - 8)); now.addLine(to: CGPoint(x: end.x, y: bottom))
+            ctx.stroke(now, with: .color(VColor.text), lineWidth: 1.2)
+        }
     }
 
     static func hours(_ hm: String?) -> Double? {
@@ -300,13 +320,5 @@ enum EatCopy {
     static func proteinBehind(_ d: FoodDay) -> Bool {
         guard let pt = d.macros.protein.targetG, pt > 0, let kt = d.kcalTarget, kt > 0 else { return false }
         return d.macros.protein.g / pt + 0.1 < d.kcalEaten / kt
-    }
-
-    static func macros(_ d: FoodDay) -> [Readout] {
-        let p = d.macros.protein
-        return [Readout("Protein", "\(Int(p.g.rounded()))" + (p.targetG.map { "/\(Int($0.rounded())) g" } ?? " g"),
-                        status: p.targetG == nil ? nil : proteinBehind(d) ? ("Behind", .watch) : ("On track", .good)),
-                Readout("Carbs", "\(Int(d.macros.carbs.g.rounded())) g"),
-                Readout("Fat", "\(Int(d.macros.fat.g.rounded())) g")]
     }
 }

@@ -18,17 +18,15 @@ struct WelcomeStep: View {
             VStack(alignment: .leading, spacing: 0) {
                 MuscleMap(heat: Self.exampleHeat).frame(height: 290).frame(maxWidth: .infinity)
                     .accessibilityHidden(true)
-                Wordmark().padding(.top, 52)
-                HeadlineLines(["Sleep, recovery, training", "and food.", "On a server you own."], size: 30,
-                              colors: [VColor.bone, VColor.bone, VColor.steel])
-                    .padding(.top, 18)
-                VStack(spacing: 0) {
-                    Rule()
+                Wordmark().padding(.top, VSpace.s7)
+                SetupHeadline(["Sleep, recovery, training", "and food.", "On a server you own."], dimmedFrom: 2)
+                    .padding(.top, VSpace.s4)
+                ListCard {
                     feature("01", "Every raw sample from Apple Health")
                     feature("02", "Log sets on your Watch, see muscles light up")
                     feature("03", "Meals in seconds: usual, scan or describe")
                 }
-                .padding(.top, 18)
+                .padding(.top, VSpace.s5)
             }
         } action: {
             PrimaryButton("Get started") { store.step = .connect }
@@ -36,24 +34,22 @@ struct WelcomeStep: View {
     }
 
     private func feature(_ n: String, _ text: String) -> some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 18) {
-                MonoLabel(n)
-                Text(text).vBody(15, color: VColor.bone)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 12)
-            Rule()
+        HStack(alignment: .firstTextBaseline, spacing: VSpace.s4) {
+            Text(n).vText(.secondary)
+            Text(text).vText(.body)
+            Spacer(minLength: 0)
         }
+        .padding(.vertical, VSpace.s3)
+        .accessibilityElement(children: .combine)
     }
 }
 
-/// "Vitalis" with the pulse V (frame 19). VitalisUI has no wordmark component yet, so it's composed from type roles.
+/// "Vitalis" with the pulse V (frame 19): a logo, so it keeps its own size outside the type scale.
 private struct Wordmark: View {
     var body: some View {
         HStack(spacing: 0) {
-            Text("V").vRole(.statusTime(58), color: VColor.pulse)
-            Text("italis").vRole(.statusTime(58), color: VColor.bone)
+            Text("V").font(VFont.archivo(58, width: 100, weight: 600)).foregroundStyle(VColor.accent)
+            Text("italis").font(VFont.archivo(58, width: 100, weight: 600)).foregroundStyle(VColor.text)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Vitalis")
@@ -70,53 +66,44 @@ struct ConnectStep: View {
     var body: some View {
         SetupChrome(step: .connect) {
             VStack(alignment: .leading, spacing: 0) {
-                HeadlineLines(["Connect your", "server"], size: 44)
+                SetupHeadline(["Connect your", "server"])
                 Text("Your data goes straight to your own Vitalis server. Nothing else sees it.")
-                    .vBody(15).padding(.top, 16)
-                VStack(spacing: 0) {
-                    Rule()
-                    VStack(alignment: .leading, spacing: 8) {
-                        MonoLabel("Server")
-                        TextField("", text: $store.serverText, prompt: Text("https://vitalis.example.com").foregroundStyle(VColor.disabled))
-                            .vReading(14)
+                    .vText(.body).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4)
+                ListCard {
+                    VStack(alignment: .leading, spacing: VSpace.s1) {
+                        Text("Server").vText(.secondary)
+                        TextField("", text: $store.serverText, prompt: Text("https://vitalis.example.com").foregroundStyle(VColor.text3))
+                            .vText(.body)
                             .keyboardType(.URL).textContentType(.URL)
                             .textInputAutocapitalization(.never).autocorrectionDisabled()
                             .focused($focus, equals: .server).submitLabel(.next)
                             .onSubmit { focus = .token }
                     }
-                    .padding(.vertical, 14)
-                    Rule()
+                    .padding(.vertical, VSpace.s3)
                     HStack(alignment: .center) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            MonoLabel("Write token")
-                            SecureField("", text: $store.tokenText, prompt: Text("Paste your token").foregroundStyle(VColor.disabled))
-                                .vReading(14)
+                        VStack(alignment: .leading, spacing: VSpace.s1) {
+                            Text("Write token").vText(.secondary)
+                            SecureField("", text: $store.tokenText, prompt: Text("Paste your token").foregroundStyle(VColor.text3))
+                                .vText(.body)
                                 .textContentType(.password)
                                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                                 .focused($focus, equals: .token).submitLabel(.go)
                                 .onSubmit { Task { await store.check() } }
                         }
-                        Spacer(minLength: 12)
+                        Spacer(minLength: VSpace.s3)
                         SecondaryButton("Paste") {
                             if let text = UIPasteboard.general.string { store.tokenText = text; Task { await store.check() } }
                         }
                     }
-                    .padding(.vertical, 14)
-                    Rule()
+                    .padding(.vertical, VSpace.s3)
                 }
-                .padding(.top, 28)
-                Text("No token yet? On your server run").vBody(14).padding(.top, 16)
-                Text("vitalis token create iphone --scope write").vReading(13).padding(.top, 6)
+                .padding(.top, VSpace.s5)
+                Text("No token yet? On your server run").vText(.secondary).padding(.top, VSpace.s4)
+                Text("vitalis token create iphone --scope write").vText(.body).padding(.top, VSpace.s1)
                     .textSelection(.enabled)
                 if let label = store.connect.label {
-                    HStack(spacing: 10) {
-                        if store.connect == .connected {
-                            Image(systemName: "checkmark").vLabel(.custom(14), tint: .good)
-                        }
-                        MonoLabel(label, tint: store.connect.isError ? .watch : store.connect == .connected ? .good : .steel)
-                    }
-                    .padding(.top, 28)
-                    .accessibilityElement(children: .combine)
+                    StatusWord(label, tone: store.connect.isError ? .watch : store.connect == .connected ? .good : .quiet)
+                        .padding(.top, VSpace.s5)
                 }
             }
         } action: {
@@ -137,16 +124,15 @@ struct HealthStep: View {
     var body: some View {
         SetupChrome(step: .health) {
             VStack(alignment: .leading, spacing: 0) {
-                HeadlineLines(["Health access"], size: 44)
+                SetupHeadline(["Health access"])
                 Text("Vitalis reads every sample with its source and time zone. Meals you log go back into Health.")
-                    .vBody(15).padding(.top, 16)
-                VStack(spacing: 0) {
-                    Rule()
-                    ForEach(Self.areas, id: \.0) { SetupRow(key: $0.0, value: $0.1, verticalPadding: 15) }
+                    .vText(.body).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4)
+                ListCard {
+                    ForEach(Self.areas, id: \.0) { ListRow($0.0, subtitle: $0.1, chevron: false) }
                 }
-                .padding(.top, 24)
+                .padding(.top, VSpace.s5)
                 Text("Apple only allows Health reads while your phone is unlocked, so the first sync is fastest with Vitalis open.")
-                    .vBody(13).padding(.top, 18)
+                    .vText(.secondary).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4)
             }
         } action: {
             PrimaryButton("Allow in Health") { Task { await store.allowHealth() } }
@@ -170,38 +156,33 @@ struct HistoryStep: View {
         let p = store.progress()
         SetupChrome(step: .history, showsPulse: false) {
             VStack(alignment: .leading, spacing: 0) {
-                HeadlineLines(["Reading your", "history"], size: 44)
+                SetupHeadline(["Reading your", "history"])
                 Text("Keep Vitalis open and your phone unlocked. Progress is saved if you leave.")
-                    .vBody(15).padding(.top, 16)
+                    .vText(.body).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4)
                 HStack(alignment: .lastTextBaseline) {
-                    HStack(alignment: .lastTextBaseline, spacing: 2) {
-                        Text(p.percent.map(String.init) ?? "–").vNumber(96, color: p.percent == nil ? VColor.steel : nil)
-                        Text("%").vNumber(44)
-                    }
-                    .accessibilityElement(children: .combine)
-                    Spacer(minLength: 8)
-                    VStack(alignment: .trailing, spacing: 8) {
-                        MonoLabel(p.done ? "Finished" : "Now reading")
-                        Text(p.reading ?? "–").vReading(13, tint: p.reading == nil ? .steel : .bone)
+                    Figure(p.percent.map(String.init) ?? FoodFormat.dash, unit: "%", size: 56, color: p.percent == nil ? VColor.text3 : nil)
+                    Spacer(minLength: VSpace.s2)
+                    VStack(alignment: .trailing, spacing: VSpace.s1) {
+                        Text(p.done ? "Finished" : "Now reading").vText(.secondary)
+                        Text(p.reading ?? FoodFormat.dash).vText(.body, color: p.reading == nil ? VColor.text3 : nil)
                     }
                     .accessibilityElement(children: .combine)
                 }
-                .padding(.top, 36)
-                PulseLine(now: Double(p.percent ?? 0) / 100, style: .progress).padding(.top, 24)
+                .padding(.top, VSpace.s6)
+                PulseLine(now: Double(p.percent ?? 0) / 100, style: .progress).padding(.top, VSpace.s5)
                 HStack {
-                    MonoLabel("First sample")
+                    Text("First sample").vText(.secondary)
                     Spacer()
-                    MonoLabel("Today")
+                    Text("Today").vText(.secondary)
                 }
-                .padding(.top, 10)
-                VStack(spacing: 0) {
-                    Rule()
+                .padding(.top, VSpace.s2)
+                ListCard {
                     SetupRow(key: "Samples sent", value: p.samplesSent)
-                    SetupRow(key: "Time left", value: p.timeLeft ?? "–", tint: p.timeLeft == nil ? .steel : .bone)
-                    SetupRow(key: "Server", value: store.connect == .connected ? "Connected" : "–",
+                    SetupRow(key: "Time left", value: p.timeLeft ?? FoodFormat.dash, tint: p.timeLeft == nil ? .steel : .bone)
+                    SetupRow(key: "Server", value: store.connect == .connected ? "Connected" : FoodFormat.dash,
                              tint: store.connect == .connected ? .good : .steel)
                 }
-                .padding(.top, 36)
+                .padding(.top, VSpace.s6)
             }
         } action: {
             SecondaryButton(p.done ? "Set targets" : "Set targets while this runs", size: .full) { store.goToTargets() }
@@ -219,18 +200,17 @@ struct TargetsStep: View {
     var body: some View {
         SetupChrome(step: .targets) {
             VStack(alignment: .leading, spacing: 0) {
-                HeadlineLines(["Your targets"], size: 44)
+                SetupHeadline(["Your targets"])
                 Text("Starting points from your history. You can change any of them later.")
-                    .vBody(15).padding(.top, 16)
-                VStack(spacing: 0) {
-                    Rule()
+                    .vText(.body).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4)
+                ListCard {
                     ForEach(TargetField.setup) { field in
                         Button { editing = field } label: { row(field) }.buttonStyle(.plain)
                     }
                 }
-                .padding(.top, 24)
+                .padding(.top, VSpace.s5)
                 if let error = store.targetsError {
-                    MonoLabel(error.statusLine, tint: .watch).padding(.top, 16)
+                    Text(error.statusLine).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s4)
                 }
             }
         } action: {
@@ -246,23 +226,17 @@ struct TargetsStep: View {
 
     private func row(_ field: TargetField) -> some View {
         let value = store.draft.value(field)
-        return VStack(spacing: 0) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(field.title).vHeadline(22)
-                    MonoLabel(store.draft.basis[field] ?? " ")
-                }
-                Spacer(minLength: 12)
-                HStack(alignment: .lastTextBaseline, spacing: 6) {
-                    Text(field.format(value)).vNumber(30, color: value == nil ? VColor.steel : nil)
-                    if value != nil, let unit = field.unit { Text(unit).vNumber(16) }
-                }
+        return HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(field.title).vText(.headline)
+                if let basis = store.draft.basis[field] { Text(basis).vText(.secondary) }
             }
-            .padding(.vertical, 12)
-            .frame(minHeight: 68)
-            .contentShape(Rectangle())
-            Rule()
+            Spacer(minLength: VSpace.s3)
+            Figure(field.format(value), unit: value == nil ? nil : field.unit, size: 20, color: value == nil ? VColor.text3 : nil)
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(VColor.chevron)
         }
+        .frame(minHeight: VSpace.rowMin).padding(.vertical, VSpace.s3)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("Edit")
     }

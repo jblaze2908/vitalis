@@ -2,75 +2,36 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
-/// Status row + PulseLine pinned above an Eat screen's content (spec 30 spacing: 18 top, line 14 below).
-struct EatChrome<Content: View>: View {
-    let status: String
-    var tint: VTint = .steel
-    let pulse: Pulse?
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            StatusRow(status, tint: tint).padding(.top, VSpace.statusTop)
-            EatPulse(pulse: pulse).padding(.top, 14)
-            content
-        }
-    }
-}
-
-/// Eat isn't a timeline: a flat line with only the now-dot (spec 30 → PulseLine, tabs other than Today).
-struct EatPulse: View {
-    let pulse: Pulse?
-    var body: some View { PulseLine(events: [], now: 0.64).frame(height: PulseLine.Style.phone.height) }
-}
-
-/// SEARCH / SCAN / DESCRIBE (and USUAL on Eat): an outlined square or tile with an icon and a mono label.
+/// Search / Scan / Describe (and Usual on Eat): a surface tile with an icon over its name.
 struct FoodTile: View {
     enum Kind: CaseIterable { case usual, search, scan, describe
         var title: String { switch self { case .usual: "Usual"; case .search: "Search"; case .scan: "Scan"; case .describe: "Describe" } }
         var icon: String { switch self { case .usual: "bookmark"; case .search: "magnifyingglass"; case .scan: "barcode.viewfinder"; case .describe: "pencil" } }
     }
-    enum Style { case square, tile(height: CGFloat) }
     let kind: Kind
-    let style: Style
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            switch style {
-            case .square:
-                VStack(spacing: 12) {
-                    icon.frame(width: 56, height: 52).overlay(ring)
-                    MonoLabel(kind.title, size: .small).lineLimit(1).fixedSize()
-                }
-                .frame(maxWidth: .infinity)
-            case .tile(let height):
-                VStack(spacing: 10) {
-                    icon
-                    MonoLabel(kind.title, tint: .bone).lineLimit(1).minimumScaleFactor(0.8)
-                }
-                .frame(maxWidth: .infinity, minHeight: height).overlay(ring)
+            VStack(spacing: VSpace.s2) {
+                Image(systemName: kind.icon).font(.title3).foregroundStyle(VColor.eat)
+                Text(kind.title).vText(.headline).lineLimit(1).minimumScaleFactor(0.8)
             }
+            .frame(maxWidth: .infinity).padding(.vertical, VSpace.s4)
+            .background(VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(kind.title)
     }
-
-    private var icon: some View { Image(systemName: kind.icon).font(.title3).foregroundStyle(VColor.bone) }
-    private var ring: some View {
-        RoundedRectangle(cornerRadius: VRadius.button, style: .continuous).inset(by: 0.75).stroke(VColor.future, lineWidth: 1.5)
-    }
 }
 
-/// 34×34 outlined plus on food rows; logs immediately.
+/// The plus on a food row; logs immediately.
 struct RowPlus: View {
     let label: String
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Image(systemName: "plus").font(.body.weight(.semibold)).foregroundStyle(VColor.bone)
-                .frame(width: 34, height: 34)
-                .overlay(RoundedRectangle(cornerRadius: VRadius.mini, style: .continuous).inset(by: 0.75).stroke(VColor.future, lineWidth: 1.5))
+            Image(systemName: "plus.circle.fill").font(.title2).foregroundStyle(VColor.eat)
                 .frame(width: 44, height: 44).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -78,50 +39,91 @@ struct RowPlus: View {
     }
 }
 
-/// A food row (54–58 tall): name, mono detail, kcal, plus.
+/// A food in a Quick add or search list: name, detail, kcal, plus. Sits in a `ListCard`.
 struct FoodRow: View {
     let name: String
     let detail: String?
     let kcal: Double?
     let add: () -> Void
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(name).vReading(14).textCase(.uppercase).lineLimit(1)
-                    if let detail { MonoLabel(detail, size: .small).lineLimit(1) }
-                }
-                Spacer(minLength: 8)
-                Text(FoodFormat.kcal(kcal)).vNumber(19, color: kcal == nil ? VColor.steel : nil)
-                RowPlus(label: name, action: add)
-            }
-            .frame(minHeight: 56)
-            Rule()
+        ListRow(name, subtitle: detail?.isEmpty == false ? detail : nil, chevron: false) {
+            Text("\(FoodFormat.kcal(kcal)) kcal").vText(.secondary).lineLimit(1).fixedSize()
+            RowPlus(label: name, action: add).padding(.vertical, -VSpace.s3)
         }
-        .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Add", add)
     }
 }
 
-/// PROTEIN / CARBS / FAT in three columns.
+/// Protein / Carbs / Fat as readouts.
 struct MacroColumns: View {
     let protein: Double?, carbs: Double?, fat: Double?
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            column("Protein", protein); column("Carbs", carbs); column("Fat", fat)
-        }
+        ReadoutRow([Readout("Protein", grams(protein)), Readout("Carbs", grams(carbs)), Readout("Fat", grams(fat))])
     }
-    private func column(_ title: String, _ g: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            MonoLabel(title)
-            Text(g == nil ? FoodFormat.dash : "\(FoodFormat.grams(g)) G").vReading(14, tint: g == nil ? .steel : .bone)
+    private func grams(_ g: Double?) -> String { g == nil ? FoodFormat.dash : "\(FoodFormat.grams(g)) g" }
+}
+
+/// A section label inside a sheet whose content already sits on the gutter (`SectionLabel` brings its own).
+struct SheetLabel: View {
+    let text: String
+    var note: String? = nil
+    init(_ text: String, note: String? = nil) { self.text = text; self.note = note }
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(text).vText(.label)
+            Spacer(minLength: VSpace.s2)
+            if let note { Text(note).vText(.label) }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .padding(.top, VSpace.s5).padding(.bottom, VSpace.s2)
     }
 }
 
-/// Sheet height with its top at 104 pt (spec 30), so the pulse line stays visible above it.
+/// Sheet top bar: Cancel or Back on the left, the title centred.
+struct SheetBar: View {
+    let title: String
+    var leading = "Cancel"
+    var back = false
+    let action: () -> Void
+    var body: some View {
+        ZStack {
+            Text(title).vText(.title).lineLimit(1).padding(.horizontal, VSpace.s7)
+            HStack {
+                Button(action: action) {
+                    HStack(spacing: VSpace.s1) {
+                        if back { Image(systemName: "chevron.left").font(.body.weight(.semibold)) }
+                        Text(leading).vText(.headline, color: VColor.text2)
+                    }
+                    .foregroundStyle(VColor.text2).frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+        }
+        .padding(.top, VSpace.s3)
+    }
+}
+
+/// A form field in a `ListCard`: label left, value typed on the right.
+struct FormFieldRow<Field: Hashable>: View {
+    let title: String
+    @Binding var text: String
+    let focus: FocusState<Field?>.Binding
+    let field: Field
+    var prompt: String = FoodFormat.dash
+    var keyboard: UIKeyboardType = .decimalPad
+    var body: some View {
+        HStack {
+            Text(title).vText(.secondary)
+            Spacer(minLength: VSpace.s4)
+            TextField("", text: $text, prompt: Text(prompt).foregroundStyle(VColor.text3))
+                .vText(.body).multilineTextAlignment(.trailing).keyboardType(keyboard).tint(VColor.eat)
+                .focused(focus, equals: field)
+        }
+        .frame(minHeight: VSpace.rowMin)
+    }
+}
+
+/// Sheet height with its top at 104 pt (spec 30), so the tab's header stays visible above it.
 struct BelowPulseDetent: CustomPresentationDetent {
     static func height(in context: Context) -> CGFloat? { context.maxDetentValue - 47 }
 }

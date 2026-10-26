@@ -40,41 +40,36 @@ struct SavedMealForm: View {
     var body: some View {
         SheetChrome {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    HStack {
-                        Button { dismiss() } label: { MonoLabel("Cancel", tint: .bone).frame(minHeight: 44) }.buttonStyle(.plain)
-                        Spacer()
-                    }
-                    Text(meal == nil ? "New saved meal" : "Saved meal").vHeadline(22)
-                }
-                .padding(.top, 14)
+                SheetBar(title: meal == nil ? "New saved meal" : "Saved meal") { dismiss() }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         Text(multi ? "\(meal!.items.map(\.name).joined(separator: " · ")) · \(FoodFormat.kcal(meal?.kcal)) kcal"
                              : "Enter it once. It then sits under Saved on Eat and in Add, one tap to log.")
-                            .vUI(13, weight: 400, color: VColor.muted).fixedSize(horizontal: false, vertical: true).padding(.top, 16).padding(.bottom, 6)
-                        row("Name", $name, .name, keyboard: .default, prompt: "Protein shake")
-                        if !multi {
-                            row("Portion", $portion, .portion, keyboard: .default, prompt: "1 scoop + 300 ml milk")
-                            row("Kcal", $kcal, .kcal)
-                            row("Protein g", $protein, .protein)
-                            row("Carbs g", $carbs, .carbs)
-                            row("Fat g", $fat, .fat)
+                            .vText(.secondary).fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4).padding(.bottom, VSpace.s3)
+                        ListCard {
+                            FormFieldRow(title: "Name", text: $name, focus: $focus, field: .name, prompt: "Protein shake", keyboard: .default)
+                            if !multi {
+                                FormFieldRow(title: "Portion", text: $portion, focus: $focus, field: .portion, prompt: "1 scoop + 300 ml milk", keyboard: .default)
+                                FormFieldRow(title: "Calories (kcal)", text: $kcal, focus: $focus, field: .kcal)
+                                FormFieldRow(title: "Protein (g)", text: $protein, focus: $focus, field: .protein)
+                                FormFieldRow(title: "Carbs (g)", text: $carbs, focus: $focus, field: .carbs)
+                                FormFieldRow(title: "Fat (g)", text: $fat, focus: $focus, field: .fat)
+                            }
                         }
                         if meal != nil {
                             Button { confirmDelete = true } label: {
-                                Text("Delete saved meal").vUI(15, weight: 600, color: VColor.watch).frame(maxWidth: .infinity, minHeight: 48)
+                                Text("Delete saved meal").vText(.headline, color: VColor.watch).frame(maxWidth: .infinity, minHeight: 44)
                             }
-                            .buttonStyle(.plain).padding(.top, 18)
+                            .buttonStyle(.plain).padding(.top, VSpace.s4)
                         }
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
-                PrimaryButton(addTo.map { "Save and add to \($0.slotTitle)" } ?? "Save") { save() }
+                PrimaryButton(addTo.map { "Save and add to \($0.slotTitle)" } ?? "Save", fill: VColor.eat, ink: VColor.onEat) { save() }
                     .opacity(isValid ? 1 : 0.4).disabled(!isValid)
-                    .padding(.bottom, 38)
+                    .padding(.top, VSpace.s3).padding(.bottom, VSpace.s6)
             }
-            .padding(.horizontal, VSpace.gutter)
+            .padding(.horizontal, VSpace.edge)
         }
         .presentationDetents([.custom(BelowPulseDetent.self)])
         .onAppear { if meal == nil { focus = .name } }
@@ -84,20 +79,6 @@ struct SavedMealForm: View {
                 dismiss()
             }
         } message: { Text("Food you already logged with it stays logged.") }
-    }
-
-    private func row(_ title: String, _ text: Binding<String>, _ field: Field, keyboard: UIKeyboardType = .decimalPad, prompt: String = FoodFormat.dash) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(title).vReading(13, tint: .steel).textCase(.uppercase)
-                Spacer(minLength: 16)
-                TextField("", text: text, prompt: Text(prompt).foregroundStyle(VColor.steel))
-                    .vReading(14).multilineTextAlignment(.trailing).keyboardType(keyboard)
-                    .focused($focus, equals: field).tint(VColor.bone)
-            }
-            .frame(minHeight: 52)
-            Rule()
-        }
     }
 
     private static func number(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)) }
