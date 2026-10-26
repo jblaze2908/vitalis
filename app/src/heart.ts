@@ -44,8 +44,10 @@ export function heartDay(day: string, at = Date.now()) {
   const sleep = [...nights(day, addDays(day, 1))].filter((n) => n.sleep_start && n.sleep_end).map((n) => ({
     start_m: Math.max(0, minuteOf(Date.parse(n.sleep_start!), start)), end_m: Math.min(1440, minuteOf(Date.parse(n.sleep_end!), start)) }))
     .filter((s) => s.end_m > 0 && s.start_m < 1440 && s.end_m > s.start_m);
+  // A Watch workout linked to a logged session opens that session, as in the workout list.
   const workouts = all<{ id: string; name: string; start_ms: number; end_ms: number; hr_avg: number | null; hr_max: number | null }>(
-    "SELECT id,name,start_ms,end_ms,hr_avg,hr_max FROM hk_workouts WHERE start_ms<=? AND end_ms>=? ORDER BY start_ms", end, start)
+    `SELECT COALESCE(s.id,w.id) id,COALESCE(s.title,w.name) name,w.start_ms,w.end_ms,w.hr_avg,w.hr_max FROM hk_workouts w
+      LEFT JOIN sessions s ON s.hk_workout_uuid=w.id AND s.deleted_at IS NULL WHERE w.start_ms<=? AND w.end_ms>=? ORDER BY w.start_ms`, end, start)
     .map((w) => ({ id: w.id, title: w.name, start_m: Math.max(0, minuteOf(w.start_ms, start)), end_m: Math.min(1440, minuteOf(w.end_ms, start)),
       avg_bpm: w.hr_avg && Math.round(w.hr_avg), max_bpm: w.hr_max && Math.round(w.hr_max) }));
   const avg = rs.length ? Math.round(rs.reduce((t, r) => t + r.bpm, 0) / rs.length) : null;

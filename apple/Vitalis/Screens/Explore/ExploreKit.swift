@@ -295,10 +295,20 @@ struct WorkoutHeartChart: View {
     /// Minutes from the start, as the chart's x.
     @State private var selected: Double?
 
-    private struct P: Identifiable { let id: Int; let min: Double; let bpm: Double }
+    private struct P: Identifiable { let id: Int; let min: Double; let bpm: Double; let run: Int }
+
+    /// A new run wherever readings stop for over four buckets (no Watch on, sparse background readings), so gaps draw as gaps.
+    private var runs: [P] {
+        var run = 0, last: Double?
+        return hr.points.enumerated().map { i, p in
+            if let last, p.s - last > hr.bucketS * 4 { run += 1 }
+            last = p.s
+            return P(id: i, min: p.s / 60, bpm: Double(p.bpm), run: run)
+        }
+    }
 
     var body: some View {
-        let pts = hr.points.enumerated().map { P(id: $0.offset, min: $0.element.s / 60, bpm: Double($0.element.bpm)) }
+        let pts = runs
         let pick = selected.flatMap { s in pts.min { abs($0.min - s) < abs($1.min - s) } }
         let floor = Double(hr.min) - 6
         Chart {
@@ -321,11 +331,11 @@ struct WorkoutHeartChart: View {
     @ChartContentBuilder private func line(_ pts: [P], floor: Double) -> some ChartContent {
         let fill = LinearGradient(colors: [VColor.pulse.opacity(0.22), VColor.pulse.opacity(0.02)], startPoint: .top, endPoint: .bottom)
         ForEach(pts) { p in
-            AreaMark(x: .value("Time", p.min), yStart: .value("Floor", floor), yEnd: .value("BPM", p.bpm))
+            AreaMark(x: .value("Time", p.min), yStart: .value("Floor", floor), yEnd: .value("BPM", p.bpm), series: .value("Run", p.run))
                 .foregroundStyle(fill).interpolationMethod(.monotone)
         }
         ForEach(pts) { p in
-            LineMark(x: .value("Time", p.min), y: .value("BPM", p.bpm))
+            LineMark(x: .value("Time", p.min), y: .value("BPM", p.bpm), series: .value("Run", p.run))
                 .foregroundStyle(VColor.pulse).lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round)).interpolationMethod(.monotone)
         }
     }

@@ -37,6 +37,16 @@ test("a cardio workout carries its heart-rate line; /v2/heart buckets the day an
   assert.deepEqual(h.json.workouts.map((x) => [x.title, x.start_m, x.end_m]), [["running", 420, 450]]);
   assert.equal(h.json.next_day, today());
   assert.equal((await get("/v2/heart?date=nope")).status, 400);
+
+  // A phone session linked to this Watch workout takes its place, so the row opens the strength view.
+  const linked = await http("POST", "/v2/workouts", { token: write, json: {
+    session: { client_id: "L-1", title: "Legs", source: "phone", started_at: at("07:00"), ended_at: at("07:30"), tz_offset_min: 330, hk_workout_uuid: w.uuid },
+    sets: [{ id: "L-1-0", exercise: "barbell-squat", kind: "normal", weight_kg: 100, reps: 5, performed_at: at("07:05") }] } });
+  assert.equal(linked.status, 200, linked.text);
+  const again = await get(`/v2/heart?date=${D}`);
+  assert.deepEqual(again.json.workouts.map((x) => [x.id, x.title]), [["L-1", "Legs"]]);
+  const strength = await get("/v2/training/sessions/L-1");
+  assert.equal(strength.json.kind, "strength"); assert.equal(strength.json.hr.max, 170);
 });
 
 test("/v2/training/exercises lists performed exercises newest first with e1RM; exercise detail has per-session history", async () => {
@@ -49,15 +59,15 @@ test("/v2/training/exercises lists performed exercises newest first with e1RM; e
 
   const r = await get("/v2/training/exercises");
   assert.equal(r.status, 200, r.text);
-  const [bench, squat] = r.json.exercises;
-  assert.equal(r.json.count, 2);
-  assert.match(bench.name, /bench/i);
+  // The first test's linked session logged squats yesterday, so squat is newest.
+  assert.deepEqual(r.json.exercises.map((x) => x.id), ["barbell-squat", "barbell-bench-press-medium-grip"]);
+  const [squat, bench] = r.json.exercises;
   assert.equal(bench.sessions, 2); assert.equal(bench.working_sets, 3); assert.equal(bench.heaviest_kg, 85);
   assert.deepEqual(bench.last_top, { weight_kg: 85, reps: 5 });
   assert.equal(bench.last_day, day(3));
   assert.deepEqual(bench.spark, [93.3, 101.3]);
   assert.equal(bench.e1rm_kg, 101.3); assert.equal(bench.change_8w_kg, 8);
-  assert.equal(squat.sessions, 1);
+  assert.equal(squat.sessions, 2); assert.equal(squat.last_day, D);
 
   const d = await get(`/v2/exercises/${bench.id}`);
   assert.equal(d.status, 200, d.text);
