@@ -23,7 +23,7 @@ public struct TabBar: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(Color(hex: 0x222222)).frame(height: 1)
+            Rectangle().fill(VColor.line).frame(height: 1)
             HStack(spacing: 0) {
                 ForEach(VTab.allCases) { tab in
                     let on = selection == tab
@@ -31,7 +31,7 @@ public struct TabBar: View {
                         VStack(spacing: 4) {
                             Image(systemName: tab.symbol).font(.system(size: 20, weight: .regular))
                                 .foregroundStyle(on ? VColor.pulse : VColor.muted).frame(height: 24)
-                            Text(tab.name).vUI(11, weight: 600, color: on ? VColor.bone : VColor.muted).lineLimit(1).fixedSize()
+                            Text(tab.name).vUI(11, weight: 600, color: on ? VColor.accent : VColor.muted).lineLimit(1).fixedSize()
                         }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .top)
                         .padding(.top, 8)

@@ -75,7 +75,7 @@ public enum VTint: String, Sendable, Codable, CaseIterable {
 }
 
 public enum VSpace {
-    public static let gutter: CGFloat = 24
+    public static let gutter: CGFloat = 16
     public static let statusTop: CGFloat = 18
     public static let statusSide: CGFloat = 30
     public static let sectionTop: CGFloat = 16

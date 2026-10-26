@@ -24,6 +24,7 @@ struct RootView: View {
             Task { await TodayStore.shared.refresh(); TodayStore.shared.presentDigestIfDue(router: router) }
         }
         .vScreen()
+        .environment(\.openSettings, { router.open(.settings) })
         .environment(router)
         .environment(Services.shared)
         .onOpenURL { router.open($0) }
@@ -31,20 +32,6 @@ struct RootView: View {
         // Simulator screenshots without taps: launch with `-VitalisRoute vitalis://train`.
         .task { if let raw = UserDefaults.standard.string(forKey: "VitalisRoute"), let url = URL(string: raw) { router.open(url) } }
         #endif
-    }
-
-    /// Settings from every tab, level with each tab's status row (Today used to be the only way in).
-    private var settingsButton: some View {
-        // A 28 pt card-coloured disc inside a 44 pt target, sitting in the slot every TabHeader leaves at its leading edge.
-        Button { router.open(.settings) } label: {
-            Image(systemName: "gearshape").font(.system(size: 14, weight: .medium)).foregroundStyle(VColor.bone)
-                .frame(width: 28, height: 28).background(VColor.card, in: Circle())
-                .frame(width: 44, height: 44).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.leading, 8)
-        .padding(.top, 2)
-        .accessibilityLabel("Settings")
     }
 
     /// A minimised workout stays one tap away above the tab bar.
@@ -77,7 +64,6 @@ struct RootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .topLeading) { if router.detailDepth == 0 { settingsButton } }
             .overlay(alignment: .bottom) {
                 // Eat draws its own toast; elsewhere a food add from Today still gets its Undo.
                 if router.tab != .eat, let toast = EatStore.shared.toast {

@@ -26,14 +26,14 @@ public enum VTone: Sendable {
 public struct VCard<Content: View>: View {
     let padding: EdgeInsets
     let content: Content
-    public init(padding: EdgeInsets = EdgeInsets(top: 13, leading: 14, bottom: 13, trailing: 14), @ViewBuilder content: () -> Content) {
+    public init(padding: EdgeInsets = EdgeInsets(top: VSpace.s4, leading: VSpace.s4, bottom: VSpace.s4, trailing: VSpace.s4), @ViewBuilder content: () -> Content) {
         self.padding = padding; self.content = content()
     }
     public var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(VColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.card, style: .continuous))
     }
 }
 
@@ -44,7 +44,7 @@ public struct StatusWord: View {
     public var body: some View {
         HStack(spacing: 6) {
             Circle().fill(tone.color).frame(width: 8, height: 8)
-            Text(text).vUI(13, weight: 500, color: VColor.muted).lineLimit(1)
+            Text(text).vText(.secondary).lineLimit(1)
         }
         .accessibilityElement(children: .combine)
     }
@@ -57,7 +57,7 @@ public struct CardHeader: View {
     public init(_ title: String, status: (String, VTone)? = nil) { self.title = title; self.status = status }
     public var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            Text(title).vUI(14, weight: 600).lineLimit(1)
+            Text(title).vText(.headline).lineLimit(1)
             Spacer(minLength: 4)
             if let status { StatusWord(status.0, tone: status.1) }
         }
@@ -70,19 +70,21 @@ public struct Figure: View {
     let unit: String?
     let size: CGFloat
     let color: Color?
+    /// `size` picks the nearest number style: 56 xl, 40 l, 28 m, 20 s.
     public init(_ value: String, unit: String? = nil, size: CGFloat = 28, color: Color? = nil) {
         self.value = value; self.unit = unit; self.size = size; self.color = color
     }
+    private var style: VText { size >= 50 ? .numXL : size >= 36 ? .numL : size >= 24 ? .numM : .numS }
     public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(value).vFigure(size, color: color).lineLimit(1).minimumScaleFactor(0.7)
-            if let unit { Text(unit).vLabel(.standard, tint: .steel).lineLimit(1) }
+            Text(value).vText(style, color: color).lineLimit(1).minimumScaleFactor(0.7)
+            if let unit { Text(unit).vText(.unit).lineLimit(1) }
         }
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A 6 pt meter: track, fill, and an optional marker with a mono caption above it ("USUAL 1,450", "NEED 7:00").
+/// Progress against a target: always 8 high. The target tick is drawn over the bar and never changes its height.
 public struct Meter: View {
     let fraction: Double
     let marker: Double?
@@ -93,31 +95,32 @@ public struct Meter: View {
         self.fraction = fraction; self.marker = marker; self.caption = caption; self.leading = leading; self.fill = fill
     }
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             if caption != nil || leading != nil {
                 HStack {
-                    if let leading { Text(leading).vLabel(.standard, tint: .bone) }
+                    if let leading { Text(leading).font(VFont.archivo(13, width: 100, weight: 500)).foregroundStyle(VColor.text).monospacedDigit() }
                     Spacer(minLength: 0)
-                    if let caption { Text(caption).vLabel(.standard, tint: .steel) }
+                    if let caption { Text(caption).vText(.secondary) }
                 }
             }
             GeometryReader { g in
                 let w = g.size.width, clamp = { (v: Double) in min(max(v, 0), 1) }
                 ZStack(alignment: .leading) {
-                    Capsule().fill(VColor.meterTrack)
-                    Capsule().fill(fill).frame(width: max(6, w * clamp(fraction)))
+                    Capsule().fill(VColor.barTrack)
+                    Capsule().fill(fill).frame(width: max(VBar.meter, w * clamp(fraction)))
+                }
+                .overlay(alignment: .leading) {
                     if let marker {
-                        Rectangle().fill(VColor.muted).frame(width: 1.5, height: 14).offset(x: w * clamp(marker) - 0.75)
+                        RoundedRectangle(cornerRadius: 1).fill(VColor.text2).frame(width: 2, height: VBar.tick).offset(x: w * clamp(marker) - 1)
                     }
                 }
             }
-            .frame(height: 6)
+            .frame(height: VBar.meter)
         }
         .accessibilityHidden(true)
     }
 }
 
-/// Seven daily values as a line, the usual range as two dashed lines, the latest as a dot in the status tone.
 public struct Sparkline: View {
     let values: [Double?]
     let usual: ClosedRange<Double>?
@@ -136,10 +139,8 @@ public struct Sparkline: View {
             let y = { (v: Double) in size.height * (1 - (v - lo) / (hi - lo)) }
             let step = values.count > 1 ? (size.width - 4) / Double(values.count - 1) : 0
             if let usual {
-                for v in [usual.lowerBound, usual.upperBound] {
-                    var p = Path(); p.move(to: CGPoint(x: 0, y: y(v))); p.addLine(to: CGPoint(x: size.width, y: y(v)))
-                    ctx.stroke(p, with: .color(Color(hex: 0x3A3A3A)), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                }
+                ctx.fill(Path(CGRect(x: 0, y: y(usual.upperBound), width: size.width, height: max(1, y(usual.lowerBound) - y(usual.upperBound)))),
+                         with: .color(VColor.range.opacity(0.6)))
             }
             var line = Path(), started = false, last: CGPoint?
             for (i, v) in values.enumerated() {
@@ -212,20 +213,12 @@ public struct PulseGlyph: View {
 }
 
 /// Tab header: room for the Settings gear (drawn by the shell), the condensed title, the pulse glyph, and a trailing view.
+/// Legacy name for `VHeader` (the gear now lives inside the header). Screens move to `VHeader` to pass freshness.
 public struct TabHeader<Trailing: View>: View {
     let title: String
     let trailing: Trailing
     public init(_ title: String, @ViewBuilder trailing: () -> Trailing) { self.title = title; self.trailing = trailing() }
-    public var body: some View {
-        HStack(spacing: 10) {
-            Color.clear.frame(width: 28, height: 28)
-            Text(title).vHeadline(19).tracking(19 * 0.05)
-            PulseGlyph()
-            Spacer(minLength: 8)
-            trailing
-        }
-        .frame(height: 32)
-    }
+    public var body: some View { VHeader(title) { trailing } }
 }
 
 public extension TabHeader where Trailing == EmptyView {
@@ -246,16 +239,16 @@ public struct ReadoutRow: View {
         HStack(alignment: .top, spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(item.label).vUI(12, weight: 400, color: VColor.muted).lineLimit(1)
-                    Text(item.value).vFigure(18).lineLimit(1).minimumScaleFactor(0.7)
+                    Text(item.label).vText(.secondary).lineLimit(1)
+                    Text(item.value).vText(.numS).lineLimit(1).minimumScaleFactor(0.7)
                     if let s = item.status {
                         HStack(spacing: 5) {
                             Circle().fill(s.1.color).frame(width: 7, height: 7)
-                            Text(s.0).vUI(12, weight: 500, color: VColor.muted).lineLimit(1).minimumScaleFactor(0.8)
+                            Text(s.0).font(VFont.archivo(12, width: 100, weight: 400)).foregroundStyle(VColor.text2).lineLimit(1).minimumScaleFactor(0.8)
                         }
                     }
                 }
-                .padding(.vertical, 12).padding(.leading, i == 0 ? 0 : 10)
+                .padding(.vertical, VSpace.s3).padding(.leading, i == 0 ? 0 : VSpace.s3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .leading) { if i > 0 { Rectangle().fill(VColor.hairline).frame(width: 1) } }
                 .accessibilityElement(children: .combine)

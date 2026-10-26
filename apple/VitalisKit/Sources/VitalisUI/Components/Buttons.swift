@@ -6,23 +6,27 @@ public struct PrimaryButton: View {
     let value: String?
     let icon: String?
     let height: CGFloat
+    let fill: Color
+    let ink: Color
     let action: () -> Void
 
-    public init(_ title: String, value: String? = nil, icon: String? = nil, height: CGFloat = VSpace.buttonHeight, action: @escaping () -> Void) {
-        self.title = title; self.value = value; self.icon = icon; self.height = height; self.action = action
+    /// The one primary action on a screen: 52 high, 12 radius, in the tab's colour (accent unless Eat or Body).
+    public init(_ title: String, value: String? = nil, icon: String? = nil, height: CGFloat = VSpace.buttonHeight,
+                fill: Color = VColor.accent, ink: Color = VColor.onAccent, action: @escaping () -> Void) {
+        self.title = title; self.value = value; self.icon = icon; self.height = height; self.fill = fill; self.ink = ink; self.action = action
     }
 
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                if let icon { Image(systemName: icon).font(.system(size: 18, weight: .semibold)) }
-                Text(title).vAction(20, color: VColor.ground).lineLimit(1).minimumScaleFactor(0.7)
-                if let value { Spacer(); Text(value).vAction(20, color: VColor.ground) }
+                if let icon { Image(systemName: icon).font(.system(size: 17, weight: .semibold)) }
+                Text(title).font(VFont.archivo(17, width: 100, weight: 700)).lineLimit(1).minimumScaleFactor(0.7)
+                if let value { Spacer(); Text(value).font(VFont.archivo(17, width: 125, weight: 600)).monospacedDigit() }
             }
-            .foregroundStyle(VColor.ground)
-            .padding(.horizontal, value == nil ? 12 : 18)
+            .foregroundStyle(ink)
+            .padding(.horizontal, value == nil ? VSpace.s3 : VSpace.s4)
             .frame(maxWidth: .infinity, minHeight: height)
-            .background(VColor.pulse, in: RoundedRectangle(cornerRadius: VRadius.button, style: .continuous))
+            .background(fill, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
         }
         .buttonStyle(PressStyle())
     }
