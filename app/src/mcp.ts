@@ -10,11 +10,17 @@ import { addDays, DAY_RE, today } from "./time.js";
 import { authenticate, logCall, type Token } from "./tokens.js";
 import { KINDS, editSet, editWorkout, exerciseHistory, getWorkout, listWorkouts, logSets, trainingSummary } from "./training.js";
 import { scoresFor, trainingSets, trainingState } from "./derived.js";
-import { deleteEntries, entriesSchema, foodDay, logSaved, logSavedSchema, postEntries, saveMeal, saveMealSchema, savedMeals } from "./food.js";
-import { logWeight, logWeightSchema } from "./weight.js";
+import { deleteEntries, entriesSchema, foodDay, foodQuick, slotAt, SLOTS, logSaved, logSavedSchema, postEntries, saveMeal, saveMealSchema, savedMeals } from "./food.js";
+import { bodyDay, logWeight, logWeightSchema } from "./weight.js";
+import { sleepDay, sleepMonth, sleepWeek } from "./sleep-view.js";
+import { heartDay } from "./heart.js";
+import { metricsOverview } from "./metric-view.js";
+import { performedExercises } from "./exercise-view.js";
+import { barcode, barcodePutSchema, putBarcode, searchFood } from "./off.js";
+import { sessionDetail } from "./training-view.js";
 import { definedSplits, deleteSplit, putSplit, splitSchema } from "./splits.js";
 import { getTargets, effectiveTargets, putSchema, putTargets } from "./targets.js";
-import { todayBody } from "./today.js";
+import { digestBody, todayBody } from "./today.js";
 import { weekStartOf, weeklySets } from "./training-analytics.js";
 import { daysBetween, ownerOffsetMin } from "./time.js";
 
@@ -26,7 +32,8 @@ export const INSTRUCTIONS = `Vitalis holds one person's health record: Apple Hea
 - Watch energy, VO2 max and estimated 1RM are estimates; say so when you use them.
 - Start with get_brief for "how am I today"; get_today is exactly what the app's Home screen shows. Use find_exercises when an exercise name might be ambiguous.
 - Scores (sleep, recovery) are computed by Vitalis; quote them and their parts, never compute your own.
-- log_sets and log_food are safe to retry when you pass your own ids.`;
+- log_sets, log_food, log_saved_meal and log_weight are safe to retry when you pass your own ids.
+- Everything the app can show or change has a tool here; prefer the app-view tools (get_today, get_body, get_sleep_view, get_heart_day) when the person refers to a screen.`;
 
 const day = z.string().regex(DAY_RE, "a date like 2026-10-09");
 const when = z.string().min(10).max(40).describe("ISO 8601 time with offset, e.g. 2026-10-09T19:05:00+05:30");
@@ -42,6 +49,24 @@ function wrap<A>(ctx: Ctx, tool: string, fn: (a: A) => unknown, detail?: (r: unk
     try {
       const r = fn(a);
       logCall(ctx.token.id, tool, true, Date.now() - t0, detail ? detail(r) : null);
+      return ok(r);
+    } catch (e) {
+      const err = e as HttpError;
+      const known = err instanceof HttpError && err.status < 500;
+      if (!known) console.error(`mcp ${tool} failed:`, err.message);
+      logCall(ctx.token.id, tool, false, Date.now() - t0, known ? err.message.slice(0, 200) : "internal error");
+      return fail(known ? err.message : "Vitalis couldn't do that; the error is in the server log.");
+    }
+  };
+}
+
+/** `wrap` for tools that await (food search and barcode lookups reach Open Food Facts). */
+function wrapAsync<A>(ctx: Ctx, tool: string, fn: (a: A) => Promise<unknown>) {
+  return async (a: A) => {
+    const t0 = Date.now();
+    try {
+      const r = await fn(a);
+      logCall(ctx.token.id, tool, true, Date.now() - t0, null);
       return ok(r);
     } catch (e) {
       const err = e as HttpError;
@@ -102,7 +127,14 @@ export function buildServer(token: Token) {
   s.registerTool("get_workout", { title: "One workout", annotations: READ, outputSchema: Out,
     description: "One workout in full, by an id from list_workouts: every set (weight, reps, kind, RPE, time), best set and estimated 1RM per exercise, and heart rate when an Apple Watch workout overlapped it.",
     inputSchema: z.object({ id: z.string().min(1).max(80) }) },
-  wrap(ctx, "get_workout", (a: { id: string }) => getWorkout(a.id)));
+  wrap(ctx, "get_workout", (a: { id: string }) => {
+    // The app's view adds the heart-rate line and, for back-to-back workouts, the whole visit.
+    let d: ReturnType<typeof sessionDetail> | null = null;
+    try { d = sessionDetail(a.id); } catch { d = null; }
+    const v = d as { hr?: unknown; parts?: unknown; title?: string; start?: string; end?: string; duration_min?: number } | null;
+    return { ...getWorkout(a.id), ...(v?.hr ? { heart_rate: v.hr } : {}),
+      ...(v?.parts ? { visit: { title: v.title, start: v.start, end: v.end, duration_min: v.duration_min, parts: v.parts } } : {}) };
+  }));
 
   s.registerTool("get_exercise_history", { title: "Exercise history", annotations: READ, outputSchema: Out,
     description: "One exercise's recent sessions (sets, best set, estimated 1RM), all-time records, and a rule-based suggestion for next time (double progression). Use before suggesting today's weights or answering 'what did I bench last time'.",
@@ -156,6 +188,58 @@ export function buildServer(token: Token) {
     description: "What health data Vitalis has and how current it is: last sync from the phone, sync days and problems in the last 7 days, the latest day for every metric, the latest workouts. Check this before saying something didn't happen.",
     inputSchema: z.object({}) },
   wrap(ctx, "get_freshness", () => freshness()));
+
+  // App screens without a tool before (audit 26 Oct): every read the app makes has one now.
+  s.registerTool("get_digest", { title: "Morning digest", annotations: READ, outputSchema: Out,
+    description: "The morning digest the app shows on the first open after waking: last night's sleep and recovery with their parts, yesterday's steps, energy and workout, and today's plan.",
+    inputSchema: z.object({ day: day.optional().describe("default today") }) },
+  wrap(ctx, "get_digest", (a: { day?: string }) => digestBody(a.day ?? today())));
+
+  s.registerTool("get_sleep_view", { title: "Sleep as the app shows it", annotations: READ, outputSchema: Out,
+    description: "One of the Sleep tab's views. day: that night with stages over time, score parts, naps and tonight's bed-by time. week_end: the 7 nights ending that day with averages. month (YYYY-MM): every night of the month. Give exactly one; default is last night.",
+    inputSchema: z.object({ day: day.optional(), week_end: day.optional(), month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional() }) },
+  wrap(ctx, "get_sleep_view", (a: { day?: string; week_end?: string; month?: string }) => {
+    if ([a.day, a.week_end, a.month].filter(Boolean).length > 1) throw new HttpError(422, "Give one of day, week_end or month");
+    return a.month ? sleepMonth(a.month) : a.week_end ? sleepWeek(a.week_end) : sleepDay(a.day ?? today());
+  }));
+
+  s.registerTool("get_body", { title: "Body", annotations: READ, outputSchema: Out,
+    description: "The Body tab: latest weigh-in and weight trend (30-day change, goal, whether it's heading toward the goal, daily series), vitals against the usual range, and the day's steps, active energy and exercise minutes.",
+    inputSchema: z.object({ day: day.optional().describe("default today") }) },
+  wrap(ctx, "get_body", (a: { day?: string }) => bodyDay(a.day ?? today())));
+
+  s.registerTool("get_heart_day", { title: "Heart rate across a day", annotations: READ, outputSchema: Out,
+    description: "Heart rate through one day in 5-minute buckets (minute of day, average, low, high), with that day's sleep and workouts, the lowest and highest readings with their times, and resting heart rate against usual. For 'what was my heart rate at 3pm', 'how high did it go in the gym'.",
+    inputSchema: z.object({ day: day.optional().describe("default today") }) },
+  wrap(ctx, "get_heart_day", (a: { day?: string }) => heartDay(a.day ?? today())));
+
+  s.registerTool("get_health_overview", { title: "Every metric at a glance", annotations: READ, outputSchema: Out,
+    description: "The app's All health data list: every metric Vitalis stores, grouped (heart, sleep, activity, body), each with its latest value, the day it's from, the usual range, a low/high flag and the last 14 days. Use get_metrics for longer history.",
+    inputSchema: z.object({}) },
+  wrap(ctx, "get_health_overview", () => metricsOverview(today())));
+
+  s.registerTool("list_trained_exercises", { title: "Exercises trained", annotations: READ, outputSchema: Out,
+    description: "Every exercise with logged working sets, most recent first: sessions, working sets, last top set, heaviest weight, best and current estimated 1-rep max and its 8-week change. Use get_exercise_history for one exercise's sessions.",
+    inputSchema: z.object({}) },
+  wrap(ctx, "list_trained_exercises", () => performedExercises()));
+
+  s.registerTool("get_food_suggestions", { title: "Quick add", annotations: READ, outputSchema: Out,
+    description: "What the app offers in Quick add for a meal: the person's usual for that meal, recently logged foods with their numbers, and saved meals. Re-log a recent food with log_food using its numbers.",
+    inputSchema: z.object({ slot: z.enum(SLOTS).optional().describe("default: the meal window it is now") }) },
+  wrap(ctx, "get_food_suggestions", (a: { slot?: (typeof SLOTS)[number] }) => {
+    const at = Date.now(), d = new Date(at + ownerOffsetMin(at) * 60_000);
+    return foodQuick(a.slot ?? slotAt(d.getUTCHours() * 60 + d.getUTCMinutes()), at);
+  }));
+
+  s.registerTool("search_food", { title: "Search foods", annotations: { readOnlyHint: true, openWorldHint: true }, outputSchema: Out,
+    description: "Search foods the way the app does: the person's own recent foods and saved meals first, then Open Food Facts, with per-serving and per-100 g numbers. Log a result with log_food.",
+    inputSchema: z.object({ query: z.string().min(2).max(80), page: z.number().int().min(1).max(10).optional() }) },
+  wrapAsync(ctx, "search_food", (a: { query: string; page?: number }) => searchFood(a.query, a.page ?? 1)));
+
+  s.registerTool("lookup_barcode", { title: "Look up a barcode", annotations: { readOnlyHint: true, openWorldHint: true }, outputSchema: Out,
+    description: "A packaged food by its barcode (EAN-8/13, UPC): the person's saved numbers for it first, else Open Food Facts. found: false means neither knows it; save_barcode teaches it.",
+    inputSchema: z.object({ code: z.string().regex(/^\d{8,14}$/) }) },
+  wrapAsync(ctx, "lookup_barcode", (a: { code: string }) => barcode(a.code)));
 
   if (token.scope !== "write") return s;
 
@@ -219,6 +303,11 @@ export function buildServer(token: Token) {
     description: "Change targets the person asks for: goal (lose/maintain/gain) and goal weight, fixed calories or protein, steps, exercise minutes, weekly sets per muscle, rest time. Send only the keys to change; null resets a key to its default. Returns every target and where it comes from.",
     inputSchema: putSchema },
   wrap(ctx, "set_targets", (a: Parameters<typeof putTargets>[0]) => { putTargets(a); return getTargets(); }, (r) => "ok"));
+
+  s.registerTool("save_barcode", { title: "Remember a barcode", annotations: WRITE, outputSchema: Out,
+    description: "Save the person's numbers for a barcode Open Food Facts doesn't know (or gets wrong), as the app does after a scan, so the next scan or lookup_barcode finds them.",
+    inputSchema: barcodePutSchema.extend({ code: z.string().regex(/^\d{8,14}$/) }) },
+  wrap(ctx, "save_barcode", (a: { code: string; item: Parameters<typeof putBarcode>[1] }) => putBarcode(a.code, a.item)));
 
   s.registerTool("edit_split", { title: "Create, edit or delete a training split", annotations: { ...WRITE, destructiveHint: true }, outputSchema: Out,
     description: "A split is a named group of muscles the person trains together (e.g. Push: chest, shoulders, triceps). Saving an existing name or id replaces it; delete: true removes it. Muscles use the slugs from get_training_summary.",

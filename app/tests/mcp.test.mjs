@@ -19,10 +19,11 @@ test("a fresh install answers honestly: no data, no verdict, no sync", async () 
 test("tool lists follow the token's scope; ingest tokens and foreign origins can't use /mcp", async () => {
   const names = async (t) => (await mcp(t, "tools/list")).msg.result.tools.map((x) => x.name).sort();
   // S-19 added get_today, get_scores, get_food_day, get_targets (read) and log_food (write).
-  const reads = ["find_exercises", "get_brief", "get_exercise_history", "get_food_day", "get_freshness", "get_metrics", "get_scores", "get_sleep", "get_targets",
-    "get_today", "get_training_summary", "get_workout", "list_workouts"];
+  const reads = ["find_exercises", "get_body", "get_brief", "get_digest", "get_exercise_history", "get_food_day", "get_food_suggestions", "get_freshness",
+    "get_health_overview", "get_heart_day", "get_metrics", "get_scores", "get_sleep", "get_sleep_view", "get_targets", "get_today", "get_training_summary",
+    "get_workout", "list_trained_exercises", "list_workouts", "lookup_barcode", "search_food"];
   assert.deepEqual(await names(readTok), reads);
-  assert.deepEqual(await names(writeTok), [...reads, "create_exercise", "delete_food", "edit_set", "edit_split", "edit_workout", "log_food", "log_saved_meal", "log_sets", "log_weight", "save_meal", "set_targets"].sort());
+  assert.deepEqual(await names(writeTok), [...reads, "create_exercise", "delete_food", "edit_set", "edit_split", "edit_workout", "log_food", "log_saved_meal", "log_sets", "log_weight", "save_barcode", "save_meal", "set_targets"].sort());
   const tools = (await mcp(readTok, "tools/list")).msg.result.tools;
   assert.ok(tools.every((t) => t.annotations?.readOnlyHint === true && t.outputSchema));
   const bad = await mcp(ingestTok, "tools/list");
