@@ -14,20 +14,17 @@ struct SyncScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                let status = statusLabel
-                StatusRow(status.text, tint: status.tint).padding(.top, VSpace.statusTop)
-                CachedPulseLine().padding(.top, 18)
-                SettingsBackLink(title: "Settings") { if !router.settingsPath.isEmpty { router.settingsPath.removeLast() } }
-                    .padding(.top, 4)
-                HeadlineLines(["Sync"], size: 46)
+                SettingsBar(title: "Sync", back: { if !router.settingsPath.isEmpty { router.settingsPath.removeLast() } })
+                // This screen is about the phone's own uploads, so its last success stands in for a fetch time.
+                FreshnessLine(DataFreshness(fetchedAt: sync.lastSuccess, refreshing: sync.isWorking))
+                    .frame(maxWidth: .infinity).padding(.top, VSpace.s1)
                 if sync.tokenRejected { rejected } else { exporter }
                 queue
                 failed
                 types
                 batches
             }
-            .padding(.horizontal, VSpace.gutter)
-            .padding(.bottom, 40)
+            .padding(.bottom, VSpace.s6)
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable { await model.refresh(); await sync.refresh() }
@@ -42,48 +39,48 @@ struct SyncScreen: View {
     // MARK: Token rejected (frame 25)
 
     private var rejected: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Rectangle().fill(VColor.watch).frame(height: 1.5)
-            MonoLabel(["Token rejected", sync.rejectedSince.map { "since \(SyncStore.sinceLabel($0))" }].compactMap { $0 }
-                .joined(separator: " · "), tint: .watch)
-                .padding(.top, 14)
-            HeadlineLines(["Nothing is lost."], size: 36).padding(.top, 6)
-            Text(SyncStore.waitingCopy(sync.counts)).vBody(15).padding(.top, 12)
-            HStack(spacing: 12) {
-                PrimaryButton("Replace token") { replacing = true }
+        VCard {
+            VStack(alignment: .leading, spacing: VSpace.s3) {
+                StatusWord(["Token rejected", sync.rejectedSince.map { "since \(SyncStore.sinceLabel($0))" }].compactMap { $0 }
+                    .joined(separator: " · "), tone: .watch)
+                Text("Nothing is lost.").vText(.title)
+                Text(SyncStore.waitingCopy(sync.counts)).vText(.body).fixedSize(horizontal: false, vertical: true)
+                PrimaryButton("Replace token") { replacing = true }.padding(.top, VSpace.s2)
                 SecondaryButton(sync.isWorking ? "Trying" : "Try again", size: .full, enabled: !sync.isWorking) {
                     Task { await sync.tryAgain() }
                 }
             }
-            .padding(.top, 22)
         }
-        .padding(.top, 24)
+        .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
     }
 
     // MARK: Healthy exporter (restyled SyncView)
 
     private var exporter: some View {
         let s = model.snapshot
-        return SettingsGroup(title: "Export") {
-            SettingsRow(key: "State", value: s.phase)
-            if let type = s.currentType {
-                SettingsRow(key: shortName(type), value: "Page \(s.page)")
+        return VStack(alignment: .leading, spacing: 0) {
+            SettingsGroup(title: "Export") {
+                SettingsRow(key: "State", value: s.phase)
+                if let type = s.currentType {
+                    SettingsRow(key: shortName(type), value: "Page \(s.page)")
+                }
+                SettingsRow(key: "Last upload", value: SyncStore.agoLabel(s.history.lastSuccess, now: Date()),
+                            tint: s.history.lastSuccess == nil ? .steel : .good)
+                if let error = model.setupError ?? s.history.lastError {
+                    Text(error).vText(.secondary, color: VColor.watch).padding(.vertical, VSpace.s3).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            SettingsRow(key: "Last upload", value: SyncStore.agoLabel(s.history.lastSuccess, now: Date()),
-                        tint: s.history.lastSuccess == nil ? .steel : .good)
-            if let error = model.setupError ?? s.history.lastError {
-                Text(error).vBody(13, color: VColor.watch).padding(.vertical, 10).textSelection(.enabled)
-                Rule()
-            }
-            HStack(spacing: 12) {
+            HStack(spacing: VSpace.s3) {
                 SecondaryButton("Sync now", size: .full, enabled: !model.isSyncing) { Task { await model.syncNow() } }
                 SecondaryButton("Allow Health", size: .full, enabled: !(model.isAuthorizing || model.isSyncing)) {
                     Task { await model.authorize() }
                 }
             }
-            .padding(.top, 16)
+            .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
             Text("The first sync backfills all readable history. HealthKit doesn't say which read permissions were denied.")
-                .vBody(12).padding(.top, 10)
+                .vText(.secondary).fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s2)
         }
     }
 
@@ -103,7 +100,7 @@ struct SyncScreen: View {
 
     private var reachability: (text: String, tint: VTint) {
         switch sync.reachability {
-        case .reachable: ("✓ Reachable", .good)
+        case .reachable: ("Reachable", .good)
         case .unreachable: ("Unreachable", .watch)
         case .unknown: ("–", .steel)
         }
@@ -115,19 +112,18 @@ struct SyncScreen: View {
         if !sync.failedItems.isEmpty {
             SettingsGroup(title: "Not accepted by the server") {
                 ForEach(sync.failedItems) { item in
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: VSpace.s1) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text("\(item.method) \(item.path)").vReading(12.5).lineLimit(1)
-                            Spacer(minLength: 8)
-                            SecondaryButton("Dismiss", size: .mini) {
+                            Text("\(item.method) \(item.path)").vText(.body).lineLimit(1)
+                            Spacer(minLength: VSpace.s2)
+                            SecondaryButton("Dismiss", size: .compact) {
                                 Task { try? await services.outbox?.dismissFailed(id: item.id); await sync.refresh() }
                             }
                         }
-                        Text(item.lastError ?? "Rejected").vBody(13, color: VColor.watch)
-                        Text(item.createdAt, format: .dateTime.day().month().hour().minute()).vLabel(.small)
+                        Text(item.lastError ?? "Rejected").vText(.secondary, color: VColor.watch)
+                        Text(item.createdAt, format: .dateTime.day().month().hour().minute()).vText(.secondary)
                     }
-                    .padding(.vertical, 10)
-                    Rule()
+                    .padding(.vertical, VSpace.s3)
                 }
             }
         }
@@ -141,17 +137,7 @@ struct SyncScreen: View {
             SettingsGroup(title: "Health types") {
                 ForEach(history.types.keys.sorted(), id: \.self) { id in
                     if let type = history.types[id] {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(shortName(id)).vReading(12.5, tint: .steel).lineLimit(1).minimumScaleFactor(0.7)
-                                Spacer(minLength: 8)
-                                Text("\(type.objectsSent.formatted()) sent").vReading(12.5)
-                            }
-                            Text(type.backgroundDelivery).vLabel(.small)
-                        }
-                        .padding(.vertical, 8)
-                        .accessibilityElement(children: .combine)
-                        Rule()
+                        ListRow(shortName(id), subtitle: type.backgroundDelivery, value: "\(type.objectsSent.formatted()) sent", chevron: false)
                     }
                 }
             }
@@ -163,30 +149,21 @@ struct SyncScreen: View {
         if !history.batches.isEmpty {
             SettingsGroup(title: "Last 20 batches") {
                 ForEach(history.batches) { batch in
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: VSpace.s1) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(batch.date, format: .dateTime.day().month().hour().minute()).vReading(12.5, tint: .steel)
-                            Spacer(minLength: 8)
-                            Text("\(batch.upserts.formatted()) samples").vReading(12.5)
+                            Text(batch.date, format: .dateTime.day().month().hour().minute()).vText(.body)
+                            Spacer(minLength: VSpace.s2)
+                            Text("\(batch.upserts.formatted()) samples").vText(.secondary)
                         }
-                        Text("\(batch.deletions) deletions · \(batch.dailyStats) daily stats").vLabel(.small)
+                        Text("\(batch.deletions) deletions · \(batch.dailyStats) daily stats").vText(.secondary)
                         ForEach(Array(batch.rejected.enumerated()), id: \.offset) { _, r in
-                            Text("Rejected \(r.uuid): \(r.reason)").vBody(12, color: VColor.watch)
+                            Text("Rejected \(r.uuid): \(r.reason)").vText(.secondary, color: VColor.watch)
                         }
                     }
-                    .padding(.vertical, 8)
-                    Rule()
+                    .padding(.vertical, VSpace.s3)
+                    .accessibilityElement(children: .combine)
                 }
             }
-        }
-    }
-
-    private var statusLabel: (text: String, tint: VTint) {
-        if sync.tokenRejected { return ("Sync paused", .watch) }
-        // This screen is about the phone's own uploads, so its last success stands in for the server's last_sync.
-        switch sync.staleState(lastSync: sync.lastSuccess, cachedAt: nil, refreshFailed: false).status {
-        case .synced(let label), .offline(let label): return (label, .steel)
-        case .stale(let label, _, _): return (label, .watch)
         }
     }
 

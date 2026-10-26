@@ -115,6 +115,12 @@ final class EatStore {
         }
     }
 
+    /// Pull to refresh and each return to the foreground: the day on screen and Quick add's lists.
+    func refresh() async {
+        await load()
+        await loadQuick(slot: nil)
+    }
+
     func goBack() async { guard let prev = day.value?.prevDay else { return }; date = prev; await load() }
     func goForward() async { guard let next = day.value?.nextDay else { return }; date = next; await load() }
 

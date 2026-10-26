@@ -37,7 +37,7 @@ struct SetupSteps: View {
     }
 }
 
-/// StatusRow, the progress PulseLine (not on Welcome or Reading history, per the frames), scrolling content, bottom action.
+/// The step label, the progress PulseLine (not on Welcome or Reading history, per the frames), scrolling content, bottom action.
 struct SetupChrome<Content: View, Action: View>: View {
     let step: SetupStep
     var showsPulse = true
@@ -46,43 +46,53 @@ struct SetupChrome<Content: View, Action: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StatusRow(step.statusLabel).padding(.top, VSpace.statusTop)
+            Text(step.statusLabel).vText(.label).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s4)
             if showsPulse, let pulse = step.pulse {
-                PulseLine(events: pulse.events, now: pulse.now, style: .progress).padding(.top, 18)
+                PulseLine(events: pulse.events, now: pulse.now, style: .progress).padding(.top, VSpace.s4)
             }
             ScrollView {
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, VSpace.gutter)
-                    .padding(.top, showsPulse && step.pulse != nil ? 8 : 40)
-                    .padding(.bottom, VSpace.gutter)
+                    .padding(.horizontal, VSpace.edge)
+                    .padding(.top, showsPulse && step.pulse != nil ? VSpace.s2 : VSpace.s6)
+                    .padding(.bottom, VSpace.edge)
             }
             .scrollBounceBehavior(.basedOnSize)
             action
-                .padding(.horizontal, VSpace.gutter)
-                .padding(.bottom, 44)
+                .padding(.horizontal, VSpace.edge)
+                .padding(.bottom, VSpace.s7)
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .vScreen()
     }
 }
 
-/// A mono key on the left, a reading value on the right, a rule under it (Health access and history rows).
+/// A key and its value in a `ListCard` (Reading history rows); a good or watch value shows as a status word.
 struct SetupRow: View {
     let key: String
     let value: String
     var tint: VTint = .bone
-    var verticalPadding: CGFloat = 14
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(key).vReading(13, tint: .steel).textCase(.uppercase)
-                Spacer(minLength: 12)
-                Text(value).vReading(13, tint: tint).textCase(.uppercase).multilineTextAlignment(.trailing)
+        switch tint {
+        case .good: ListRow(key, chevron: false) { StatusWord(value, tone: .good) }
+        case .watch: ListRow(key, chevron: false) { StatusWord(value, tone: .watch) }
+        case .steel, .bone, .pulse: ListRow(key, value: value, chevron: false)
+        }
+    }
+}
+
+/// A setup step's headline: condensed display lines, the last ones optionally dimmed.
+struct SetupHeadline: View {
+    let lines: [String]
+    var dimmedFrom: Int? = nil
+    init(_ lines: [String], dimmedFrom: Int? = nil) { self.lines = lines; self.dimmedFrom = dimmedFrom }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { i, line in
+                Text(line).vText(.display, color: dimmedFrom.map { i >= $0 } == true ? VColor.text2 : nil)
+                    .lineLimit(1).minimumScaleFactor(0.7)
             }
-            .padding(.vertical, verticalPadding)
-            Rule()
         }
         .accessibilityElement(children: .combine)
     }

@@ -39,33 +39,28 @@ struct ManualFoodForm: View {
     var body: some View {
         SheetChrome {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    HStack {
-                        Button { dismiss() } label: { MonoLabel("Cancel", tint: .bone).frame(minHeight: 44) }.buttonStyle(.plain)
-                        Spacer()
-                    }
-                    Text("Per serving").vHeadline(22)
-                }
-                .padding(.top, 14)
+                SheetBar(title: "Per serving") { dismiss() }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        MonoLabel(caption, size: .small, tint: food.fromPhoto && food.values.isEmpty ? .watch : .steel)
-                            .fixedSize(horizontal: false, vertical: true).padding(.top, 16).padding(.bottom, 6)
-                        row("Name", $name, .name, keyboard: .default)
-                        row("Serving", $serving, .serving, keyboard: .default)
-                        row("Grams", $grams, .grams)
-                        row("Kcal", $kcal, .kcal)
-                        row("Protein g", $protein, .protein)
-                        row("Carbs g", $carbs, .carbs)
-                        row("Fat g", $fat, .fat)
+                        Text(caption).vText(.secondary, color: food.fromPhoto && food.values.isEmpty ? VColor.watch : nil)
+                            .fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s4).padding(.bottom, VSpace.s3)
+                        ListCard {
+                            FormFieldRow(title: "Name", text: $name, focus: $focus, field: .name, keyboard: .default)
+                            FormFieldRow(title: "Serving", text: $serving, focus: $focus, field: .serving, keyboard: .default)
+                            FormFieldRow(title: "Grams", text: $grams, focus: $focus, field: .grams)
+                            FormFieldRow(title: "Calories (kcal)", text: $kcal, focus: $focus, field: .kcal)
+                            FormFieldRow(title: "Protein (g)", text: $protein, focus: $focus, field: .protein)
+                            FormFieldRow(title: "Carbs (g)", text: $carbs, focus: $focus, field: .carbs)
+                            FormFieldRow(title: "Fat (g)", text: $fat, focus: $focus, field: .fat)
+                        }
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
-                PrimaryButton("Add to \(slot.slotTitle)") { save() }
+                PrimaryButton("Add to \(slot.slotTitle)", fill: VColor.eat, ink: VColor.onEat) { save() }
                     .opacity(isValid ? 1 : 0.4).disabled(!isValid)
-                    .padding(.bottom, 38)
+                    .padding(.top, VSpace.s3).padding(.bottom, VSpace.s6)
             }
-            .padding(.horizontal, VSpace.gutter)
+            .padding(.horizontal, VSpace.edge)
         }
         .presentationDetents([.custom(BelowPulseDetent.self)])
         .onAppear { focus = .name }
@@ -74,20 +69,6 @@ struct ManualFoodForm: View {
     private var caption: String {
         if !food.fromPhoto { return "Barcode \(BarcodeStore.grouped(food.code)) · we'll remember it" }
         return food.values.isEmpty ? "Couldn't read the label · type the numbers" : "Read from the label · check each number"
-    }
-
-    private func row(_ title: String, _ text: Binding<String>, _ field: Field, keyboard: UIKeyboardType = .decimalPad) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(title).vReading(13, tint: .steel).textCase(.uppercase)
-                Spacer(minLength: 16)
-                TextField("", text: text, prompt: Text(FoodFormat.dash).foregroundStyle(VColor.steel))
-                    .vReading(14).multilineTextAlignment(.trailing).keyboardType(keyboard)
-                    .focused($focus, equals: field).tint(VColor.bone)
-            }
-            .frame(minHeight: 52)
-            Rule()
-        }
     }
 
     private static func number(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)) }

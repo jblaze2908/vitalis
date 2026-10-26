@@ -41,7 +41,7 @@ struct QuickAddSheet: View {
                     if let describe { DescribeView(describe: describe, store: store, slot: currentSlot) { drafts in finishDescribe(drafts, describe) } }
                 }
             }
-            .padding(.horizontal, VSpace.gutter)
+            .padding(.horizontal, VSpace.edge)
         }
         .presentationDetents([.custom(BelowPulseDetent.self)])
         .task {
@@ -83,19 +83,19 @@ struct QuickAddSheet: View {
             ZStack {
                 HStack {
                     Button { if mode == .home { router.sheet = nil } else { mode = .home } } label: {
-                        HStack(spacing: 6) {
-                            if mode != .home { Image(systemName: "chevron.left").font(.body.weight(.semibold)).foregroundStyle(VColor.bone) }
-                            MonoLabel(mode == .home ? "Cancel" : "Back", tint: .bone)
+                        HStack(spacing: VSpace.s1) {
+                            if mode != .home { Image(systemName: "chevron.left").font(.body.weight(.semibold)) }
+                            Text(mode == .home ? "Cancel" : "Back").vText(.headline, color: VColor.text2)
                         }
-                        .frame(minHeight: 44).contentShape(Rectangle())
+                        .foregroundStyle(VColor.text2).frame(minHeight: 44).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     Spacer()
                 }
                 slotMenu
             }
-            .padding(.top, 14)
-            if mode != .home { segments.padding(.top, 10) }
+            .padding(.top, VSpace.s3)
+            if mode != .home { segments.padding(.top, VSpace.s3) }
         }
     }
 
@@ -105,9 +105,9 @@ struct QuickAddSheet: View {
                 Button(s.capitalized) { chosenSlot = s; Task { await store.loadQuick(slot: s) } }
             }
         } label: {
-            HStack(spacing: 8) {
-                Text("Add to \(currentSlot.slotTitle)").vHeadline(22)
-                if mode == .home { Image(systemName: "chevron.down").font(.callout.weight(.semibold)).foregroundStyle(VColor.steel) }
+            HStack(spacing: VSpace.s1) {
+                Text("Add to \(currentSlot.slotTitle)").vText(.title)
+                if mode == .home { Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(VColor.text2) }
             }
         }
         .disabled(mode != .home)
@@ -115,28 +115,23 @@ struct QuickAddSheet: View {
     }
 
     private var segments: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                segment("Search", active: { if case .search = mode { true } else { false } }()) { go(.search(text: "")) }
-                segment("Scan", active: false) { scanning = true }
-                if store.describeAvailable || { if case .describe = mode { true } else { false } }() {
-                    segment("Describe", active: { if case .describe = mode { true } else { false } }()) { go(.describe(text: search.query, barcode: nil)) }
-                }
+        HStack(spacing: 0) {
+            segment("Search", active: { if case .search = mode { true } else { false } }()) { go(.search(text: "")) }
+            segment("Scan", active: false) { scanning = true }
+            if store.describeAvailable || { if case .describe = mode { true } else { false } }() {
+                segment("Describe", active: { if case .describe = mode { true } else { false } }()) { go(.describe(text: search.query, barcode: nil)) }
             }
-            Rule()
         }
+        .padding(VSpace.s1)
+        .background(VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
     }
 
     private func segment(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 10) {
-                MonoLabel(title, tint: active ? .bone : .steel)
-                GeometryReader { g in
-                    Rectangle().fill(active ? VColor.bone : .clear).frame(width: g.size.width * 0.4, height: 2).frame(maxWidth: .infinity)
-                }
-                .frame(height: 2)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .bottom).contentShape(Rectangle())
+            Text(title).vText(.headline, color: active ? VColor.text : VColor.text2)
+                .frame(maxWidth: .infinity).padding(.vertical, VSpace.s2)
+                .background(active ? VColor.segmentOn : .clear, in: RoundedRectangle(cornerRadius: VRadius.control, style: .continuous))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(active ? .isSelected : [])
@@ -147,81 +142,85 @@ struct QuickAddSheet: View {
     private var home: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    FoodTile(kind: .search, style: .tile(height: 80)) { go(.search(text: "")) }
-                    FoodTile(kind: .scan, style: .tile(height: 80)) { scanning = true }
-                    if store.describeAvailable { FoodTile(kind: .describe, style: .tile(height: 80)) { go(.describe(text: "", barcode: nil)) } }
+                HStack(spacing: VSpace.s3) {
+                    FoodTile(kind: .search) { go(.search(text: "")) }
+                    FoodTile(kind: .scan) { scanning = true }
+                    if store.describeAvailable { FoodTile(kind: .describe) { go(.describe(text: "", barcode: nil)) } }
                 }
-                .padding(.top, 20)
+                .padding(.top, VSpace.s5)
                 if let quick = store.quick.value { lists(quick) }
-                else if store.quick.error != nil { MonoLabel((store.quick.error as? APIError)?.statusLine ?? "COULDN'T UPDATE", tint: .watch).padding(.top, 24) }
+                else if let error = store.quick.error {
+                    Text((error as? APIError)?.statusLine ?? "Couldn't update").vText(.secondary, color: VColor.watch).padding(.top, VSpace.s5)
+                }
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, VSpace.s5)
         }
         .scrollIndicators(.hidden)
     }
 
     @ViewBuilder private func lists(_ quick: FoodQuick) -> some View {
         if let usual = quick.usual {
-            MonoLabel("Your usual at \(currentSlot.slotTitle)").padding(.top, 26)
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HeadlineLines(HeadlineLines.split(usual.name, maxChars: 20), size: 26)
-                    MonoLabel([FoodFormat.kcal(usual.kcal) + " KCAL", usual.proteinG.map { "\(FoodFormat.grams($0)) G PROTEIN" }].compactMap { $0 }.joined(separator: " · "))
+            SheetLabel("Your usual at \(currentSlot.slotTitle)")
+            VCard {
+                HStack(alignment: .center, spacing: VSpace.s3) {
+                    VStack(alignment: .leading, spacing: VSpace.s1) {
+                        Text(usual.name).vText(.title).lineLimit(2)
+                        Text(["\(FoodFormat.kcal(usual.kcal)) kcal", usual.proteinG.map { "\(FoodFormat.grams($0)) g protein" }].compactMap { $0 }.joined(separator: " · "))
+                            .vText(.secondary)
+                    }
+                    Spacer(minLength: VSpace.s2)
+                    Button { add(usual.items.map(FoodDraft.init), source: "usual") } label: {
+                        Image(systemName: "plus").font(.title2.weight(.semibold)).foregroundStyle(VColor.onEat)
+                            .frame(width: VSpace.buttonHeight, height: VSpace.buttonHeight)
+                            .background(VColor.eat, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add usual: \(usual.name)")
                 }
-                Spacer(minLength: 8)
-                Button { add(usual.items.map(FoodDraft.init), source: "usual") } label: {
-                    Image(systemName: "plus").font(.title2.weight(.semibold)).foregroundStyle(VColor.ground)
-                        .frame(width: 52, height: 52)
-                        .background(VColor.pulse, in: RoundedRectangle(cornerRadius: VRadius.button, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add usual: \(usual.name)")
             }
-            .padding(.top, 12).padding(.bottom, 18)
-            Rule()
         }
         if !quick.recent.isEmpty {
-            MonoLabel("Recent").padding(.top, 24).padding(.bottom, 4)
-            ForEach(Array(quick.recent.enumerated()), id: \.offset) { _, r in
-                FoodRow(name: r.name, detail: [r.portionText, r.lastDay.flatMap(dayWord)].compactMap { $0 }.joined(separator: " · "), kcal: r.kcal) {
-                    add([FoodDraft(r)], source: "recent")
+            SheetLabel("Recent")
+            ListCard {
+                ForEach(Array(quick.recent.enumerated()), id: \.offset) { _, r in
+                    FoodRow(name: r.name, detail: [r.portionText, r.lastDay.flatMap(dayWord)].compactMap { $0 }.joined(separator: " · "), kcal: r.kcal) {
+                        add([FoodDraft(r)], source: "recent")
+                    }
                 }
             }
         }
-        MonoLabel("Saved meals").padding(.top, 24).padding(.bottom, 4)
-        ForEach(store.savedMeals, id: \.id) { s in
-            FoodRow(name: s.name, detail: s.items.map(\.name).joined(separator: " · "), kcal: s.kcal) {
-                add(s.items.map(FoodDraft.init), source: "saved", sourceRef: s.id)
+        SheetLabel("Saved meals")
+        ListCard {
+            ForEach(store.savedMeals, id: \.id) { s in
+                FoodRow(name: s.name, detail: s.items.map(\.name).joined(separator: " · "), kcal: s.kcal) {
+                    add(s.items.map(FoodDraft.init), source: "saved", sourceRef: s.id)
+                }
+                .contextMenu {
+                    Button { savedForm = SavedFormTarget(meal: s) } label: { Label("Edit", systemImage: "pencil") }
+                    Button(role: .destructive) { Task { await store.deleteSavedMeal(s.id) } } label: { Label("Delete", systemImage: "trash") }
+                }
             }
-            .contextMenu {
-                Button { savedForm = SavedFormTarget(meal: s) } label: { Label("Edit", systemImage: "pencil") }
-                Button(role: .destructive) { Task { await store.deleteSavedMeal(s.id) } } label: { Label("Delete", systemImage: "trash") }
+            Button { savedForm = SavedFormTarget(meal: nil) } label: {
+                ListRow("New saved meal", chevron: false) {
+                    Image(systemName: "plus").font(.body.weight(.semibold)).foregroundStyle(VColor.eat)
+                }
             }
+            .buttonStyle(.plain)
         }
-        Button { savedForm = SavedFormTarget(meal: nil) } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "plus").font(.body.weight(.semibold)).foregroundStyle(VColor.eat)
-                Text("New saved meal").vUI(15, weight: 600)
-                Spacer()
-            }
-            .frame(minHeight: 52).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
         if quick.usual == nil && quick.recent.isEmpty && store.savedMeals.isEmpty {
-            Text("Meals you repeat become one tap after a few days.").vBody().padding(.top, 26)
+            Text("Meals you repeat become one tap after a few days.").vText(.body).padding(.top, VSpace.s5)
         }
     }
 
-    /// TODAY / YESTERDAY / weekday within a week / 12 OCT.
+    /// Today / Yesterday / weekday within a week / 12 Oct.
     private func dayWord(_ day: String) -> String? {
         let cal = Calendar.current
         guard let date = EatStore.date(day, calendar: cal) else { return nil }
         let days = cal.dateComponents([.day], from: date, to: cal.startOfDay(for: Date())).day ?? 99
-        if days == 0 { return "TODAY" }
-        if days == 1 { return "YESTERDAY" }
+        if days == 0 { return "Today" }
+        if days == 1 { return "Yesterday" }
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = days < 7 ? "EEEE" : "d MMM"
-        return f.string(from: date).uppercased()
+        return f.string(from: date)
     }
 }
 
