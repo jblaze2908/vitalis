@@ -2,53 +2,18 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
-/// Vertical rhythm measured from spec/design/02, 03 and 24 at 390×844 (gaps include the fonts' ascent/descent).
-enum TodayLayout {
-    static let pulseGap: CGFloat = 18
-    static let afterPulse: CGFloat = 1.5
-    static let labelToHeadline: CGFloat = 10
-    static let columnGap: CGFloat = 20
-    static let stackGap: CGFloat = 6
-    static let mapWidth: CGFloat = 130
-    static let mapGap: CGFloat = 14
-    static let trainingLine: CGFloat = 22
-    static let hitSlop: CGFloat = 16
-}
-
-/// Status label + PulseLine above the content (spec 30 → StatusRow), below the system status bar.
-struct TodayTop: View {
-    let label: String
-    let tint: VTint
-    let pulse: Pulse?
-
+/// The tab headline: one `.display` line per entry.
+private struct TodayHeadline: View {
+    let lines: [String]
+    var color: Color? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StatusRow(label.isEmpty ? " " : label, tint: tint).padding(.top, VSpace.statusTop)
-            line.padding(.top, TodayLayout.pulseGap)
-        }
-    }
-
-    private var line: PulseLine {
-        guard let p = pulse, let pos = PulseLine.positions(windowStart: p.window.start, windowEnd: p.window.end,
-                                                            now: p.now, events: p.events.map(\.at)) else { return PulseLine(now: 0) }
-        return PulseLine(events: pos.events, now: pos.now)
-    }
-}
-
-/// `–` hero number + NO RECOVERY SCORE + the server's reason (calibrating, missing night; frame 24).
-struct NoScoreBlock: View {
-    let reason: String?
-    var body: some View {
-        HStack(alignment: .center, spacing: TodayLayout.columnGap) {
-            // Zero layout height: the dash centres on the text column the way frame 24 draws it.
-            Text("–").vNumber(92, color: VColor.steel).fixedSize().frame(height: 0)
-            VStack(alignment: .leading, spacing: 7) {
-                MonoLabel("No recovery score")
-                if let reason { Text(reason).vBody().fixedSize(horizontal: false, vertical: true) }
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line).vText(.display, color: color).lineLimit(1).minimumScaleFactor(0.6)
             }
-            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -69,15 +34,14 @@ struct TodayScreen: View {
         NavigationStack(path: $path) {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                TabHeader("Today") { headerTrailing(status) }
-                    .padding(.horizontal, 20).padding(.top, 2)
+                VHeader("Today", freshness: DataFreshness(fetchedAt: store.fetchedAt, refreshing: store.today.isLoading)) { headerTrailing }
                 if stale, case .stale(_, let section, let cause) = status.status {
-                    staleBody(section: section, cause: cause).padding(.horizontal, VSpace.gutter)
+                    staleBody(section: section, cause: cause)
                 } else {
                     homeBody
                 }
             }
-            .padding(.bottom, VSpace.gutter)
+            .padding(.bottom, VSpace.s4)
         }
         .refreshable { if live { await AppModel.shared.syncNow(); await store.refresh() } }
         // Below the system status bar, like the other tabs: its icons would cover the header.
@@ -99,11 +63,11 @@ struct TodayScreen: View {
     }
 
     /// The date opens the digest; when the phone can't reach the server it says so instead.
-    @ViewBuilder private func headerTrailing(_ status: StaleState) -> some View {
+    @ViewBuilder private var headerTrailing: some View {
         if store.phase == .failed {
-            MonoLabel("Offline", tint: .watch)
-        } else if let label = TodayFormat.dateLabel(day: store.today.value?.day) {
-            Button { router.showsDigest = true } label: { MonoLabel(label, tint: .steel).hitSlop() }
+            Text("Offline").vText(.secondary, color: VColor.watch)
+        } else if let label = TodayFormat.dateLabel(day: store.today.value?.day)?.capitalized {
+            Button { router.showsDigest = true } label: { Text(label).vText(.secondary).hitSlop() }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(label). Morning digest")
         }
@@ -114,21 +78,21 @@ struct TodayScreen: View {
     @ViewBuilder private var homeBody: some View {
         let t = store.today.value
         VStack(alignment: .leading, spacing: 0) {
-            HeadlineLines(t.map { TodayCopy.headline($0) } ?? ["–"], size: 36, colors: t == nil ? [VColor.steel] : [])
-                .padding(.top, 9).padding(.horizontal, 20)
+            TodayHeadline(lines: t.map { TodayCopy.headline($0) } ?? ["–"], color: t == nil ? VColor.text3 : nil)
+                .padding(.top, VSpace.s4).padding(.horizontal, VSpace.edge)
             if store.phase == .failed {
-                Text("Connect to your server to see today.").vBody().padding(.top, 12).padding(.horizontal, 20)
-                SecondaryButton("Try again") { Task { await store.refresh() } }.padding(.top, 12).padding(.horizontal, 20)
+                Text("Connect to your server to see today.").vText(.body).padding(.top, VSpace.s3).padding(.horizontal, VSpace.edge)
+                SecondaryButton("Try again") { Task { await store.refresh() } }.padding(.top, VSpace.s3).padding(.horizontal, VSpace.edge)
             }
-            VStack(spacing: 10) {
+            VStack(spacing: VSpace.s3) {
                 recoveryCard(t?.recovery)
                 // Cards in a row share the taller one's height.
-                HStack(spacing: 10) {
+                HStack(spacing: VSpace.s3) {
                     vitalCard("HRV", key: "hrv", t?.recovery.parts?.hrv, unit: "ms")
                     vitalCard("Resting HR", key: "resting_hr", t?.recovery.parts?.restingHr, unit: "bpm")
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
+                HStack(spacing: VSpace.s3) {
                     sleepCard(t?.sleep)
                     caloriesCard(t?.fuel)
                 }
@@ -136,7 +100,7 @@ struct TodayScreen: View {
                 stepsCard(t?.activity)
                 musclesCard(t?.training)
             }
-            .padding(.horizontal, 16).padding(.top, 14)
+            .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
         }
     }
 
@@ -149,14 +113,14 @@ struct TodayScreen: View {
         let ok = r?.status == "ok"
         tap({ router.showBody(.vitals) }) {
             VCard {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: VSpace.s3) {
                     CardHeader("Recovery", status: TodayCopy.recoveryStatus(r))
                     if ok || r == nil {
-                        Figure(TodayFormat.number(r?.score) ?? "–", unit: "/100", size: 42, color: r?.score == nil ? VColor.steel : nil)
+                        Figure(TodayFormat.number(r?.score) ?? "–", unit: "/100", size: 40, color: r?.score == nil ? VColor.text3 : nil)
                         BandScale(score: r?.score, ease: r?.bands?.ease ?? 45, steady: r?.bands?.steady ?? 60, ready: r?.bands?.ready ?? 75)
                     } else {
-                        Figure("–", size: 42, color: VColor.steel)
-                        if let reason = r?.reason { Text(reason).vUI(13, weight: 400, color: VColor.muted).fixedSize(horizontal: false, vertical: true) }
+                        Figure("–", size: 40, color: VColor.text3)
+                        if let reason = r?.reason { Text(reason).vText(.secondary).fixedSize(horizontal: false, vertical: true) }
                     }
                 }
             }
@@ -172,8 +136,8 @@ struct TodayScreen: View {
             VCard {
                 VStack(alignment: .leading, spacing: 0) {
                     CardHeader(title, status: part?.value == nil ? nil : (TodayCopy.vitalWord(part), tone))
-                    Sparkline(part?.week ?? [], usual: usual, tone: tone).frame(height: 26).padding(.top, 12)
-                    Figure(TodayFormat.number(part?.value) ?? "–", unit: unit, color: part?.value == nil ? VColor.steel : nil).padding(.top, 12)
+                    Sparkline(part?.week ?? [], usual: usual, tone: tone).frame(height: 26).padding(.top, VSpace.s3)
+                    Figure(TodayFormat.number(part?.value) ?? "–", unit: unit, color: part?.value == nil ? VColor.text3 : nil).padding(.top, VSpace.s3)
                 }
             }
         }
@@ -187,8 +151,8 @@ struct TodayScreen: View {
                     CardHeader("Sleep", status: TodayCopy.sleepStatus(sl))
                     Meter(fraction: (asleep ?? 0) / max(need ?? 8, 1) * 0.88, marker: need == nil ? nil : 0.88,
                           caption: need.map { "Need \(TodayCopy.hm($0))" }, leading: asleep.map(TodayCopy.hm))
-                        .padding(.top, 10)
-                    Figure(TodayFormat.number(sl?.score) ?? "–", unit: "score", color: sl?.score == nil ? VColor.steel : nil).padding(.top, 12)
+                        .padding(.top, VSpace.s3)
+                    Figure(TodayFormat.number(sl?.score) ?? "–", unit: "score", color: sl?.score == nil ? VColor.text3 : nil).padding(.top, VSpace.s3)
                 }
             }
         }
@@ -203,8 +167,9 @@ struct TodayScreen: View {
                     // No intake pace exists to judge "on track", so under target only says what's left.
                     CardHeader("Calories", status: target == nil ? nil : over ? ("Over", .watch)
                                : ("\(TodayFormat.number(f?.kcalLeft) ?? "–") left", .quiet))
-                    Meter(fraction: target.map { eaten / max($0, 1) } ?? 0, fill: over ? VColor.watch : VColor.bone).padding(.top, 25)
-                    Figure(TodayFormat.number(f?.kcalEaten) ?? "–", unit: target.map { "/\(TodayFormat.number($0) ?? "")" }).padding(.top, 25)
+                    // 24 above and below keeps the meter level with Sleep's captioned one beside it.
+                    Meter(fraction: target.map { eaten / max($0, 1) } ?? 0, fill: over ? VColor.watch : VColor.text).padding(.top, VSpace.s5)
+                    Figure(TodayFormat.number(f?.kcalEaten) ?? "–", unit: target.map { "/\(TodayFormat.number($0) ?? "")" }).padding(.top, VSpace.s5)
                 }
             }
         }
@@ -214,19 +179,19 @@ struct TodayScreen: View {
         let target = Double(a?.stepsTarget ?? 0), steps = Double(a?.steps ?? 0), expected = a?.stepsExpectedNow.map(Double.init)
         return tap({ path.append(.metric(key: "steps")) }) {
             VCard {
-                HStack(alignment: .bottom, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 10) {
-                            Text("Steps").vUI(14, weight: 600)
+                HStack(alignment: .bottom, spacing: VSpace.s4) {
+                    VStack(alignment: .leading, spacing: VSpace.s3) {
+                        HStack(spacing: VSpace.s3) {
+                            Text("Steps").vText(.headline)
                             if let s = TodayCopy.paceStatus(a?.stepsPace) { StatusWord(s.0, tone: s.1) }
                         }
                         Figure(TodayFormat.number(a?.steps) ?? "–", unit: a?.stepsTarget.map { "/\(TodayFormat.number($0) ?? "")" },
-                               color: a?.steps == nil ? VColor.steel : nil)
+                               color: a?.steps == nil ? VColor.text3 : nil)
                     }
                     .fixedSize()
                     Meter(fraction: target > 0 ? steps / target : 0, marker: target > 0 ? expected.map { $0 / target } : nil,
                           caption: expected.map { "Usual by now \(TodayFormat.number($0) ?? "")" })
-                        .padding(.bottom, 6)
+                        .padding(.bottom, VSpace.s2)
                 }
             }
         }
@@ -235,9 +200,9 @@ struct TodayScreen: View {
     @ViewBuilder private func musclesCard(_ tr: TodayResponse.Training?) -> some View {
         tap({ router.tab = .train }) {
             VCard {
-                VStack(spacing: 6) {
+                VStack(spacing: VSpace.s2) {
                     CardHeader("Muscles", status: TodayCopy.muscleStatus(tr))
-                    MuscleMap(heat: tr?.heat ?? [:], view: .both, seam: VColor.card).frame(width: 168, height: 136)
+                    MuscleMap(heat: tr?.heat ?? [:], view: .both, seam: VColor.surface).frame(width: 168, height: 136)
                 }
             }
         }
@@ -249,15 +214,16 @@ struct TodayScreen: View {
         let t = store.today.value
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                Rectangle().fill(VColor.watch).frame(height: 1.5)
-                MonoLabel(section, tint: .watch).padding(.top, VSpace.sectionPad)
-                HeadlineLines(HeadlineLines.split(cause), size: 36).padding(.top, 12)
-                Text(StaleState.body).vBody().padding(.top, 11)
-                PrimaryButton("Fix sync") { router.open(.settingsSync) }.padding(.top, 19)
+                Rectangle().fill(VColor.watch).frame(height: 1)
+                Text(section).vText(.label, color: VColor.watch).padding(.top, VSpace.s3)
+                TodayHeadline(lines: HeadlineLines.split(cause)).padding(.top, VSpace.s3)
+                Text(StaleState.body).vText(.body).padding(.top, VSpace.s3)
+                PrimaryButton("Fix sync") { router.open(.settingsSync) }.padding(.top, VSpace.s5)
             }
-            .padding(.top, 15)
-            recoveryCard(t?.recovery).padding(.top, 24)
+            .padding(.top, VSpace.s4)
+            recoveryCard(t?.recovery).padding(.top, VSpace.s5)
         }
+        .padding(.horizontal, VSpace.edge)
     }
 }
 
@@ -320,7 +286,7 @@ enum TodayCopy {
 private extension View {
     /// ≥ 44 pt tap target around small labels without moving them.
     func hitSlop() -> some View {
-        padding(TodayLayout.hitSlop).contentShape(Rectangle()).padding(-TodayLayout.hitSlop)
+        padding(VSpace.s4).contentShape(Rectangle()).padding(-VSpace.s4)
     }
 }
 

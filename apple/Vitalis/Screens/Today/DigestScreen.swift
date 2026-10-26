@@ -2,21 +2,6 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
-/// Spacing measured from spec/design/02-morning-digest.png at 390×844.
-private enum DigestLayout {
-    static let headlineToScore: CGFloat = 12
-    static let scoreLabelOverlap: CGFloat = -0.75
-    static let rowPad: CGFloat = 6
-    static let yesterdayHeadlineNudge: CGFloat = 5
-    static let planLabelGap: CGFloat = 14
-    static let planTop: CGFloat = 5
-    static let planRow: CGFloat = 49
-    static let planDot: CGFloat = 8
-    static let planDotGap: CGFloat = 12
-    static let buttonHeight: CGFloat = 54
-    static let buttonBottom: CGFloat = 38
-}
-
 /// Full-screen morning digest over Today (spec 20 §4). "Start my day" dismisses; only an automatic presentation sets
 /// the once-per-day flag (TodayStore.finishDigest).
 struct DigestScreen: View {
@@ -35,30 +20,16 @@ struct DigestScreen: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    TodayTop(label: d == nil ? "" : label(status), tint: status.isStale ? .watch : .steel, pulse: d?.pulse)
-                        .overlay(alignment: .topLeading) {
-                            // A way out that isn't "Start my day", e.g. when reopened in the evening.
-                            Button { TodayStore.shared.finishDigest(); router.showsDigest = false } label: {
-                                Image(systemName: "xmark").vLabel().frame(width: 44, height: 44)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.leading, VSpace.statusSide - 12)
-                            .padding(.top, VSpace.statusTop - 14)
-                            .accessibilityLabel("Close digest")
-                        }
-                    content(d).padding(.horizontal, VSpace.gutter)
+                    top(staleLabel: d == nil ? nil : staleLabel(status))
+                    pulse(d?.pulse).padding(.top, VSpace.s2)
+                    content(d)
                 }
-                .padding(.bottom, VSpace.gutter)
+                .padding(.bottom, VSpace.s4)
             }
-            PrimaryButton("Start my day", height: DigestLayout.buttonHeight) {
-                TodayStore.shared.finishDigest()
-                router.showsDigest = false
-            }
-            .padding(.horizontal, VSpace.gutter)
-            .padding(.top, 8)
-            .padding(.bottom, DigestLayout.buttonBottom)
+            PrimaryButton("Start my day") { close() }
+                .padding(.horizontal, VSpace.edge)
+                .padding(.vertical, VSpace.s2)
         }
-        .ignoresSafeArea(.container, edges: .bottom)
         .vScreen()
         .task {
             guard live, let api = Services.shared.api else { return }
@@ -66,146 +37,154 @@ struct DigestScreen: View {
         }
     }
 
-    private func label(_ status: StaleState) -> String {
-        switch status.status {
-        case .synced(let l), .offline(let l), .stale(let l, _, _): l
+    private func close() {
+        TodayStore.shared.finishDigest()
+        router.showsDigest = false
+    }
+
+    /// Close on the gutter, then when the digest came from the server; a stale sync says so on the right.
+    private func top(staleLabel: String?) -> some View {
+        HStack(spacing: VSpace.s2) {
+            // A way out that isn't "Start my day", e.g. when reopened in the evening.
+            Button { close() } label: {
+                Image(systemName: "xmark").font(.system(size: 15, weight: .medium)).foregroundStyle(VColor.text)
+                    .frame(width: 44, height: 44, alignment: .leading).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close digest")
+            FreshnessLine(DataFreshness(fetchedAt: digest.fetchedAt, refreshing: digest.isLoading))
+            Spacer(minLength: VSpace.s2)
+            if let staleLabel { Text(staleLabel).vText(.secondary, color: VColor.watch).lineLimit(1) }
         }
+        .padding(.horizontal, VSpace.edge)
+    }
+
+    /// The day so far, edge to edge (the brand line, drawn from the server's window).
+    private func pulse(_ p: Pulse?) -> PulseLine {
+        guard let p, let pos = PulseLine.positions(windowStart: p.window.start, windowEnd: p.window.end,
+                                                    now: p.now, events: p.events.map(\.at)) else { return PulseLine(now: 0) }
+        return PulseLine(events: pos.events, now: pos.now)
+    }
+
+    private func staleLabel(_ status: StaleState) -> String? {
+        if case .stale(let label, _, _) = status.status { return DigestCopy.sentence(label) }
+        return nil
     }
 
     @ViewBuilder private func content(_ d: DigestResponse?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            MonoLabel([d?.dateLabel, d?.greeting].compactMap { $0 }.joined(separator: " · "))
-                .padding(.top, TodayLayout.afterPulse)
-            headline(d?.headline ?? [])
-                .padding(.top, TodayLayout.labelToHeadline)
-            sleep(d?.sleep).padding(.top, DigestLayout.headlineToScore)
-            VSection { recovery(d?.recovery) }
-            VSection { yesterday(d?.yesterday) }
+            Group {
+                Text([d?.dateLabel?.capitalized, d?.greeting.map(DigestCopy.sentence)].compactMap { $0 }.joined(separator: " · "))
+                    .vText(.secondary)
+                    .padding(.top, VSpace.s3)
+                headline(d?.headline ?? []).padding(.top, VSpace.s2)
+                sleepScore(d?.sleep).padding(.top, VSpace.s5)
+            }
+            .padding(.horizontal, VSpace.edge)
+            sleepRows(d?.sleep?.rows ?? [])
+            SectionLabel("Recovery")
+            recovery(d?.recovery).padding(.horizontal, VSpace.edge)
+            SectionLabel("Yesterday")
+            yesterday(d?.yesterday).padding(.horizontal, VSpace.edge)
             plan(d?.plan ?? [])
         }
     }
 
-    /// Two lines: the first bone, the second `pulse` (the approved exception to rule 2, spec 30).
+    /// Two lines: the first in text, the second in accent (the approved exception to rule 2, spec 30).
     private func headline(_ lines: [String]) -> some View {
-        HeadlineLines(lines.isEmpty ? ["–"] : Array(lines.prefix(2)), size: 44,
-                      colors: lines.isEmpty ? [VColor.steel] : [VColor.bone, VColor.pulse])
+        let shown = lines.isEmpty ? ["–"] : Array(lines.prefix(2))
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.offset) { i, line in
+                Text(line).vText(.display, color: lines.isEmpty ? VColor.text3 : i == 1 ? VColor.accent : nil)
+                    .lineLimit(1).minimumScaleFactor(0.6)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
-    private func sleep(_ s: DigestResponse.Sleep?) -> some View {
+    private func sleepScore(_ s: DigestResponse.Sleep?) -> some View {
         let score = TodayFormat.number(s?.score)
-        let rows = s?.rows ?? []
-        return HStack(alignment: .bottom, spacing: TodayLayout.columnGap) {
-            VStack(alignment: .leading, spacing: DigestLayout.scoreLabelOverlap) {
-                Text(score ?? "–").vNumber(96, color: score == nil ? VColor.steel : nil).lineLimit(1).fixedSize()
-                MonoLabel("Sleep")
-            }
+        return Figure(score ?? "–", unit: "sleep score", size: 56, color: score == nil ? VColor.text3 : nil)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Sleep \(score ?? "not available")")
-            VStack(spacing: 0) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
-                    DigestRow(row: row, showsRule: i < rows.count - 1)
-                }
+    }
+
+    @ViewBuilder private func sleepRows(_ rows: [DigestResponse.Row]) -> some View {
+        if !rows.isEmpty {
+            ListCard {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in DigestRow(row: row) }
             }
+            .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
         }
     }
 
     private func recovery(_ r: DigestResponse.Recovery?) -> some View {
         let score = TodayFormat.number(r?.score)
-        let tint = TodayFormat.bandTint(r?.band)
-        return HStack(alignment: .center, spacing: TodayLayout.columnGap) {
-            Text(score ?? "–").vNumber(48, color: score == nil ? VColor.steel : nil).lineLimit(1).fixedSize()
-            VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-                MonoLabel(["Recovery", r?.label].compactMap { $0 }.joined(separator: " · "), tint: r?.label == nil ? .steel : tint)
-                (signal("HRV", r?.hrv) + Text(" · ") + signal("Resting", r?.restingHr)).vReading()
+        let tone: VTone = switch TodayFormat.bandTint(r?.band) { case .good: .good; case .watch: .watch; default: .usual }
+        return VCard {
+            VStack(alignment: .leading, spacing: VSpace.s3) {
+                CardHeader("Recovery", status: r?.label.map { (DigestCopy.sentence($0), tone) })
+                Figure(score ?? "–", unit: "/100", size: 40, color: score == nil ? VColor.text3 : nil)
+                (signal("HRV", r?.hrv, unit: "ms") + Text("  ·  ") + signal("Resting HR", r?.restingHr, unit: "bpm")).vText(.secondary)
             }
-            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
     }
 
-    /// Value in bone, arrow in the server's tint (frame 02).
-    private func signal(_ key: String, _ s: DigestResponse.Signal?) -> Text {
-        let value = TodayFormat.number(s?.value) ?? "–"
-        let base = Text("\(key.uppercased()) \(value)")
+    /// Value in text, arrow in the server's tint (frame 02).
+    private func signal(_ key: String, _ s: DigestResponse.Signal?, unit: String) -> Text {
+        let value = TodayFormat.number(s?.value)
+        let base = Text("\(key) ") + Text(value.map { "\($0) \(unit)" } ?? "–").foregroundStyle(VColor.text)
         guard let glyph = TodayFormat.arrowGlyph(s?.arrow) else { return base }
-        return base + Text(" ") + Text(glyph).foregroundStyle(VTint.server(s?.tint, else: .bone).color)
+        return base + Text(" ") + Text(glyph).foregroundStyle(VTone.server(s?.tint).color)
     }
 
     private func yesterday(_ y: DigestResponse.Yesterday?) -> some View {
-        VStack(alignment: .leading, spacing: TodayLayout.stackGap) {
-            MonoLabel("Yesterday")
-            HStack(alignment: .top, spacing: 0) {
-                stat(TodayFormat.number(y?.steps), "Steps")
-                stat(TodayFormat.number(y?.activeKcal), "Active kcal")
-                VStack(alignment: .leading, spacing: 0) {
-                    let title = y.map { $0.workout?.title ?? "Rest" }
-                    HeadlineLines([title ?? "–"], size: 26, colors: title == nil ? [VColor.steel] : [])
-                    MonoLabel(y == nil ? " " : y?.workout == nil ? "No workout" : "Workout", size: .small)
-                }
-                .padding(.top, DigestLayout.yesterdayHeadlineNudge)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
-            }
-        }
+        ReadoutRow([Readout("Steps", TodayFormat.number(y?.steps) ?? "–"),
+                    Readout("Active kcal", TodayFormat.number(y?.activeKcal) ?? "–"),
+                    Readout("Workout", y.map { $0.workout?.title ?? "Rest" } ?? "–")])
     }
 
-    private func stat(_ value: String?, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(value ?? "–").vNumber(24, color: value == nil ? VColor.steel : nil).lineLimit(1)
-            MonoLabel(label, size: .small)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func plan(_ items: [DigestResponse.PlanItem]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            MonoLabel("Today")
-            VStack(spacing: 0) {
+    @ViewBuilder private func plan(_ items: [DigestResponse.PlanItem]) -> some View {
+        SectionLabel("Today")
+        if !items.isEmpty {
+            ListCard {
                 ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, item in
-                    VStack(spacing: 0) {
-                        Rule()
-                        HStack(spacing: DigestLayout.planDotGap) {
-                            Circle().fill(item.primary ? VColor.pulse : VColor.steel)
-                                .frame(width: DigestLayout.planDot, height: DigestLayout.planDot)
-                            Text(item.title).vHeadline(22).lineLimit(1).minimumScaleFactor(0.7)
-                            Spacer(minLength: 8)
-                            if let reason = item.reason { MonoLabel(reason).lineLimit(1) }
-                        }
-                        .frame(minHeight: DigestLayout.planRow)
+                    ListRow(item.title, subtitle: item.reason.map(DigestCopy.sentence), chevron: false) {
+                        Circle().fill(item.primary ? VColor.accent : VColor.usual).frame(width: 8, height: 8).accessibilityHidden(true)
                     }
-                    .accessibilityElement(children: .combine)
                 }
             }
-            .padding(.top, DigestLayout.planTop)
+            .padding(.horizontal, VSpace.edge)
         }
-        .padding(.top, DigestLayout.planLabelGap)
     }
 }
 
-/// ReadingRow with the digest's 6 pt padding and an optional delta; the tint marks the delta, or the value without one.
+/// One sleep row: label, value and delta; a status dot when the server flags it (good = better than usual, watch = off it).
 private struct DigestRow: View {
     let row: DigestResponse.Row
-    let showsRule: Bool
 
     var body: some View {
-        let tint = VTint.server(row.tint, else: .bone)
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text(row.label).vReading(tint: .steel).textCase(.uppercase)
-                Spacer(minLength: 12)
-                valueText(tint: tint).vReading(tint: row.value == nil ? .steel : .bone).textCase(.uppercase)
+        ListRow(DigestCopy.sentence(row.label), value: value, chevron: false) {
+            if row.tint != nil {
+                Circle().fill(VTone.server(row.tint).color).frame(width: 8, height: 8)
+                    .accessibilityLabel(row.tint == "good" ? "better than usual" : "off your usual")
             }
-            .padding(.vertical, DigestLayout.rowPad)
-            if showsRule { Rule() }
         }
-        .accessibilityElement(children: .combine)
     }
 
-    private func valueText(tint: VTint) -> Text {
-        guard let value = row.value else { return Text("–") }
-        guard let delta = row.delta else { return row.tint == nil ? Text(value) : Text(value).foregroundStyle(tint.color) }
-        return Text(value) + Text(" ") + (row.tint == nil ? Text(delta) : Text(delta).foregroundStyle(tint.color))
+    private var value: String {
+        guard let v = row.value else { return "–" }
+        return [v, row.delta].compactMap { $0?.lowercased() }.joined(separator: " ")
+    }
+}
+
+/// The server sends digest words in mono caps ("DURATION", "6 DAYS SINCE"); the system sets them in sentence case.
+private enum DigestCopy {
+    static func sentence(_ s: String) -> String {
+        let lower = s.lowercased()
+        return lower.prefix(1).uppercased() + lower.dropFirst()
     }
 }
 
