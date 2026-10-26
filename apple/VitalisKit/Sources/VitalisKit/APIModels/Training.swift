@@ -16,6 +16,8 @@ public struct SessionRow: Codable, Sendable, Equatable {
     public let durationMin: Int?
     public let workingSets: Int?
     public let hrAvg: Double?
+    /// Set when back-to-back workouts were merged into one visit.
+    public let partCount: Int?
     public let tag: Tag?
 }
 
@@ -88,6 +90,20 @@ public struct SessionDetail: Codable, Sendable, Equatable {
         public let hrAvg: Double?
         public let hrMax: Double?
     }
+    /// One workout inside a visit (a walk, the elliptical, the logged sets).
+    public struct Part: Codable, Sendable, Equatable {
+        public let id: String
+        public let kind: String
+        public let title: String?
+        public let start: String
+        public let end: String
+        public let durationMin: Int
+        public let hrAvg: Double?
+        public let hrMax: Double?
+        public let activeKcal: Double?
+        public let distanceKm: Double?
+        public let workingSets: Int?
+    }
     public let id: String
     public let kind: String
     public let title: String?
@@ -114,6 +130,7 @@ public struct SessionDetail: Codable, Sendable, Equatable {
     public let distanceKm: Double?
     public let source: String?
     public let hr: WorkoutHeart?
+    public let parts: [Part]?
     public let freshness: Freshness?
 
     public var isCardio: Bool { kind == "cardio" }

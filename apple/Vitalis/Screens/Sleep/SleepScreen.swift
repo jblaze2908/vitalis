@@ -426,7 +426,8 @@ enum SleepCopy {
     static func weekday(_ day: String) -> String { date(day).map { fmt($0, "EEE") } ?? "" }
     static func weekTitle(end: String) -> String {
         guard let e = date(end), let s = Calendar(identifier: .gregorian).date(byAdding: .day, value: -6, to: e) else { return end }
-        return "\(fmt(s, "d"))–\(fmt(e, "d MMM"))"
+        // A week across two months names both: "26 Oct–1 Nov", not "26–1 Nov".
+        return "\(fmt(s, fmt(s, "MMM") == fmt(e, "MMM") ? "d" : "d MMM"))–\(fmt(e, "d MMM"))"
     }
     static func monthTitle(_ m: String) -> String { date("\(m)-01").map { fmt($0, "MMMM") } ?? m }
     static func daysIn(_ m: String) -> Int {

@@ -35,6 +35,14 @@ import VitalisKit
         #expect(s.exercises?.flatMap(\.sets).allSatisfy { $0.at != nil } == true)
     }
 
+    @Test func visitRowAndParts() throws {
+        let row = try APICoding.decoder().decode(SessionRow.self, from: Data(#"{"id":"w1","kind":"cardio","title":"walking · elliptical","day":"2026-10-14","start":"2026-10-14T19:10:29+05:30","duration_min":39,"hr_avg":162,"part_count":2,"parts":["walking","elliptical"],"tag":null}"#.utf8))
+        #expect(row.partCount == 2)
+        let part = try APICoding.decoder().decode(SessionDetail.Part.self, from: Data(#"{"id":"w1","kind":"cardio","title":"walking","start":"2026-10-14T19:10:29+05:30","end":"2026-10-14T19:15:33+05:30","duration_min":5,"hr_avg":165.7,"hr_max":180,"active_kcal":57,"distance_km":null,"working_sets":null}"#.utf8))
+        #expect(part.durationMin == 5 && part.activeKcal == 57 && part.distanceKm == nil)
+        #expect(WorkoutCopy.name("walking · elliptical") == "Walking · Elliptical")
+    }
+
     @Test func launchPathParsesOnlyItsTab() {
         UserDefaults.standard.set("body/metric/hrv", forKey: "VitalisDetail")
         defer { UserDefaults.standard.removeObject(forKey: "VitalisDetail") }

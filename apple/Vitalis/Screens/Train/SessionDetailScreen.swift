@@ -37,6 +37,7 @@ struct SessionDetailScreen: View {
         ])
         .padding(.top, 8)
         heart(d, sets: setOffsets(d))
+        partsCard(d)
         if let heat = d.heat, !heat.isEmpty {
             DetailSection("Muscles worked")
             VCard { MuscleMap(heat: heat, view: .both, seam: VColor.card).frame(height: 150).frame(maxWidth: .infinity) }
@@ -55,6 +56,7 @@ struct SessionDetailScreen: View {
         ])
         .padding(.top, 8)
         heart(d, sets: [])
+        partsCard(d)
         if d.hr == nil, d.hrAvg != nil {
             ReadoutRow([Readout("Avg HR", TrainFormat.int(d.hrAvg.map { Int($0.rounded()) })), Readout("Max HR", TrainFormat.int(d.hrMax.map { Int($0.rounded()) })),
                         Readout("Min HR", TrainFormat.int(d.hrMin.map { Int($0.rounded()) }))]).padding(.top, 14)
@@ -67,7 +69,7 @@ struct SessionDetailScreen: View {
             DetailSection("Heart rate", trailing: "\(hr.min)–\(hr.max) bpm")
             VCard {
                 VStack(alignment: .leading, spacing: 8) {
-                    WorkoutHeartChart(hr: hr, sets: sets).frame(height: 180)
+                    WorkoutHeartChart(hr: hr, sets: sets, spans: spans(d)).frame(height: 180)
                     if !sets.isEmpty { Text("Each tick is a set. Drag to read.").vUI(11, weight: 500, color: Color(hex: 0x6E6E6E)) }
                 }
             }
@@ -75,6 +77,43 @@ struct SessionDetailScreen: View {
                 RowsCard { DrillRow("Heart rate that day", route: .heart(day: day)) }.padding(.top, 10)
             }
         }
+    }
+
+    /// The Watch workouts inside a visit, in seconds from the heart-rate line's start, shaded on the chart.
+    private func spans(_ d: SessionDetail) -> [ClosedRange<Double>] {
+        guard let start = APIDate.parse(d.hr?.start ?? d.start), let parts = d.parts, parts.count > 1 else { return [] }
+        return parts.filter { $0.kind == "cardio" }.compactMap { p in
+            guard let a = APIDate.parse(p.start), let b = APIDate.parse(p.end) else { return nil }
+            return a.timeIntervalSince(start)...max(b.timeIntervalSince(start), a.timeIntervalSince(start))
+        }
+    }
+
+    /// Every workout this visit merged: the Watch saves each activity on its own.
+    @ViewBuilder private func partsCard(_ d: SessionDetail) -> some View {
+        if let parts = d.parts, parts.count > 1 {
+            DetailSection("In this visit", trailing: "\(parts.count)")
+            RowsCard {
+                ForEach(parts, id: \.id) { p in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(p.kind == "strength" ? (p.title ?? "Workout") : WorkoutCopy.name(p.title ?? "Workout")).vUI(15, weight: 500)
+                            Text([APIDate.clockText(p.start), APIDate.clockText(p.end)].compactMap { $0 }.joined(separator: "–") + " · \(p.durationMin) min")
+                                .vUI(12, weight: 400, color: VColor.muted)
+                        }
+                        Spacer(minLength: 8)
+                        Text(partStat(p)).vUI(13, weight: 500, color: VColor.muted).lineLimit(1)
+                    }
+                    .padding(.vertical, 12)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func partStat(_ p: SessionDetail.Part) -> String {
+        if p.kind == "strength" { return TrainFormat.plural(p.workingSets ?? 0, "set", "sets") }
+        return [p.hrAvg.map { "\(Int($0.rounded())) bpm" }, p.activeKcal.map { "\(Int($0.rounded())) kcal" }, p.distanceKm.map { "\(TrainFormat.kg($0)) km" }]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     private func setOffsets(_ d: SessionDetail) -> [Double] {

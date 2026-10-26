@@ -42,13 +42,16 @@ const shortName = (id: string) => {
 type Listed = ReturnType<typeof listWorkouts>[number];
 /** One row of the Train tab and history list. */
 function sessionRow(w: Listed) {
+  const visit = "parts" in w && w.parts ? { part_count: w.parts.length, parts: w.parts.map((p) => p.title) } : {};
   if (w.type === "strength") {
-    const v = w as ReturnType<typeof sessionView>, pr = prs(v.id)[0];
+    const v = w as ReturnType<typeof sessionView> & { hr_avg?: number | null }, pr = prs(v.id)[0];
+    const hr = v.hr_avg ?? (typeof v.watch === "object" ? v.watch.hr_avg : null);
     return { id: v.id, kind: "strength", title: v.title ?? "Workout", day: v.day, start: v.start, duration_min: v.duration_min, working_sets: v.working_sets,
-      tag: pr ? { kind: "pr", label: `PR · ${shortName(pr.exercise_id)}` } : null };
+      hr_avg: hr ?? null, ...visit, tag: pr ? { kind: "pr", label: `PR · ${shortName(pr.exercise_id)}` } : null };
   }
   const c = w as Listed & { hr_avg: number | null };
-  return { id: c.id, kind: "cardio", title: c.title, day: c.day, start: c.start, duration_min: c.duration_min, hr_avg: c.hr_avg ?? null, tag: { kind: "cardio", label: "CARDIO" } };
+  return { id: c.id, kind: "cardio", title: c.title, day: c.day, start: c.start, duration_min: c.duration_min, hr_avg: c.hr_avg ?? null, ...visit,
+    tag: { kind: "cardio", label: "CARDIO" } };
 }
 
 const toTraining = (r: SetRow & { tz_offset_min: number }): TrainingSet => {
@@ -117,7 +120,25 @@ export function sessionHistory(before: string | undefined, limit: number, at = D
 
 const MONTH_DAY = (iso: string) => `${dateLabel(iso.slice(0, 10))} · ${iso.slice(11, 16)}`;
 
+/** One workout, or the whole visit when it was back-to-back with others: any member's id opens the visit. */
 export function sessionDetail(id: string, at = Date.now()) {
+  const s = one<{ started_at: number; tz_offset_min: number }>("SELECT started_at,tz_offset_min FROM sessions WHERE id=? AND deleted_at IS NULL", id);
+  const day = s ? isoAt(s.started_at, s.tz_offset_min).slice(0, 10) : one<{ day: string }>("SELECT day FROM hk_workouts WHERE id=?", id)?.day;
+  type Visit = Listed & { hr_avg?: number | null; hr_max?: number | null; active_kcal_estimate?: number | null; distance_km?: number };
+  const visit = (day ? listWorkouts(addDays(day, -1), addDays(day, 1)).find((w) => w.parts?.some((p) => p.id === id)) : undefined) as Visit | undefined;
+  if (!visit?.parts) return singleDetail(id, at);
+  const base = singleDetail(visit.id, at), startMs = Date.parse(visit.start), endMs = Math.min(at, Date.parse(visit.end));
+  const ids = visit.parts.map((p) => p.id);
+  const src = one<{ source: string }>(`SELECT source FROM hk_workouts WHERE source IS NOT NULL AND id IN (${ids.map(() => "?").join(",")}) LIMIT 1`, ...ids)?.source ?? null;
+  const hr = workoutHeart(startMs, endMs, src);
+  return { ...base, title: visit.title, start: visit.start, end: visit.end, duration_min: visit.duration_min,
+    context_label: `${MONTH_DAY(visit.start)} · ${visit.duration_min} MIN`,
+    ...(base.kind === "cardio" ? { name: null, duration_s: (endMs - startMs) / 1000, hr_avg: visit.hr_avg, hr_max: visit.hr_max, distance_km: visit.distance_km ?? null }
+      : { avg_bpm: hr?.avg ?? visit.hr_avg }),
+    active_kcal: visit.active_kcal_estimate, parts: visit.parts, hr: hr && { ...hr, start: visit.start } };
+}
+
+function singleDetail(id: string, at: number) {
   const s = one<SessionRow>("SELECT * FROM sessions WHERE id=?", id);
   if (!s) {
     const w = one<Record<string, unknown> & { start_ms: number; end_ms: number; source: string | null }>(

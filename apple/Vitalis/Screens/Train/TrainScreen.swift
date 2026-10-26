@@ -85,7 +85,7 @@ struct TrainWeekView: View {
         }
         .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 8)
         WeekTiles(weekStart: t?.weekStart, sessions: store.sessions).padding(.horizontal, 16)
-        if let t, let weekly = t.weeklySets, !t.muscles.isEmpty {
+        if let t, let weekly = t.weeklySets, t.muscles.contains(where: { ($0.weekSets ?? 0) > 0 }) {
             HStack { Text("Sets per muscle").vLabel(); Spacer(); Text("Aim \(weekly.min)–\(weekly.max)").vLabel() }
                 .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 10)
             SetsBars(muscles: t.muscles, weekly: weekly).padding(.horizontal, 20)
@@ -107,7 +107,7 @@ struct TrainWeekView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(row.kind == "strength" ? (row.title ?? "Workout") : WorkoutCopy.name(row.title ?? "Workout")).vUI(15, weight: 500)
-                                Text(TrainCopy.sessionLine(row)).vUI(13, weight: 400, color: VColor.muted)
+                                Text(TrainCopy.sessionLine(row) + (row.partCount.map { " · \($0) parts" } ?? "")).vUI(13, weight: 400, color: VColor.muted)
                             }
                             Spacer()
                             if row.kind == "strength" {

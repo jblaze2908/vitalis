@@ -93,7 +93,7 @@ export function buildServer(token: Token) {
   wrap(ctx, "get_metrics", (a: { metrics: string[]; from?: string; to?: string; every?: "day" | "week" }) => getMetrics(a.metrics, ...span(a, 30), a.every ?? "day")));
 
   s.registerTool("list_workouts", { title: "Workouts", annotations: READ, outputSchema: Out,
-    description: "Workouts between two dates, newest first: strength sessions from the training log (sets per exercise, volume, working sets per muscle) and Apple Watch workouts (duration, heart rate, energy). A Watch workout that overlaps a strength session is shown inside it. Open one with get_workout.",
+    description: "Workouts between two dates, newest first: strength sessions from the training log (sets per exercise, volume, working sets per muscle) and Apple Watch workouts (duration, heart rate, energy). A Watch workout that overlaps a strength session is shown inside it, and workouts within 30 minutes of each other are one visit with its members under `parts` (one gym trip saved as a walk, the elliptical and weights). Open one with get_workout.",
     inputSchema: z.object({ from: day.optional().describe("default 13 days before to"), to: day.optional().describe("default today") }) },
   wrap(ctx, "list_workouts", (a: { from?: string; to?: string }) => { const [f, t] = span(a, 14); return { range: `${f}..${t}`, workouts: listWorkouts(f, t) }; }));
 

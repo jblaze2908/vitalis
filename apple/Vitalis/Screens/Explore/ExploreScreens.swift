@@ -343,8 +343,10 @@ private struct ExerciseProgressRow: View {
 /// HealthKit's activity names arrive camelCased (`traditionalStrengthTraining`); show them as words.
 enum WorkoutCopy {
     static func name(_ raw: String) -> String {
-        let spaced = raw.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
-        return spaced.prefix(1).uppercased() + spaced.dropFirst().lowercased()
+        raw.components(separatedBy: " · ").map { part in
+            let spaced = part.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
+            return spaced.prefix(1).uppercased() + spaced.dropFirst().lowercased()
+        }.joined(separator: " · ")
     }
 }
 

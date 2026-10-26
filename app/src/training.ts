@@ -12,6 +12,11 @@ import { round } from "./stats.js";
 export const KINDS = ["warmup", "normal", "drop", "failure"] as const;
 export type Kind = (typeof KINDS)[number];
 export const SESSION_GAP_H = 3;
+/**
+ * Saved workouts this close together are one gym visit. Apple's Workout app saves each activity on its own (a walk, the
+ * elliptical, weights), minutes apart. Separate from SESSION_GAP_H, which decides when logged sets join one session.
+ */
+export const VISIT_GAP_MS = 30 * 60_000;
 /** Filter on `hk_workouts w`: the Health workout a deleted Vitalis session wrote is deleted with it, wherever workouts are listed. */
 export const LIVE_HK = "NOT EXISTS (SELECT 1 FROM sessions d WHERE d.hk_workout_uuid=w.id AND d.deleted_at IS NOT NULL)";
 
@@ -196,7 +201,43 @@ export function listWorkouts(from: string, to: string) {
     .map((w) => ({ id: w.id, type: "watch", title: w.name, day: w.day, start: w.start, end: w.end, duration_min: Math.round(w.duration_s / 60),
       hr_avg: w.hr_avg && Math.round(w.hr_avg), hr_max: w.hr_max, active_kcal_estimate: w.active_kcal && Math.round(w.active_kcal),
       ...(w.distance_km && { distance_km: round(w.distance_km, 2) }) }));
-  return [...strength, ...watch].sort((x, y) => y.start.localeCompare(x.start));
+  return visits([...strength, ...watch]);
+}
+
+type Part = { id: string; type: string; title: string | null; start: string; end: string; duration_min: number; hr_avg?: number | null;
+  hr_max?: number | null; active_kcal_estimate?: number | null; distance_km?: number; working_sets?: number; watch?: unknown };
+type Watch = { hr_avg: number | null; hr_max: number | null; active_kcal_estimate: number | null };
+/** A logged session carries its Watch numbers under `watch`; a Watch workout has them on itself. */
+const nums = (p: Part) => (typeof p.watch === "object" && p.watch ? p.watch as Watch : p);
+const partView = (p: Part) => ({ id: p.id, kind: p.type === "strength" ? "strength" : "cardio", title: p.title, start: p.start, end: p.end,
+  duration_min: p.duration_min, hr_avg: nums(p).hr_avg ?? null, hr_max: nums(p).hr_max ?? null, active_kcal: nums(p).active_kcal_estimate ?? null,
+  distance_km: p.distance_km ?? null, working_sets: p.working_sets ?? null });
+
+/**
+ * Newest first, back-to-back workouts merged into one visit. The visit keeps a member's id (the logged session if any, else
+ * the first Watch workout), so any member's id opens the whole visit; `parts` lists the members when there are several.
+ */
+function visits<T extends Part>(rows: T[]) {
+  const asc = [...rows].sort((x, y) => Date.parse(x.start) - Date.parse(y.start));
+  const groups: T[][] = [];
+  let reach = -Infinity;
+  for (const r of asc) {
+    if (groups.length && Date.parse(r.start) - reach <= VISIT_GAP_MS) { groups.at(-1)!.push(r); reach = Math.max(reach, Date.parse(r.end)); }
+    else { groups.push([r]); reach = Date.parse(r.end); }
+  }
+  return groups.map((g) => {
+    if (g.length === 1) return g[0] as T & { parts?: ReturnType<typeof partView>[] };
+    const lead = g.find((x) => x.type === "strength") ?? g[0];
+    const start = g[0].start, endMs = Math.max(...g.map((x) => Date.parse(x.end))), end = g.find((x) => Date.parse(x.end) === endMs)!.end;
+    const parts = g.map(partView), timed = parts.filter((x) => x.hr_avg != null), mins = timed.reduce((t, x) => t + x.duration_min, 0);
+    const kcal = parts.some((x) => x.active_kcal != null) ? Math.round(parts.reduce((t, x) => t + (x.active_kcal ?? 0), 0)) : null;
+    const km = parts.some((x) => x.distance_km != null) ? round(parts.reduce((t, x) => t + (x.distance_km ?? 0), 0), 2) : null;
+    return { ...lead, title: lead.type === "strength" ? lead.title : g.map((x) => x.title).join(" · "), start, end,
+      duration_min: Math.round((endMs - Date.parse(start)) / 60_000),
+      hr_avg: mins ? Math.round(timed.reduce((t, x) => t + x.hr_avg! * x.duration_min, 0) / mins) : timed[0]?.hr_avg ?? null,
+      hr_max: parts.some((x) => x.hr_max != null) ? Math.round(Math.max(...parts.map((x) => x.hr_max ?? 0))) : null,
+      active_kcal_estimate: kcal, ...(km !== null && { distance_km: km }), parts };
+  }).sort((x, y) => Date.parse(y.start) - Date.parse(x.start));
 }
 
 export function getWorkout(id: string) {

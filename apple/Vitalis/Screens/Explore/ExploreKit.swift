@@ -292,6 +292,8 @@ struct WorkoutHeartChart: View {
     let hr: WorkoutHeart
     /// Seconds from `hr.start` for each working set.
     let sets: [Double]
+    /// Seconds from the start: the Watch workouts inside a visit.
+    var spans: [ClosedRange<Double>] = []
     /// Minutes from the start, as the chart's x.
     @State private var selected: Double?
 
@@ -312,6 +314,9 @@ struct WorkoutHeartChart: View {
         let pick = selected.flatMap { s in pts.min { abs($0.min - s) < abs($1.min - s) } }
         let floor = Double(hr.min) - 6
         Chart {
+            ForEach(Array(spans.enumerated()), id: \.offset) { _, r in
+                RectangleMark(xStart: .value("Start", r.lowerBound / 60), xEnd: .value("End", r.upperBound / 60)).foregroundStyle(VColor.bone.opacity(0.05))
+            }
             line(pts, floor: floor)
             ticks(floor: floor)
             if let pick { callout(pick) }
