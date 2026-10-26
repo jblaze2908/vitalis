@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { addDays, http, ingest, body, payload, tokens } from "./_env.mjs";
+import { addDays, body, call, http, ingest, payload, tokens } from "./_env.mjs";
 import { today } from "../dist/src/time.js";
 
 const ingestToken = tokens.createToken("explore phone", "ingest").token;
@@ -47,6 +47,13 @@ test("a cardio workout carries its heart-rate line; /v2/heart buckets the day an
   assert.deepEqual(again.json.workouts.map((x) => [x.id, x.title]), [["L-1", "Legs"]]);
   const strength = await get("/v2/training/sessions/L-1");
   assert.equal(strength.json.kind, "strength"); assert.equal(strength.json.hr.max, 170);
+
+  // Deleting the session takes its Health twin out of every list instead of leaving it behind as a separate workout.
+  const del = await call(write, "edit_workout", { id: "L-1", delete: true });
+  assert.ok(!del.isError, JSON.stringify(del));
+  assert.deepEqual((await get(`/v2/heart?date=${D}`)).json.workouts, []);
+  const page = await get("/v2/training/sessions");
+  assert.ok(!page.json.sessions.some((x) => x.id === w.uuid || x.id === "L-1"), JSON.stringify(page.json.sessions));
 });
 
 test("/v2/training/exercises lists performed exercises newest first with e1RM; exercise detail has per-session history", async () => {
@@ -59,15 +66,15 @@ test("/v2/training/exercises lists performed exercises newest first with e1RM; e
 
   const r = await get("/v2/training/exercises");
   assert.equal(r.status, 200, r.text);
-  // The first test's linked session logged squats yesterday, so squat is newest.
-  assert.deepEqual(r.json.exercises.map((x) => x.id), ["barbell-squat", "barbell-bench-press-medium-grip"]);
-  const [squat, bench] = r.json.exercises;
+  // The first test's squat session was deleted, so it counts for nothing here.
+  assert.deepEqual(r.json.exercises.map((x) => x.id), ["barbell-bench-press-medium-grip", "barbell-squat"]);
+  const [bench, squat] = r.json.exercises;
   assert.equal(bench.sessions, 2); assert.equal(bench.working_sets, 3); assert.equal(bench.heaviest_kg, 85);
   assert.deepEqual(bench.last_top, { weight_kg: 85, reps: 5 });
   assert.equal(bench.last_day, day(3));
   assert.deepEqual(bench.spark, [93.3, 101.3]);
   assert.equal(bench.e1rm_kg, 101.3); assert.equal(bench.change_8w_kg, 8);
-  assert.equal(squat.sessions, 2); assert.equal(squat.last_day, D);
+  assert.equal(squat.sessions, 1);
 
   const d = await get(`/v2/exercises/${bench.id}`);
   assert.equal(d.status, 200, d.text);

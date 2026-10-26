@@ -4,6 +4,7 @@ import { freshnessBlock } from "./health.js";
 import { baseline, compare, daily, nights } from "./stats.js";
 import { addDays, isoAt, ownerOffsetMin, today } from "./time.js";
 import { heartReadings, ownOrAll, type Reading } from "./hr-readings.js";
+import { LIVE_HK } from "./training.js";
 
 type Bucket = { i: number; n: number; sum: number; lo: number; hi: number };
 /** Fixed-width buckets from `startMs`; empty buckets are left out so a gap in wear stays a gap. */
@@ -47,7 +48,7 @@ export function heartDay(day: string, at = Date.now()) {
   // A Watch workout linked to a logged session opens that session, as in the workout list.
   const workouts = all<{ id: string; name: string; start_ms: number; end_ms: number; hr_avg: number | null; hr_max: number | null }>(
     `SELECT COALESCE(s.id,w.id) id,COALESCE(s.title,w.name) name,w.start_ms,w.end_ms,w.hr_avg,w.hr_max FROM hk_workouts w
-      LEFT JOIN sessions s ON s.hk_workout_uuid=w.id AND s.deleted_at IS NULL WHERE w.start_ms<=? AND w.end_ms>=? ORDER BY w.start_ms`, end, start)
+      LEFT JOIN sessions s ON s.hk_workout_uuid=w.id AND s.deleted_at IS NULL WHERE w.start_ms<=? AND w.end_ms>=? AND ${LIVE_HK} ORDER BY w.start_ms`, end, start)
     .map((w) => ({ id: w.id, title: w.name, start_m: Math.max(0, minuteOf(w.start_ms, start)), end_m: Math.min(1440, minuteOf(w.end_ms, start)),
       avg_bpm: w.hr_avg && Math.round(w.hr_avg), max_bpm: w.hr_max && Math.round(w.hr_max) }));
   const avg = rs.length ? Math.round(rs.reduce((t, r) => t + r.bpm, 0) / rs.length) : null;

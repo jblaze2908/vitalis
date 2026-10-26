@@ -12,6 +12,8 @@ import { round } from "./stats.js";
 export const KINDS = ["warmup", "normal", "drop", "failure"] as const;
 export type Kind = (typeof KINDS)[number];
 export const SESSION_GAP_H = 3;
+/** Filter on `hk_workouts w`: the Health workout a deleted Vitalis session wrote is deleted with it, wherever workouts are listed. */
+export const LIVE_HK = "NOT EXISTS (SELECT 1 FROM sessions d WHERE d.hk_workout_uuid=w.id AND d.deleted_at IS NOT NULL)";
 
 export type SetInput = { id?: string; exercise: string; kind?: Kind; weight_kg?: number | null; reps?: number | null; duration_s?: number | null;
   distance_m?: number | null; rpe?: number | null; rir?: number | null; target_weight_kg?: number | null; target_reps?: number | null;
@@ -185,7 +187,8 @@ export function listWorkouts(from: string, to: string) {
     .filter((v) => v.day >= from && v.day <= to && v.exercises.length > 0);
   const attached = new Set(strength.map((s) => (typeof s.watch === "object" ? s.watch.workout_id : "")));
   // A workout a session links explicitly belongs to that session even when the session falls outside this range.
-  for (const r of all<{ id: string }>("SELECT hk_workout_uuid id FROM sessions WHERE deleted_at IS NULL AND hk_workout_uuid IS NOT NULL")) attached.add(r.id);
+  // Deleted sessions count too, so their Health twin doesn't reappear as a separate workout.
+  for (const r of all<{ id: string }>("SELECT hk_workout_uuid id FROM sessions WHERE hk_workout_uuid IS NOT NULL")) attached.add(r.id);
   const watch = all<{ id: string; name: string; start: string; end: string; day: string; duration_s: number; active_kcal: number | null;
     hr_avg: number | null; hr_max: number | null; distance_km: number | null }>(
     "SELECT id,name,start,end,day,duration_s,active_kcal,hr_avg,hr_max,distance_km FROM hk_workouts WHERE day BETWEEN ? AND ? ORDER BY start_ms DESC", from, to)
@@ -318,7 +321,7 @@ export function daysSinceTrained(day: string) {
 
 export function lastTraining(day: string) {
   const s = one<SessionRow>("SELECT * FROM sessions WHERE deleted_at IS NULL AND started_at <= ? ORDER BY started_at DESC LIMIT 1", dayBounds(day, day)[1]);
-  const w = one<{ id: string; name: string; day: string; start: string; duration_s: number }>("SELECT id,name,day,start,duration_s FROM hk_workouts WHERE day <= ? ORDER BY start_ms DESC LIMIT 1", day);
+  const w = one<{ id: string; name: string; day: string; start: string; duration_s: number }>(`SELECT id,name,day,start,duration_s FROM hk_workouts w WHERE day <= ? AND ${LIVE_HK} ORDER BY start_ms DESC LIMIT 1`, day);
   const sDay = s ? localDay(s.started_at, s.tz_offset_min) : null;
   const strength = s && sDay! <= day ? { id: s.id, title: s.title, day: sDay!, days_ago: Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${sDay}T00:00:00Z`)) / 86_400_000) } : null;
   const watch = w ? { id: w.id, name: w.name, day: w.day, minutes: Math.round(w.duration_s / 60), days_ago: Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${w.day}T00:00:00Z`)) / 86_400_000) } : null;

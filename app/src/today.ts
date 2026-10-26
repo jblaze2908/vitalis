@@ -11,6 +11,7 @@ import { RECOVERY, roundHalfAway } from "./scoring-config.js";
 import { baseline, daily, nights } from "./stats.js";
 import { addDays, isoAt, localDay, ownerOffsetMin, today as todayOf } from "./time.js";
 import { effectiveTargets } from "./targets.js";
+import { LIVE_HK } from "./training.js";
 
 const MIN = 60_000;
 const DIGEST_SETTLE_MIN = 30;
@@ -142,7 +143,7 @@ export function digestBody(day: string, at = Date.now()) {
   const tint = (k: string) => ((part(k)?.score ?? 100) < 70 ? "watch" : null);
   const cons = part("consistency"), eff = part("efficiency"), wake = part("wakeups");
   const yesterday = addDays(day, -1), ys = strengthOn(yesterday).at(-1);
-  const yw = ys ? null : one<{ id: string; name: string }>("SELECT id,name FROM hk_workouts WHERE day=? ORDER BY start_ms DESC LIMIT 1", yesterday);
+  const yw = ys ? null : one<{ id: string; name: string }>(`SELECT id,name FROM hk_workouts w WHERE day=? AND ${LIVE_HK} ORDER BY start_ms DESC LIMIT 1`, yesterday);
   const plan: { kind: string; title: string; reason: string; primary: boolean }[] = [];
   const action = a.v.action;
   if (action.kind === "start_workout") {

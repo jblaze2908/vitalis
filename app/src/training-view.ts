@@ -7,7 +7,7 @@ import { freshnessBlock } from "./health.js";
 import { ApiError } from "./http.js";
 import { effectiveTargets } from "./targets.js";
 import { addDays, isoAt, ownerOffsetMin, today } from "./time.js";
-import { e1rm, liveSets, listWorkouts, sessionView, type SessionRow, type SetRow } from "./training.js";
+import { e1rm, LIVE_HK, liveSets, listWorkouts, sessionView, type SessionRow, type SetRow } from "./training.js";
 import { SLUGS, sessionHeat, weekStartOf, weeklySets, type TrainingSet } from "./training-analytics.js";
 import { dateLabel } from "./today.js";
 import { workoutHeart } from "./heart.js";
@@ -85,7 +85,7 @@ export function trainingWeek(dayInWeek: string, at = Date.now()) {
     sessions: list.map(sessionRow),
     // Apple Watch workouts count: the empty state has no history list, so it must never hide one.
     empty: !one("SELECT 1 FROM sessions s WHERE s.deleted_at IS NULL AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL)")
-      && !one("SELECT 1 FROM hk_workouts LIMIT 1"),
+      && !one(`SELECT 1 FROM hk_workouts w WHERE ${LIVE_HK} LIMIT 1`),
     freshness: freshnessBlock(at),
   };
 }
