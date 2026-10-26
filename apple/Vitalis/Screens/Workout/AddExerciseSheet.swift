@@ -18,36 +18,37 @@ struct AddExerciseSheet: View {
         SheetChrome {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Button { dismiss() } label: { MonoLabel("Cancel", tint: .bone).frame(minHeight: 44) }.buttonStyle(.plain)
+                    Button { dismiss() } label: { Text("Cancel").vText(.body).frame(minHeight: 44) }.buttonStyle(.plain)
                     Spacer()
-                    Text("Add exercise").vHeadline(22)
+                    Text("Add exercise").vText(.title)
                     Spacer()
-                    MonoLabel("Cancel").hidden()
+                    Text("Cancel").vText(.body).hidden()
                 }
-                .padding(.top, 10)
-                TextField("", text: $query, prompt: Text("Search exercises").foregroundStyle(VColor.steel))
+                .padding(.top, VSpace.s2)
+                TextField("", text: $query, prompt: Text("Search exercises").foregroundStyle(VColor.text3))
                     .focused($searching)
-                    .vReading(14)
+                    .vText(.body)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, VSpace.s4)
                     .frame(height: VSpace.buttonHeight)
-                    .overlay(RoundedRectangle(cornerRadius: VRadius.button, style: .continuous).inset(by: 0.75).stroke(VColor.future, lineWidth: 1.5))
-                    .padding(.top, VSpace.sectionPad)
-                if let note { MonoLabel(note, tint: .watch).padding(.top, VSpace.sectionPad) }
+                    .background(VColor.surface, in: RoundedRectangle(cornerRadius: VRadius.inner, style: .continuous))
+                    .padding(.top, VSpace.s3)
+                if let note { Text(note).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s3) }
                 ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(results, id: \.id) { e in
-                            Button { pick(e); dismiss() } label: { row(e) }.buttonStyle(.plain)
-                            Rule()
+                    if !results.isEmpty {
+                        ListCard {
+                            ForEach(results, id: \.id) { e in
+                                Button { pick(e); dismiss() } label: { row(e) }.buttonStyle(.plain)
+                            }
                         }
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .padding(.top, VSpace.sectionPad)
+                .padding(.top, VSpace.s3)
             }
-            .padding(.horizontal, VSpace.gutter)
+            .gutter()
         }
         .presentationDetents([.large])
         .onAppear { searching = true }
@@ -59,14 +60,9 @@ struct AddExerciseSheet: View {
     }
 
     private func row(_ e: ExerciseInfo) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(e.name).vHeadline(20).lineLimit(1).minimumScaleFactor(0.7)
-            MonoLabel([e.equipment, e.primary.joined(separator: ", ")].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "), size: .small)
-        }
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        ListRow(e.name, subtitle: [e.equipment?.capitalized, e.primary.map(TrainCopy.name).joined(separator: ", ")].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+                chevron: false)
+            .accessibilityAddTraits(.isButton)
     }
 
     private func search(_ q: String) async {

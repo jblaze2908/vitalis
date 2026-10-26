@@ -4,39 +4,43 @@ import VitalisKit
 import VitalisUI
 
 /// Every pushed screen: a pinned back + title bar over a scrolling body, so the way back never scrolls away.
+/// Content sits on the 16 gutter; pull to refresh reloads the screen's read.
 struct DetailScaffold<Content: View, Trailing: View>: View {
     let title: String
     let subtitle: String?
+    let refresh: () async -> Void
     let trailing: Trailing
     let content: Content
     @Environment(\.dismiss) private var dismiss
     @Environment(Router.self) private var router: Router?
 
-    init(_ title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing = { EmptyView() }, @ViewBuilder content: () -> Content) {
-        self.title = title; self.subtitle = subtitle; self.trailing = trailing(); self.content = content()
+    init(_ title: String, subtitle: String? = nil, refresh: @escaping () async -> Void,
+         @ViewBuilder trailing: () -> Trailing = { EmptyView() }, @ViewBuilder content: () -> Content) {
+        self.title = title; self.subtitle = subtitle; self.refresh = refresh; self.trailing = trailing(); self.content = content()
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
+            HStack(spacing: VSpace.s1) {
                 Button { dismiss() } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold)).foregroundStyle(VColor.bone)
+                    Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold)).foregroundStyle(VColor.text)
                         .frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).accessibilityLabel("Back")
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).vUI(17, weight: 700).lineLimit(1).minimumScaleFactor(0.8)
-                    if let subtitle { Text(subtitle).vUI(12, weight: 500, color: VColor.muted).lineLimit(1) }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).vText(.title).lineLimit(1).minimumScaleFactor(0.8)
+                    if let subtitle { Text(subtitle).vText(.secondary).lineLimit(1) }
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: VSpace.s2)
                 trailing
             }
-            .padding(.horizontal, 6).padding(.top, 4).padding(.bottom, 6)
+            .padding(.leading, VSpace.s1).padding(.trailing, VSpace.edge).padding(.top, VSpace.s1).padding(.bottom, VSpace.s2)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) { content }
-                    .padding(.horizontal, 16).padding(.bottom, 32)
+                    .padding(.horizontal, VSpace.edge).padding(.bottom, VSpace.s6)
             }
             .scrollIndicators(.hidden)
+            .refreshable { await refresh() }
         }
         .toolbar(.hidden, for: .navigationBar)
         .vScreen()
@@ -45,63 +49,54 @@ struct DetailScaffold<Content: View, Trailing: View>: View {
     }
 }
 
-/// Section caption inside a detail screen, matching the tabs' `vLabel` captions.
+/// `SectionLabel` inside a detail screen or sheet, whose content already sits on the gutter.
 struct DetailSection: View {
     let title: String
     let trailing: String?
     init(_ title: String, trailing: String? = nil) { self.title = title; self.trailing = trailing }
-    var body: some View {
-        HStack { Text(title).vLabel(); Spacer(); if let trailing { Text(trailing).vLabel() } }
-            .padding(.top, 22).padding(.bottom, 8)
-    }
+    var body: some View { SectionLabel(title, note: trailing).padding(.horizontal, -VSpace.edge) }
 }
 
-/// A card row that pushes a detail: title, value, a chevron. One look for every "go deeper" in the app.
-struct DrillRow<Leading: View>: View {
-    let route: Detail
-    let leading: Leading
+/// A `ListRow` that pushes a detail. One look for every "go deeper" in the app.
+struct DrillRow<Accessory: View>: View {
+    let title: String
+    let subtitle: String?
     let value: String?
-    init(_ route: Detail, value: String? = nil, @ViewBuilder leading: () -> Leading) { self.route = route; self.value = value; self.leading = leading() }
+    let route: Detail
+    let accessory: Accessory
+
+    init(_ title: String, subtitle: String? = nil, value: String? = nil, route: Detail, @ViewBuilder accessory: () -> Accessory) {
+        self.title = title; self.subtitle = subtitle; self.value = value; self.route = route; self.accessory = accessory()
+    }
+
     var body: some View {
-        NavigationLink(value: route) {
-            HStack(spacing: 10) {
-                leading
-                Spacer(minLength: 8)
-                if let value { Text(value).vUI(14, weight: 500, color: VColor.muted).lineLimit(1) }
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color(hex: 0x5A5A5A))
-            }
-            .padding(.vertical, 13).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        NavigationLink(value: route) { ListRow(title, subtitle: subtitle, value: value) { accessory } }
+            .buttonStyle(.plain)
     }
 }
 
-struct DrillTitle: View {
-    let text: String
-    var body: some View { Text(text).vUI(15, weight: 500) }
-}
-
-extension DrillRow where Leading == DrillTitle {
-    init(_ title: String, route: Detail, value: String? = nil) {
-        self.init(route, value: value) { DrillTitle(text: title) }
+extension DrillRow where Accessory == EmptyView {
+    init(_ title: String, subtitle: String? = nil, value: String? = nil, route: Detail) {
+        self.init(title, subtitle: subtitle, value: value, route: route) { EmptyView() }
     }
 }
 
-/// Rows separated by the card hairline, inside one card.
-struct RowsCard<Content: View>: View {
-    let content: Content
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
+extension View {
+    /// The one 16 gutter for anything that doesn't carry its own (headers and section labels do).
+    func gutter() -> some View { padding(.horizontal, VSpace.edge) }
+}
+
+/// A tab's headline under its header: one `.display` line per string.
+struct TabHeadline: View {
+    let lines: [String]
+    var color: Color? = nil
     var body: some View {
-        VCard(padding: EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)) {
-            VStack(spacing: 0) {
-                Group(subviews: content) { subviews in
-                    ForEach(Array(subviews.enumerated()), id: \.offset) { i, v in
-                        if i > 0 { Rectangle().fill(VColor.hairline).frame(height: 1) }
-                        v
-                    }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line).vText(.display, color: color).lineLimit(1).minimumScaleFactor(0.7)
             }
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -158,20 +153,46 @@ enum MetricFormat {
         default: return ("Usual", .usual)
         }
     }
+
+    /// Axis tick text: whole numbers bare, otherwise one decimal.
+    static func axis(_ v: Double) -> String {
+        abs(v - v.rounded()) < 0.001 ? String(Int(v.rounded())) : String(format: "%.1f", v)
+    }
 }
 
 // MARK: Charts
 
-/// Shared chart styling: dark hairline grid, mono axis labels, the scrub rule in bone.
-private extension View {
-    func vChartStyle() -> some View {
+/// Shared chart rules: `grid` lines, `.axis` labels in a right-hand lane 8 from the plot, x labels 8 below it.
+extension View {
+    func vChartYAxis(count: Int = 3) -> some View {
         chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(Color(hex: 0x1C1C1C))
-                AxisValueLabel().font(VFont.mono(10, weight: 600)).foregroundStyle(Color(hex: 0x6E6E6E))
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: count)) { v in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(VColor.grid)
+                AxisValueLabel(horizontalSpacing: VSpace.s2) {
+                    if let d = v.as(Double.self) ?? v.as(Int.self).map(Double.init) { Text(MetricFormat.axis(d)).vText(.axis) }
+                }
             }
         }
     }
+
+    func vChartDateAxis(_ format: Date.FormatStyle, count: Int = 4) -> some View {
+        chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: count)) { v in
+                AxisValueLabel(verticalSpacing: VSpace.s2) { if let d = v.as(Date.self) { Text(d, format: format).vText(.axis) } }
+            }
+        }
+    }
+
+    /// The empty state laid over a chart with nothing to draw.
+    func chartEmpty(_ isEmpty: Bool, _ text: String) -> some View {
+        overlay { if isEmpty { Text(text).vText(.secondary) } }
+    }
+}
+
+/// The value under the finger: a rule and one `ChartCallout` above the plot.
+private func calloutRule<X: Plottable>(_ x: PlottableValue<X>, _ text: String) -> some ChartContent {
+    RuleMark(x: x).foregroundStyle(VColor.chevron).lineStyle(StrokeStyle(lineWidth: 1))
+        .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) { ChartCallout(text) }
 }
 
 /// One metric across days or weeks: line + points, the usual range as a band, per-day min–max where the server sends it.
@@ -193,7 +214,7 @@ struct HistoryChart: View {
             if let u = history.usual, let from = TrainFormat.day(history.from), let to = TrainFormat.day(history.to) {
                 RectangleMark(xStart: .value("From", from), xEnd: .value("To", to.addingTimeInterval(86_400)),
                               yStart: .value("Low", u.low), yEnd: .value("High", u.high))
-                    .foregroundStyle(Color.white.opacity(0.06))
+                    .foregroundStyle(VColor.range)
             }
             ForEach(history.band ?? [], id: \.day) { b in
                 if let d = TrainFormat.day(b.day), let lo = b.lo, let hi = b.hi {
@@ -210,22 +231,15 @@ struct HistoryChart: View {
                 }
             }
             if let pick {
-                RuleMark(x: .value("Day", pick.date, unit: .day)).foregroundStyle(VColor.bone.opacity(0.4)).lineStyle(StrokeStyle(lineWidth: 1))
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        ChartCallout("\(MetricFormat.day(pick.id, history.every == "week" ? "'Week of' d MMM" : "EEE d MMM")) · \(MetricFormat.value(pick.value, unit: history.unit))")
-                    }
+                calloutRule(.value("Day", pick.date, unit: .day),
+                            "\(MetricFormat.day(pick.id, history.every == "week" ? "'Week of' d MMM" : "EEE d MMM")) · \(MetricFormat.value(pick.value, unit: history.unit))")
             }
         }
         .chartXSelection(value: $selected)
         .chartYScale(domain: .automatic(includesZero: false))
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisValueLabel(format: history.days <= 7 ? .dateTime.weekday(.abbreviated) : .dateTime.day().month(.abbreviated))
-                    .font(VFont.mono(10, weight: 600)).foregroundStyle(Color(hex: 0x6E6E6E))
-            }
-        }
-        .vChartStyle()
-        .overlay { if pts.isEmpty { Text("Nothing recorded in this range").vUI(13, weight: 500, color: VColor.muted) } }
+        .vChartDateAxis(history.days <= 7 ? .dateTime.weekday(.abbreviated) : .dateTime.day().month(.abbreviated))
+        .vChartYAxis()
+        .chartEmpty(pts.isEmpty, "Nothing recorded in this range")
         .accessibilityLabel("\(history.name), \(pts.count) readings")
     }
 }
@@ -242,24 +256,21 @@ struct HeartDayChart: View {
                 RectangleMark(xStart: .value("Start", s.startM), xEnd: .value("End", s.endM)).foregroundStyle(VColor.sleepCore.opacity(0.12))
             }
             ForEach(day.workouts, id: \.id) { w in
-                RectangleMark(xStart: .value("Start", w.startM), xEnd: .value("End", max(w.endM, w.startM + 5))).foregroundStyle(VColor.pulse.opacity(0.14))
+                RectangleMark(xStart: .value("Start", w.startM), xEnd: .value("End", max(w.endM, w.startM + 5))).foregroundStyle(VColor.accent.opacity(0.14))
             }
             ForEach(Array(segments.enumerated()), id: \.offset) { _, seg in
                 ForEach(seg, id: \.m) { p in
                     AreaMark(x: .value("Minute", p.m), yStart: .value("Low", p.lo), yEnd: .value("High", p.hi), series: .value("Run", seg.first?.m ?? 0))
-                        .foregroundStyle(VColor.pulse.opacity(0.18)).interpolationMethod(.monotone)
+                        .foregroundStyle(VColor.accent.opacity(0.18)).interpolationMethod(.monotone)
                     LineMark(x: .value("Minute", p.m), y: .value("BPM", p.avg), series: .value("Run", seg.first?.m ?? 0))
-                        .foregroundStyle(VColor.pulse).lineStyle(StrokeStyle(lineWidth: 1.6, lineCap: .round)).interpolationMethod(.monotone)
+                        .foregroundStyle(VColor.accent).lineStyle(StrokeStyle(lineWidth: 1.6, lineCap: .round)).interpolationMethod(.monotone)
                 }
             }
             if let now = day.nowM {
-                RuleMark(x: .value("Now", now)).foregroundStyle(Color(hex: 0x4A4A4A)).lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                RuleMark(x: .value("Now", now)).foregroundStyle(VColor.dashed).lineStyle(StrokeStyle(lineWidth: 1))
             }
             if let pick {
-                RuleMark(x: .value("Minute", pick.m)).foregroundStyle(VColor.bone.opacity(0.4))
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        ChartCallout("\(MetricFormat.clock(minute: pick.m)) · \(pick.avg) bpm" + (pick.hi > pick.lo ? " (\(pick.lo)–\(pick.hi))" : ""))
-                    }
+                calloutRule(.value("Minute", pick.m), "\(MetricFormat.clock(minute: pick.m)) · \(pick.avg) bpm" + (pick.hi > pick.lo ? " (\(pick.lo)–\(pick.hi))" : ""))
             }
         }
         .chartXScale(domain: 0...1440)
@@ -267,13 +278,12 @@ struct HeartDayChart: View {
         .chartYScale(domain: .automatic(includesZero: false))
         .chartXAxis {
             AxisMarks(values: [0, 360, 720, 1080, 1440]) { v in
-                AxisGridLine().foregroundStyle(Color(hex: 0x161616))
-                AxisValueLabel { if let m = v.as(Int.self) { Text(MetricFormat.clock(minute: m == 1440 ? 0 : m)) } }
-                    .font(VFont.mono(10, weight: 600)).foregroundStyle(Color(hex: 0x6E6E6E))
+                AxisGridLine().foregroundStyle(VColor.grid)
+                AxisValueLabel(verticalSpacing: VSpace.s2) { if let m = v.as(Int.self) { Text(MetricFormat.clock(minute: m == 1440 ? 0 : m)).vText(.axis) } }
             }
         }
-        .vChartStyle()
-        .overlay { if day.points.isEmpty { Text("No heart rate recorded").vUI(13, weight: 500, color: VColor.muted) } }
+        .vChartYAxis()
+        .chartEmpty(day.points.isEmpty, "No heart rate recorded")
         .accessibilityLabel("Heart rate across the day")
     }
 
@@ -315,48 +325,40 @@ struct WorkoutHeartChart: View {
         let floor = Double(hr.min) - 6
         Chart {
             ForEach(Array(spans.enumerated()), id: \.offset) { _, r in
-                RectangleMark(xStart: .value("Start", r.lowerBound / 60), xEnd: .value("End", r.upperBound / 60)).foregroundStyle(VColor.bone.opacity(0.05))
+                RectangleMark(xStart: .value("Start", r.lowerBound / 60), xEnd: .value("End", r.upperBound / 60)).foregroundStyle(VColor.surface2)
             }
             line(pts, floor: floor)
             ticks(floor: floor)
-            if let pick { callout(pick) }
+            if let pick { calloutRule(.value("Time", pick.min), "\(TrainFormat.elapsed(pick.min * 60)) · \(Int(pick.bpm)) bpm") }
         }
         .chartXSelection(value: $selected)
         .chartYScale(domain: floor...(Double(hr.max) + 6))
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { v in
-                AxisValueLabel { if let m = v.as(Double.self) { Text("\(Int(m))m") } }
-                    .font(VFont.mono(10, weight: 600)).foregroundStyle(Color(hex: 0x6E6E6E))
+                AxisValueLabel(verticalSpacing: VSpace.s2) { if let m = v.as(Double.self) { Text("\(Int(m))m").vText(.axis) } }
             }
         }
-        .vChartStyle()
+        .vChartYAxis()
         .accessibilityLabel("Heart rate during the workout, \(hr.min) to \(hr.max) beats per minute")
     }
 
     @ChartContentBuilder private func line(_ pts: [P], floor: Double) -> some ChartContent {
-        let fill = LinearGradient(colors: [VColor.pulse.opacity(0.22), VColor.pulse.opacity(0.02)], startPoint: .top, endPoint: .bottom)
+        let fill = LinearGradient(colors: [VColor.accent.opacity(0.22), VColor.accent.opacity(0.02)], startPoint: .top, endPoint: .bottom)
         ForEach(pts) { p in
             AreaMark(x: .value("Time", p.min), yStart: .value("Floor", floor), yEnd: .value("BPM", p.bpm), series: .value("Run", p.run))
                 .foregroundStyle(fill).interpolationMethod(.monotone)
         }
         ForEach(pts) { p in
             LineMark(x: .value("Time", p.min), y: .value("BPM", p.bpm), series: .value("Run", p.run))
-                .foregroundStyle(VColor.pulse).lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round)).interpolationMethod(.monotone)
+                .foregroundStyle(VColor.accent).lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round)).interpolationMethod(.monotone)
         }
     }
 
     @ChartContentBuilder private func ticks(floor: Double) -> some ChartContent {
         ForEach(Array(sets.enumerated()), id: \.offset) { _, s in
             RuleMark(x: .value("Set", s / 60), yStart: .value("Floor", floor), yEnd: .value("Tick", floor + 4))
-                .foregroundStyle(VColor.bone.opacity(0.7)).lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                .foregroundStyle(VColor.text2).lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
         }
-    }
-
-    private func callout(_ p: P) -> some ChartContent {
-        RuleMark(x: .value("Time", p.min)).foregroundStyle(VColor.bone.opacity(0.4))
-            .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                ChartCallout("\(TrainFormat.elapsed(p.min * 60)) · \(Int(p.bpm)) bpm")
-            }
     }
 }
 
@@ -371,25 +373,18 @@ struct E1RMHistoryChart: View {
         Chart {
             ForEach(pts, id: \.0.day) { p, d in
                 LineMark(x: .value("Day", d, unit: .day), y: .value("kg", p.kg))
-                    .foregroundStyle(VColor.bone).lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round)).interpolationMethod(.monotone)
+                    .foregroundStyle(VColor.text).lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round)).interpolationMethod(.monotone)
                 PointMark(x: .value("Day", d, unit: .day), y: .value("kg", p.kg))
-                    .symbolSize(p.day == pts.last?.0.day ? 44 : 18).foregroundStyle(p.day == pts.last?.0.day ? VColor.pulse : VColor.bone)
+                    .symbolSize(p.day == pts.last?.0.day ? 44 : 18).foregroundStyle(p.day == pts.last?.0.day ? VColor.accent : VColor.text)
             }
             if let p = pick?.0, let d = pick?.1 {
-                RuleMark(x: .value("Day", d, unit: .day)).foregroundStyle(VColor.bone.opacity(0.4))
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        ChartCallout("\(MetricFormat.day(p.day, "EEE d MMM")) · \(TrainFormat.kg(p.kg)) kg")
-                    }
+                calloutRule(.value("Day", d, unit: .day), "\(MetricFormat.day(p.day, "EEE d MMM")) · \(TrainFormat.kg(p.kg)) kg")
             }
         }
         .chartXSelection(value: $selected)
         .chartYScale(domain: .automatic(includesZero: false))
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisValueLabel(format: .dateTime.day().month(.abbreviated)).font(VFont.mono(10, weight: 600)).foregroundStyle(Color(hex: 0x6E6E6E))
-            }
-        }
-        .vChartStyle()
-        .overlay { if pts.isEmpty { Text("No estimate in 12 weeks").vUI(13, weight: 500, color: VColor.muted) } }
+        .vChartDateAxis(.dateTime.day().month(.abbreviated))
+        .vChartYAxis()
+        .chartEmpty(pts.isEmpty, "No estimate in 12 weeks")
     }
 }
