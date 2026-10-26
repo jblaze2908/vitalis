@@ -55,6 +55,7 @@ public struct APIRequest: Codable, Sendable, Equatable {
     public static func deleteWeight(id: String) -> APIRequest { APIRequest(method: "DELETE", path: "v2/weight/\(seg(id))") }
     public static func createExercise(_ exercise: NewExercise) throws -> APIRequest { try json("POST", "v2/exercises", exercise) }
     public static func postWorkout(_ workout: WorkoutUpsert) throws -> APIRequest { try json("POST", "v2/workouts", workout) }
+    public static func patchSet(id: String, _ patch: SetPatch) throws -> APIRequest { try json("PATCH", "v2/sets/\(seg(id))", patch) }
     public static func postFoodEntries(_ entries: [FoodEntry]) throws -> APIRequest {
         try json("POST", "v2/food/entries", FoodEntriesRequest(entries: entries))
     }

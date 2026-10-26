@@ -15,6 +15,9 @@ struct LiveWorkoutScreen: View {
     @State private var finishing = false
     @State private var naming = false
     @State private var name = ""
+    @State private var editing: EditingSet?
+
+    struct EditingSet: Identifiable { let id: UUID; let title: String }
 
     init() { self.init(store: .shared, train: .shared) }
     init(store: LiveSessionStore, train: TrainStore) { self.store = store; self.train = train }
@@ -33,8 +36,16 @@ struct LiveWorkoutScreen: View {
             }
             .vScreen()
         }
-        .sensoryFeedback(.success, trigger: store.session?.sets.count ?? 0) { old, new in new > old }
+        .sensoryFeedback(.success, trigger: store.session?.loggedSets.count ?? 0) { old, new in new > old }
         .task { await store.prepare() }
+        .sheet(item: $editing) { t in
+            if let set = store.loggedSet(t.id) {
+                SetEditSheet(title: t.title, initial: SetEdit(exerciseID: set.exercise, exerciseName: store.session?.exercises.first { $0.id == set.exercise }?.name
+                                                              ?? LiveSessionStore.displayName(set.exercise), kind: set.kind,
+                                                              weight: TrainFormat.kg(set.weightKg, empty: ""), reps: set.reps.map(String.init) ?? "", note: set.note ?? ""),
+                             save: { e in Task { await store.editLogged(t.id, e) } }, delete: { Task { await store.deleteLogged(t.id) } })
+            }
+        }
         .sheet(isPresented: $addingExercise) {
             AddExerciseSheet(api: Services.shared.api) { info in
                 store.addExercise(id: info.id, name: info.name)
@@ -68,7 +79,11 @@ struct LiveWorkoutScreen: View {
                             rest(s, now: tick.date)
                         }
                     }
-                    if let ex = s.current { CurrentExercise(store: store, exercise: ex, index: s.currentIndex, readOnly: readOnly, focus: $focus) }
+                    if let ex = s.current {
+                        CurrentExercise(store: store, exercise: ex, index: s.currentIndex, readOnly: readOnly, focus: $focus) { id, label in
+                            focus = nil; editing = EditingSet(id: id, title: "Set \(label)")
+                        }
+                    }
                     others(s)
                 }
                 .gutter()
@@ -77,7 +92,11 @@ struct LiveWorkoutScreen: View {
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .overlay(alignment: .bottom) {
-                if !readOnly && focus == nil {
+                if let undo = store.undo {
+                    Toast(undo.text) { Task { await store.undoDelete() } }
+                        .padding(.bottom, VSpace.s6)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if !readOnly && focus == nil {
                     SecondaryButton("+ Add exercise", size: .full) { addingExercise = true }
                         .background(VColor.ground)
                         .gutter()
@@ -86,8 +105,9 @@ struct LiveWorkoutScreen: View {
             }
         }
         .ignoresSafeArea(.container, edges: .bottom)
-        .confirmationDialog(s.sets.isEmpty ? "Nothing logged yet" : "Finish \(s.title)?", isPresented: $confirmFinish, titleVisibility: .visible) {
-            if s.sets.isEmpty {
+        .animation(.easeOut(duration: 0.2), value: store.undo)
+        .confirmationDialog(s.loggedSets.isEmpty ? "Nothing logged yet" : "Finish \(s.title)?", isPresented: $confirmFinish, titleVisibility: .visible) {
+            if s.loggedSets.isEmpty {
                 Button("Discard workout", role: .destructive) { store.discard(); router.showsLiveWorkout = false }
             } else {
                 Button("Finish and save") { Task { await finish() } }
@@ -105,7 +125,7 @@ struct LiveWorkoutScreen: View {
     }
 
     private func header(_ s: LiveSession, now: Date) -> some View {
-        let logged = s.sets.count + (s.watchSets?.count ?? 0)
+        let logged = s.loggedSets.count + (s.watchSets?.count ?? 0)
         let context = "\(TrainFormat.elapsed(now.timeIntervalSince(s.startedAt))) · \(logged) of \(max(s.plannedSets, logged)) sets"
         return VStack(alignment: .leading, spacing: VSpace.s1) {
             Text(context).vText(.secondary)
@@ -126,7 +146,7 @@ struct LiveWorkoutScreen: View {
                 SecondaryButton("Finish", enabled: !finishing) {
                     focus = nil
                     // An unnamed workout can't be offered again, so ask for a name once at the end.
-                    if s.title == "Workout", !s.sets.isEmpty { name = ""; naming = true } else { confirmFinish = true }
+                    if s.title == "Workout", !s.loggedSets.isEmpty { name = ""; naming = true } else { confirmFinish = true }
                 }
             }
     }
@@ -203,6 +223,8 @@ struct CurrentExercise: View {
     let index: Int
     let readOnly: Bool
     var focus: FocusState<SetField?>.Binding
+    /// Opens the edit sheet for a logged set (its id and row label).
+    let edit: (UUID, String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -218,8 +240,11 @@ struct CurrentExercise: View {
                     let current = exercise.pendingRowIndex
                     ForEach(Array(exercise.rows.enumerated()), id: \.element.id) { i, row in
                         Hairline()
+                        let editable = row.isDone && !readOnly && row.byWatch != true
                         SetRowView(store: store, row: row, exerciseIndex: index, label: label(i),
-                                   state: row.isDone ? .done : i == current ? .current : .upcoming, readOnly: readOnly || row.byWatch == true, focus: focus)
+                                   state: row.isDone ? .done : i == current ? .current : .upcoming, readOnly: readOnly || row.byWatch == true, focus: focus,
+                                   edit: editable ? { row.loggedID.map { edit($0, label(i)) } } : nil,
+                                   delete: editable ? { row.loggedID.map { id in Task { await store.deleteLogged(id) } } } : nil)
                     }
                     Hairline()
                     Button { store.addSet(to: index) } label: {
@@ -268,13 +293,23 @@ struct SetRowView: View {
     let state: Phase
     let readOnly: Bool
     var focus: FocusState<SetField?>.Binding
+    /// Set on a logged set: tapping its number or last-time column opens the edit sheet.
+    var edit: (() -> Void)? = nil
+    var delete: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: SetGrid.gap) {
-            Text(label).vText(.headline, color: state == .current ? VColor.accent : textColor).frame(width: SetGrid.set)
-            Text(row.last ?? TrainFormat.dash).vText(.body, color: state == .current ? VColor.text : textColor)
-                .lineLimit(1).minimumScaleFactor(0.7)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let edit, let delete {
+                Button(action: edit) { identity }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Edit or delete this set")
+                    .contextMenu {
+                        Button(action: edit) { Label("Edit set", systemImage: "pencil") }
+                        Button(role: .destructive, action: delete) { Label("Delete set", systemImage: "trash") }
+                    }
+            } else {
+                identity
+            }
             field(.weight(row.id), text: row.weight, keyboard: .decimalPad, width: SetGrid.kg) {
                 store.setWeight($0, row: row.id, in: exerciseIndex)
             }
@@ -286,6 +321,17 @@ struct SetRowView: View {
         .frame(minHeight: 46)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Set \(label)")
+    }
+
+    /// Set number and last time; the tap target for editing a logged set.
+    private var identity: some View {
+        HStack(spacing: SetGrid.gap) {
+            Text(label).vText(.headline, color: state == .current ? VColor.accent : textColor).frame(width: SetGrid.set)
+            Text(row.last ?? TrainFormat.dash).vText(.body, color: state == .current ? VColor.text : textColor)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minHeight: 44).contentShape(Rectangle())
     }
 
     private var textColor: Color { state == .done ? VColor.text2 : VColor.text3 }

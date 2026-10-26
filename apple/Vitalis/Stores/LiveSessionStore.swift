@@ -13,6 +13,11 @@ struct LoggedSet: Codable, Equatable, Sendable, Identifiable {
     var targetWeightKg: Double?
     var targetReps: Int?
     var performedAt: Date
+    var note: String?
+    /// Kept after a delete so the next post tells the server, and Undo can bring it back.
+    var deleted: Bool?
+
+    var isLive: Bool { deleted != true }
 }
 
 /// One line of the set table: prefill text until it is ticked, then it points at its `LoggedSet`.
@@ -65,6 +70,8 @@ struct LiveSession: Codable, Equatable, Sendable {
     var watchSets: [LoggedSet]?
 
     var isJoined: Bool { joinedWatch == true }
+    /// Logged on this phone and not deleted.
+    var loggedSets: [LoggedSet] { sets.filter(\.isLive) }
     var current: LiveExercise? { exercises.indices.contains(currentIndex) ? exercises[currentIndex] : nil }
     var plannedSets: Int { exercises.reduce(0) { $0 + $1.rows.count } }
 }
@@ -121,6 +128,17 @@ final class LiveSessionStore {
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let timeZone: TimeZone
     @ObservationIgnored private var editedSinceUpsert = false
+    /// The last deleted set and where its row was, while the Undo toast shows.
+    private(set) var undo: DeletedSet?
+    @ObservationIgnored private var undoTask: Task<Void, Never>?
+
+    struct DeletedSet: Equatable {
+        let setID: UUID
+        let exerciseID: String
+        let row: SetRow
+        let rowIndex: Int
+        let text: String
+    }
 
     init(fileURL: URL?, api: @escaping @MainActor () -> VitalisAPI?, send: @escaping @MainActor (APIRequest) async -> Void,
          health: HealthWriting, now: @escaping () -> Date = Date.init, timeZone: TimeZone = .current) {
@@ -193,7 +211,7 @@ final class LiveSessionStore {
 
     private func shareWithWatch() {
         guard let s = session, s.isJoined else { return }
-        sendToWatch?(WatchPhoneSets(sessionID: s.id, sets: s.sets.map {
+        sendToWatch?(WatchPhoneSets(sessionID: s.id, sets: s.loggedSets.map {
             VitalisKit.LoggedSet(id: $0.id, exerciseID: $0.exercise, kind: $0.kind == "warmup" ? .warmup : .normal,
                                  weightKg: $0.weightKg, reps: $0.reps, performedAt: $0.performedAt)
         }))
@@ -306,6 +324,83 @@ final class LiveSessionStore {
         shareWithWatch()
     }
 
+    func loggedSet(_ id: UUID) -> LoggedSet? { session?.sets.first { $0.id == id && $0.isLive } }
+
+    /// Any logged set, including one moved to another exercise; the row moves with it, in time order.
+    func editLogged(_ id: UUID, _ e: SetEdit) async {
+        guard var s = session, let k = s.sets.firstIndex(where: { $0.id == id && $0.isLive }) else { return }
+        let from = s.sets[k].exercise
+        s.sets[k].exercise = e.exerciseID
+        s.sets[k].kind = e.kind
+        s.sets[k].weightKg = e.weightKg
+        s.sets[k].reps = e.repsValue
+        s.sets[k].note = e.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : e.note
+        if let i = s.exercises.firstIndex(where: { $0.id == from }), let r = s.exercises[i].rows.firstIndex(where: { $0.loggedID == id }) {
+            var row = s.exercises[i].rows[r]
+            row.weight = e.weight; row.reps = e.reps; row.kind = e.kind
+            if from == e.exerciseID { s.exercises[i].rows[r] = row } else {
+                s.exercises[i].rows.remove(at: r)
+                row.last = nil
+                let j = s.exercises.firstIndex(where: { $0.id == e.exerciseID }) ?? {
+                    s.exercises.append(LiveExercise(id: e.exerciseID, name: e.exerciseName, best: nil, rows: []))
+                    return s.exercises.count - 1
+                }()
+                let at = Dictionary(s.sets.map { ($0.id, $0.performedAt) }, uniquingKeysWith: { a, _ in a })
+                let mine = at[id] ?? .distantFuture
+                let slot = s.exercises[j].rows.prefix { r in r.loggedID.flatMap { at[$0] }.map { $0 < mine } ?? false }.count
+                s.exercises[j].rows.insert(row, at: slot)
+            }
+        }
+        session = s
+        persist()
+        await upsert()
+        shareWithWatch()
+        if from != e.exerciseID, session?.exercises.first(where: { $0.id == e.exerciseID })?.prefilled == false { await prefill(e.exerciseID) }
+    }
+
+    /// Soft delete: the set travels as a deletion marker so the server drops it; Undo within 5 s brings it back.
+    func deleteLogged(_ id: UUID) async {
+        guard var s = session, let k = s.sets.firstIndex(where: { $0.id == id && $0.isLive }) else { return }
+        s.sets[k].deleted = true
+        let exerciseID = s.sets[k].exercise
+        if let i = s.exercises.firstIndex(where: { $0.id == exerciseID }), let r = s.exercises[i].rows.firstIndex(where: { $0.loggedID == id }) {
+            let row = s.exercises[i].rows.remove(at: r)
+            let name = s.exercises[i].name, set = TrainFormat.set(s.sets[k].weightKg, s.sets[k].reps) ?? ""
+            showUndo(DeletedSet(setID: id, exerciseID: exerciseID, row: row, rowIndex: r, text: "REMOVED \(name.uppercased()) \(set)"))
+        }
+        session = s
+        persist()
+        await upsert()
+        shareWithWatch()
+    }
+
+    func undoDelete() async {
+        guard let u = undo, var s = session, let k = s.sets.firstIndex(where: { $0.id == u.setID }) else { return }
+        dismissUndo()
+        s.sets[k].deleted = nil
+        if let i = s.exercises.firstIndex(where: { $0.id == u.exerciseID }) {
+            s.exercises[i].rows.insert(u.row, at: min(u.rowIndex, s.exercises[i].rows.count))
+        } else {
+            s.exercises.append(LiveExercise(id: u.exerciseID, name: Self.displayName(u.exerciseID), best: nil, rows: [u.row]))
+        }
+        session = s
+        persist()
+        await upsert()
+        shareWithWatch()
+    }
+
+    private func showUndo(_ u: DeletedSet) {
+        undo = u
+        undoTask?.cancel()
+        undoTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            self?.undo = nil
+        }
+    }
+
+    func dismissUndo() { undoTask?.cancel(); undo = nil }
+
     func addSet(to exerciseIndex: Int) {
         guard let ex = session?.exercises[safe: exerciseIndex] else { return }
         let last = ex.rows.last { !$0.isWarmup } ?? ex.rows.last
@@ -392,7 +487,7 @@ final class LiveSessionStore {
         // sent a copy (it didn't start), the phone owns the workout after all and finishes it itself.
         if s.isJoined, s.watchSets != nil { await commitEdits(); session = nil; persist(); return nil }
         s.joinedWatch = nil
-        guard !s.sets.isEmpty else { discard(); return nil }
+        guard !s.loggedSets.isEmpty else { discard(); return nil }
         let end = now()
         s.endedAt = end
         s.restEnd = nil
@@ -431,8 +526,10 @@ final class LiveSessionStore {
                                     startedAt: iso.string(from: s.startedAt), endedAt: s.endedAt.map(iso.string(from:)),
                                     tzOffsetMin: timeZone.secondsFromGMT(for: s.startedAt) / 60, hkWorkoutUuid: s.hkWorkoutUUID)
         let sets = s.sets.map {
-            WorkoutUpsert.Set(id: $0.id.uuidString, exercise: $0.exercise, kind: $0.kind, weightKg: $0.weightKg, reps: $0.reps,
-                              targetWeightKg: $0.targetWeightKg, targetReps: $0.targetReps, performedAt: iso.string(from: $0.performedAt))
+            $0.isLive ? WorkoutUpsert.Set(id: $0.id.uuidString, exercise: $0.exercise, kind: $0.kind, weightKg: $0.weightKg, reps: $0.reps,
+                                          targetWeightKg: $0.targetWeightKg, targetReps: $0.targetReps, performedAt: iso.string(from: $0.performedAt),
+                                          note: $0.note)
+                : .deletion($0.id.uuidString)
         }
         return WorkoutUpsert(session: header, sets: sets)
     }

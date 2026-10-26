@@ -19,7 +19,7 @@ struct PulsePositions: Equatable, Sendable {
 /// Train week, paged session history and the detail reads. Shared so the logger's Finish can push Session detail.
 @MainActor @Observable
 final class TrainStore {
-    static let shared = TrainStore(api: { Services.shared.api })
+    static let shared = TrainStore(api: { Services.shared.api }, send: { _ = await Services.shared.send($0) })
 
     let week = Loadable<TrainingResponse>()
     /// Rows from `/v2/training/sessions` pages that the week view doesn't already show, newest first.
@@ -32,12 +32,20 @@ final class TrainStore {
     var path = Detail.launchPath("train")
     /// Set by Finish: the detail may 404 until the outbox delivers the session, so it shows loading meanwhile.
     private(set) var pendingSessionID: String?
+    /// The set just deleted from a finished workout, while its Undo toast shows.
+    private(set) var undo: DeletedSet?
+
+    struct DeletedSet: Equatable { let sessionID: String; let setID: String; let text: String }
 
     @ObservationIgnored private let api: @MainActor () -> VitalisAPI?
+    @ObservationIgnored private let send: @MainActor (APIRequest) async -> Void
+    @ObservationIgnored private var undoTask: Task<Void, Never>?
     @ObservationIgnored private var sessionDetails: [String: Loadable<SessionDetail>] = [:]
     @ObservationIgnored private var exerciseDetails: [String: Loadable<ExerciseDetail>] = [:]
 
-    init(api: @escaping @MainActor () -> VitalisAPI?) { self.api = api }
+    init(api: @escaping @MainActor () -> VitalisAPI?, send: @escaping @MainActor (APIRequest) async -> Void = { _ in }) {
+        self.api = api; self.send = send
+    }
 
     /// The week's rows, then older history, each session once.
     var sessions: [SessionRow] {
@@ -119,6 +127,37 @@ final class TrainStore {
     }
 
     /// After the iPhone logger's Finish: show that session's detail inside the Train tab.
+    /// Edits one set of a finished workout through the outbox; the session reloads when the server has it.
+    func editSet(_ setID: String, in sessionID: String, _ e: SetEdit, was: SetEdit) async {
+        let note = e.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let patch = SetPatch(exercise: e.exerciseID == was.exerciseID ? nil : e.exerciseID, kind: e.kind == was.kind ? nil : e.kind,
+                             weightKg: e.weight == was.weight ? nil : e.weightKg, reps: e.reps == was.reps ? nil : e.repsValue,
+                             note: note == was.note ? nil : note)
+        guard patch != SetPatch(), let request = try? APIRequest.patchSet(id: setID, patch) else { return }
+        await send(request)
+        await loadSession(sessionID)
+    }
+
+    func deleteSet(_ setID: String, in sessionID: String, label: String) async {
+        guard let request = try? APIRequest.patchSet(id: setID, SetPatch(delete: true)) else { return }
+        undo = DeletedSet(sessionID: sessionID, setID: setID, text: "REMOVED \(label.uppercased())")
+        undoTask?.cancel()
+        undoTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            self?.undo = nil
+        }
+        await send(request)
+        await loadSession(sessionID)
+    }
+
+    func undoDelete() async {
+        guard let u = undo, let request = try? APIRequest.patchSet(id: u.setID, SetPatch(restore: true)) else { return }
+        undoTask?.cancel(); undo = nil
+        await send(request)
+        await loadSession(u.sessionID)
+    }
+
     func showFinished(_ id: String) {
         pendingSessionID = id
         path = [.session(id: id)]

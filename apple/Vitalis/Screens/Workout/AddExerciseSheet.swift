@@ -6,6 +6,7 @@ import VitalisUI
 /// `GET /v2/exercises?q=` after a 300 ms pause; offline it filters the cached catalog instead.
 struct AddExerciseSheet: View {
     let api: VitalisAPI?
+    var title = "Add exercise"
     let pick: (ExerciseInfo) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -20,7 +21,7 @@ struct AddExerciseSheet: View {
                 HStack {
                     Button { dismiss() } label: { Text("Cancel").vText(.body).frame(minHeight: 44) }.buttonStyle(.plain)
                     Spacer()
-                    Text("Add exercise").vText(.title)
+                    Text(title).vText(.title)
                     Spacer()
                     Text("Cancel").vText(.body).hidden()
                 }

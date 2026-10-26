@@ -75,6 +75,7 @@ public struct SessionDetail: Codable, Sendable, Equatable {
         public let weightKg: Double?
         public let reps: Int?
         public let at: String?
+        public let note: String?
     }
     public struct Exercise: Codable, Sendable, Equatable {
         public let id: String

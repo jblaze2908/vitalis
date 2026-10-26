@@ -6,6 +6,9 @@ import VitalisUI
 struct SessionDetailScreen: View {
     let store: TrainStore
     let id: String
+    @State private var editing: EditingSet?
+
+    struct EditingSet: Identifiable { let id: String; let title: String; let initial: SetEdit }
 
     var body: some View {
         let detail = store.session(id), d = detail.value
@@ -21,6 +24,19 @@ struct SessionDetailScreen: View {
             }
         }
         .task(id: Services.shared.writesVersion) { await store.loadSession(id) }
+        .overlay(alignment: .bottom) {
+            if let undo = store.undo, undo.sessionID == id {
+                Toast(undo.text) { Task { await store.undoDelete() } }
+                    .padding(.bottom, VSpace.s4)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: store.undo)
+        .sheet(item: $editing) { t in
+            SetEditSheet(title: t.title, initial: t.initial,
+                         save: { e in Task { await store.editSet(t.id, in: id, e, was: t.initial) } },
+                         delete: { Task { await store.deleteSet(t.id, in: id, label: "\(t.initial.exerciseName) \(TrainFormat.set(t.initial.weightKg, t.initial.repsValue) ?? "")") } })
+        }
     }
 
     private func subtitle(_ d: SessionDetail) -> String {
@@ -44,7 +60,16 @@ struct SessionDetailScreen: View {
         }
         if let exercises = d.exercises, !exercises.isEmpty {
             DetailSection("Exercises", trailing: "\(exercises.count)")
-            VStack(spacing: VSpace.s3) { ForEach(exercises, id: \.id) { ExerciseSetsCard(exercise: $0) } }
+            VStack(spacing: VSpace.s3) {
+                ForEach(exercises, id: \.id) { ex in
+                    ExerciseSetsCard(exercise: ex, edit: { set, label in
+                        editing = EditingSet(id: set.id, title: "Set \(label)", initial: SetEdit(exerciseID: ex.id, exerciseName: ex.name, kind: set.kind,
+                            weight: TrainFormat.kg(set.weightKg, empty: ""), reps: set.reps.map(String.init) ?? "", note: set.note ?? ""))
+                    }, delete: { set in
+                        Task { await store.deleteSet(set.id, in: id, label: "\(ex.name) \(TrainFormat.set(set.weightKg, set.reps) ?? "")") }
+                    })
+                }
+            }
         }
     }
 
@@ -117,6 +142,9 @@ struct SessionDetailScreen: View {
 /// One exercise in a workout: every set in order, the top set brighter, warm-ups marked; the header opens its history.
 struct ExerciseSetsCard: View {
     let exercise: SessionDetail.Exercise
+    /// Set for a logged strength session: tap a set to edit it, swipe for edit and delete.
+    var edit: ((SessionDetail.LoggedSet, String) -> Void)? = nil
+    var delete: ((SessionDetail.LoggedSet) -> Void)? = nil
 
     var body: some View {
         let top = exercise.sets.filter { $0.kind != "warmup" }.max { ($0.weightKg ?? 0, $0.reps ?? 0) < ($1.weightKg ?? 0, $1.reps ?? 0) }?.id
@@ -135,21 +163,35 @@ struct ExerciseSetsCard: View {
                 .buttonStyle(.plain)
                 .padding(.bottom, VSpace.s2)
                 ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { i, s in
-                    let warmup = s.kind == "warmup"
-                    HStack(spacing: 0) {
-                        Text(warmup ? "W" : "\(workingIndex(i))").vText(.secondary, color: warmup ? VColor.text3 : VColor.text2)
-                            .frame(width: 28, alignment: .leading)
-                        Text(TrainFormat.set(s.weightKg, s.reps).map { $0.replacingOccurrences(of: " x ", with: " kg × ") } ?? TrainFormat.dash)
-                            .vText(s.id == top ? .headline : .body, color: warmup ? VColor.text2 : nil)
-                        Spacer()
-                        if s.kind != "normal", !warmup { Text(s.kind.capitalized).vText(.secondary) }
-                        if let at = s.at.flatMap(APIDate.clockText) { Text(at).vText(.secondary, color: VColor.text3).padding(.leading, VSpace.s3) }
+                    let warmup = s.kind == "warmup", label = warmup ? "W" : "\(workingIndex(i))"
+                    if let edit, let delete {
+                        SwipeRow(onDelete: { delete(s) }, onEdit: { edit(s, label) }) {
+                            Button { edit(s, label) } label: { row(s, warmup: warmup, top: top, index: i) }.buttonStyle(.plain)
+                        }
+                        .overlay(alignment: .top) { Rectangle().fill(VColor.line).frame(height: 1) }
+                    } else {
+                        row(s, warmup: warmup, top: top, index: i)
+                            .overlay(alignment: .top) { Rectangle().fill(VColor.line).frame(height: 1) }
                     }
-                    .padding(.vertical, VSpace.s2)
-                    .overlay(alignment: .top) { Rectangle().fill(VColor.line).frame(height: 1) }
                 }
             }
         }
+    }
+
+    private func row(_ s: SessionDetail.LoggedSet, warmup: Bool, top: String?, index i: Int) -> some View {
+        HStack(spacing: 0) {
+            Text(warmup ? "W" : "\(workingIndex(i))").vText(.secondary, color: warmup ? VColor.text3 : VColor.text2)
+                .frame(width: 28, alignment: .leading)
+            Text(TrainFormat.set(s.weightKg, s.reps).map { $0.replacingOccurrences(of: " x ", with: " kg × ") } ?? TrainFormat.dash)
+                .vText(s.id == top ? .headline : .body, color: warmup ? VColor.text2 : nil)
+            Spacer()
+            if s.kind != "normal", !warmup { Text(s.kind.capitalized).vText(.secondary) }
+            if s.note != nil { Image(systemName: "text.bubble").font(.system(size: 11)).foregroundStyle(VColor.text3).padding(.leading, VSpace.s2) }
+            if let at = s.at.flatMap(APIDate.clockText) { Text(at).vText(.secondary, color: VColor.text3).padding(.leading, VSpace.s3) }
+        }
+        .padding(.vertical, VSpace.s2)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 
     private func workingIndex(_ i: Int) -> Int { exercise.sets.prefix(i + 1).filter { $0.kind != "warmup" }.count }

@@ -66,7 +66,7 @@ final class WorkoutActivityController {
         let counted = working.isEmpty ? rows : working
         let total = max(counted.count, 1)
         let index = min(counted.filter(\.isDone).count + 1, total)
-        let logged = s.sets + (s.watchSets ?? [])
+        let logged = s.loggedSets + (s.watchSets ?? [])
         let mine = logged.filter { $0.exercise == ex?.id }.max { $0.performedAt < $1.performedAt }
         let last = mine.flatMap { set($0.weightKg, $0.reps) } ?? counted.first(where: { !$0.isDone })?.last.map(times)
         let pending = ex?.pendingRowIndex.map { rows[$0] }

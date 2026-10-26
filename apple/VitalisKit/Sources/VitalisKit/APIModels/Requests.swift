@@ -56,6 +56,22 @@ public struct WorkoutUpsert: Codable, Sendable, Equatable {
 }
 
 /// One entry of POST /v2/food/entries.
+/// PATCH /v2/sets/{id}: one set of any session. Nil fields are left as they are.
+public struct SetPatch: Codable, Sendable, Equatable {
+    public var exercise: String?
+    public var kind: String?
+    public var weightKg: Double?
+    public var reps: Int?
+    public var note: String?
+    public var delete: Bool?
+    public var restore: Bool?
+    public init(exercise: String? = nil, kind: String? = nil, weightKg: Double? = nil, reps: Int? = nil, note: String? = nil,
+                delete: Bool? = nil, restore: Bool? = nil) {
+        self.exercise = exercise; self.kind = kind; self.weightKg = weightKg; self.reps = reps; self.note = note
+        self.delete = delete; self.restore = restore
+    }
+}
+
 public struct FoodEntry: Codable, Sendable, Equatable {
     public var id: String
     public var mealId: String
