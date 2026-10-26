@@ -166,8 +166,9 @@ private struct WeekTiles: View {
                 let s = sessions.first { $0.day == day }
                 let shape = RoundedRectangle(cornerRadius: VRadius.control, style: .continuous)
                 VStack(spacing: VSpace.s1) {
-                    Text(s.map { String(($0.title ?? "Done").prefix(5)) } ?? "")
-                        .vText(.secondary, color: VColor.text).lineLimit(1).minimumScaleFactor(0.6)
+                    // A tile is a tag, not a sentence: small bold caps, as in the design (frame 04).
+                    Text(s.map { String(($0.title ?? "Done").prefix(5)).uppercased() } ?? "")
+                        .font(VFont.archivo(11, width: 100, weight: 700)).foregroundStyle(VColor.text).lineLimit(1).minimumScaleFactor(0.6)
                         .frame(maxWidth: .infinity, minHeight: 40)
                         .background(shape.fill(s == nil ? VColor.surface : VColor.accentTint))
                         .overlay {

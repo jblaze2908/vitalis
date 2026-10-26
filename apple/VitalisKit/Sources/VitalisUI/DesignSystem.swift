@@ -253,7 +253,7 @@ public struct ListRow<Accessory: View>: View {
             if let value { Text(value).font(VFont.archivo(14, width: 100, weight: 500)).foregroundStyle(VColor.text2).lineLimit(1).monospacedDigit() }
             if chevron { Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(VColor.chevron) }
         }
-        .frame(minHeight: VSpace.rowMin).padding(.vertical, VSpace.s3).contentShape(Rectangle())
+        .padding(.vertical, VSpace.s3).frame(minHeight: VSpace.rowMin).contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 }
