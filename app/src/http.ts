@@ -1,6 +1,9 @@
 // Shared plumbing for the app's JSON routes: scope checks, error bodies, ETag/304, bounded zod bodies, date params.
 // Every call is audited through logCall with counts only, never values.
 import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Context } from "hono";
 import type { z } from "zod";
 import { HttpError } from "./config.js";
@@ -57,11 +60,25 @@ export function handle(name: string, need: "read" | "write", fn: (c: Context, to
 }
 
 const CLOCK_BUCKET_MS = 15 * 60_000;
-/** Weak ETag from the meta versions and the route key; `clock` adds the local 15-minute bucket for bodies that read the time. */
+/**
+ * Hash of the server's own compiled code, read once at start. A deploy that changes a body's shape must not be answered
+ * 304 from the phone's cache just because no health data changed; scale-to-zero restarts keep the same value.
+ */
+const BUILD = (() => {
+  const h = createHash("sha1");
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (e.isDirectory()) walk(join(dir, e.name)); else if (e.name.endsWith(".js")) h.update(readFileSync(join(dir, e.name)));
+    }
+  };
+  walk(dirname(fileURLToPath(import.meta.url)));
+  return h.digest("base64url").slice(0, 8);
+})();
+/** Weak ETag from the build, the meta versions and the route key; `clock` adds the local 15-minute bucket for bodies that read the time. */
 export function etagFor(routeKey: string, clock = false, now = Date.now()) {
   const v = dataVersions();
   const bucket = clock ? `|${Math.floor((now + ownerOffsetMin(now) * 60_000) / CLOCK_BUCKET_MS)}` : "";
-  return `W/"${v.data}.${v.targets}.${createHash("sha1").update(routeKey + bucket).digest("base64url").slice(0, 16)}"`;
+  return `W/"${BUILD}.${v.data}.${v.targets}.${createHash("sha1").update(routeKey + bucket).digest("base64url").slice(0, 16)}"`;
 }
 
 /** 304 before computing anything when If-None-Match matches; otherwise compute and send JSON with the ETag. */
