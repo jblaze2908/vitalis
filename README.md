@@ -11,7 +11,7 @@ Your data lives on your server. One instance serves one person.
 - **Training.** Log sets on the iPhone or the Watch, including both at once in one workout. Muscle load shows on a body map, from grey (no load) to red (just trained). Splits come from your own settings and history; the app never assumes a schedule. A catalogue of about 750 exercises ships with it.
 - **Food.** Search, scan a barcode (Open Food Facts), describe a meal, or photograph a label. Log part of a pack, then edit or delete it later. A calorie target follows your goal, your weight trend and what your Watch says you burn.
 - **Body.** Your latest weigh-in, the weight trend, and vitals such as HRV, resting HR, SpO₂ and breathing against their usual range.
-- **For agents.** 18 MCP tools read and write the same data the app shows: the day's brief, sleep, scores, metrics, workouts, exercise history, food, targets and freshness, plus writing sets, workouts, exercises and food. A missing day is reported as missing, never as zero.
+- **For agents.** 20 MCP tools read and write the same data the app shows: the day's brief, sleep, scores, metrics, workouts, exercise history, food, saved meals, targets and freshness, plus writing sets, workouts, exercises, food and saved meals. A missing day is reported as missing, never as zero.
 
 ## Repository
 

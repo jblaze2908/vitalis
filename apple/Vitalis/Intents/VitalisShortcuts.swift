@@ -18,6 +18,11 @@ struct VitalisShortcuts: AppShortcutsProvider {
             "Log a meal in \(.applicationName)",
             "Add food to \(.applicationName)",
         ], shortTitle: "Log Food", systemImageName: "fork.knife")
+        AppShortcut(intent: LogSavedMealIntent(), phrases: [
+            "Log \(\.$meal) in \(.applicationName)",
+            "Add \(\.$meal) to \(.applicationName)",
+            "Log a saved meal in \(.applicationName)",
+        ], shortTitle: "Log Saved Meal", systemImageName: "bookmark")
         AppShortcut(intent: HowDidISleepIntent(), phrases: [
             "How did I sleep in \(.applicationName)",
             "Ask \(.applicationName) how I slept",

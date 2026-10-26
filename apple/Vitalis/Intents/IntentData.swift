@@ -5,11 +5,13 @@ import VitalisKit
 enum IntentFailure: Error, CustomLocalizedStringResourceConvertible {
     case notConnected
     case notSaved
+    case noSavedMeal
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .notConnected: "Vitalis isn't connected to your server yet. Open Vitalis to finish setup."
         case .notSaved: "Vitalis couldn't save that weight. Try again from the Body tab."
+        case .noSavedMeal: "That saved meal is gone. Open Eat in Vitalis to see your saved meals."
         }
     }
 }

@@ -103,7 +103,7 @@ final class FoodServer: @unchecked Sendable {
         await store.logSaved(try #require(store.savedMeals.first))
         let entries = try postedEntries(server.requests("POST").firstIndex { $0.url.path == "/v2/food/entries" }!)
         #expect(entries.count == 1 && entries[0].kcal == 310 && entries[0].proteinG == 40)
-        #expect(entries[0].source == "saved" && entries[0].sourceRef == "shake" && entries[0].slot == "breakfast")
+        #expect(entries[0].source == "saved" && entries[0].sourceRef == "shake" && entries[0].slot == "lunch", "12:30 is the lunch window")
 
         await store.deleteSavedMeal("shake")
         #expect(store.savedMeals.isEmpty)

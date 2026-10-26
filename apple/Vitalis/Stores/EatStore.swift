@@ -129,14 +129,7 @@ final class EatStore {
 
     /// The slot an add goes to when none was picked: the server's `next_slot`, else the time-of-day windows of brief 03.
     var defaultSlot: String {
-        if let s = day.value?.nextSlot { return s }
-        let h = calendar.component(.hour, from: now()), m = calendar.component(.minute, from: now())
-        switch h * 60 + m {
-        case 240..<630: return "breakfast"
-        case 630..<900: return "lunch"
-        case 900..<1080: return "snack"
-        default: return "dinner"
-        }
+        day.value?.nextSlot ?? slotNow
     }
 
     func logUsual() async {
@@ -188,16 +181,32 @@ final class EatStore {
                                        items: items.map { FoodItem(name: $0.name, portionText: $0.portionText, grams: $0.grams, kcal: $0.kcal,
                                                                    proteinG: $0.proteinG, carbsG: $0.carbsG, fatG: $0.fatG) })
         await queue.send(request)
+        VitalisShortcuts.updateAppShortcutParameters()
     }
 
     func deleteSavedMeal(_ id: String) async {
         savedEdits[id] = .some(nil)
         await queue.send(.deleteSavedMeal(id: id))
+        VitalisShortcuts.updateAppShortcutParameters()
     }
 
-    /// One tap: every item of the saved meal into the next meal of the day.
+    /// One tap: every item of the saved meal, eaten now, so into the meal window it's now (a shake at 09:00 is breakfast
+    /// even when breakfast is already logged). On a past day on screen it goes to that day's next meal.
     func logSaved(_ meal: SavedMealInfo, slot: String? = nil) async {
-        await log(meal.items.map(FoodDraft.init), slot: slot ?? day.value?.nextSlot ?? defaultSlot, source: "saved", sourceRef: meal.id)
+        let viewingToday = day.value.map { $0.nextDay == nil } ?? true
+        await log(meal.items.map(FoodDraft.init), slot: slot ?? (viewingToday ? slotNow : day.value?.nextSlot ?? defaultSlot), source: "saved", sourceRef: meal.id)
+        VitalisShortcuts.updateAppShortcutParameters()
+    }
+
+    /// The meal window the clock is in: breakfast 04:00–10:29, lunch to 14:59, snack to 17:59, dinner after (the server's windows).
+    var slotNow: String {
+        let h = calendar.component(.hour, from: now()), m = calendar.component(.minute, from: now())
+        switch h * 60 + m {
+        case 240..<630: return "breakfast"
+        case 630..<900: return "lunch"
+        case 900..<1080: return "snack"
+        default: return "dinner"
+        }
     }
 
     /// Queues the owner's numbers for an unknown barcode so the next scan finds them.

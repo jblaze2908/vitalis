@@ -22,7 +22,7 @@ test("tool lists follow the token's scope; ingest tokens and foreign origins can
   const reads = ["find_exercises", "get_brief", "get_exercise_history", "get_food_day", "get_freshness", "get_metrics", "get_scores", "get_sleep", "get_targets",
     "get_today", "get_training_summary", "get_workout", "list_workouts"];
   assert.deepEqual(await names(readTok), reads);
-  assert.deepEqual(await names(writeTok), [...reads, "create_exercise", "edit_set", "edit_workout", "log_food", "log_sets"].sort());
+  assert.deepEqual(await names(writeTok), [...reads, "create_exercise", "edit_set", "edit_workout", "log_food", "log_saved_meal", "log_sets", "save_meal"].sort());
   const tools = (await mcp(readTok, "tools/list")).msg.result.tools;
   assert.ok(tools.every((t) => t.annotations?.readOnlyHint === true && t.outputSchema));
   const bad = await mcp(ingestTok, "tools/list");

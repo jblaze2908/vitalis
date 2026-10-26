@@ -1,5 +1,6 @@
 // Food log (spec 10 §7): slots, day sums and entries. Fuel counts only Vitalis entries, never HealthKit dietary samples
 // (prevents double counting what the phone also writes to Health).
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { now } from "./config.js";
 import { all, one, run, tx } from "./db.js";
@@ -182,6 +183,55 @@ export function putSaved(input: z.infer<typeof savedSchema>) {
     markDirty([]);
   });
   return { saved: savedMeals().find((m) => m.id === input.id)! };
+}
+
+/** A saved meal by id, else by name: exact (any case) first, then the only one whose name contains it. */
+export function findSaved(ref: string) {
+  const all = savedMeals(), q = ref.trim().toLowerCase();
+  const hit = all.find((m) => m.id === ref) ?? all.find((m) => m.name.toLowerCase() === q);
+  if (hit) return hit;
+  const near = all.filter((m) => m.name.toLowerCase().includes(q) || q.includes(m.name.toLowerCase()));
+  if (near.length === 1) return near[0];
+  throw new ApiError(422, near.length ? `"${ref}" matches ${near.map((m) => m.name).join(", ")}; say which`
+    : `No saved meal "${ref}". Saved: ${all.map((m) => m.name).join(", ") || "none yet"}`, "invalid");
+}
+
+const n = z.number().min(0).max(10000).nullable().optional();
+/** MCP save_meal: one food's numbers inline, or several `items`; an existing name or id is replaced, `delete` removes it. */
+export const saveMealSchema = z.strictObject({
+  name: z.string().trim().min(1).max(80).describe("what the person calls it, e.g. 'Protein shake'"),
+  id: z.string().min(1).max(64).optional().describe("only to rename a saved meal: its current id"),
+  portion_text: z.string().max(120).nullable().optional(), kcal: n, protein_g: n, carbs_g: n, fat_g: n,
+  items: z.array(itemSchema).min(1).max(30).optional().describe("for a meal of several foods, instead of the single-food numbers"),
+  delete: z.boolean().optional(),
+});
+export function saveMeal(input: z.infer<typeof saveMealSchema>) {
+  const existing = input.id ? findSaved(input.id) : savedMeals().find((m) => m.name.toLowerCase() === input.name.toLowerCase());
+  if (input.delete) return deleteSaved((existing ?? findSaved(input.name)).id);
+  if (!input.items && (input.kcal === undefined || input.kcal === null)) throw new ApiError(422, "kcal is required (or give items)", "invalid");
+  const items = input.items ?? [{ name: input.name, portion_text: input.portion_text ?? null, kcal: input.kcal!, protein_g: input.protein_g ?? null,
+    carbs_g: input.carbs_g ?? null, fat_g: input.fat_g ?? null }];
+  return putSaved({ id: existing?.id ?? randomUUID(), name: input.name, items });
+}
+
+/** MCP log_saved_meal: a saved meal into the day, by name, in one call. */
+export const logSavedSchema = z.strictObject({
+  meal: z.string().min(1).max(80).describe("saved meal name or id"),
+  servings: z.number().min(0.25).max(10).optional().describe("default 1"),
+  slot: z.enum(SLOTS).optional().describe("default: the meal window at eaten_at"),
+  eaten_at: z.string().min(10).max(40).optional().describe("ISO 8601 with offset; default now"),
+  meal_id: z.string().min(1).max(64).optional().describe("your own id for this add, so a retry can't double-log"),
+});
+export function logSaved(input: z.infer<typeof logSavedSchema>, at = Date.now()) {
+  const m = findSaved(input.meal), k = input.servings ?? 1, mealId = input.meal_id ?? randomUUID();
+  const off = ownerOffsetMin(at), eatenAt = input.eaten_at ?? isoAt(at, off);
+  const t = parseStamp(eatenAt);
+  const slot = input.slot ?? slotAt(t ? Math.floor((t.ms + t.offsetMin * 60_000) / 60_000) % 1440 : 0);
+  const x = (v: number | null | undefined) => (v == null ? null : Math.round(v * k * 10) / 10);
+  const items = m.items as z.infer<typeof itemSchema>[];
+  return postEntries({ entries: items.map((it, i) => ({ id: `${mealId}-${i}`, meal_id: mealId, slot, eaten_at: eatenAt, name: it.name,
+    portion_text: k === 1 ? it.portion_text ?? null : `${k} × ${it.portion_text ?? "serving"}`, grams: x(it.grams), kcal: Math.round(it.kcal * k),
+    protein_g: x(it.protein_g), carbs_g: x(it.carbs_g), fat_g: x(it.fat_g), source: "saved" as const, source_ref: m.id })) });
 }
 
 export function deleteSaved(id: string) {

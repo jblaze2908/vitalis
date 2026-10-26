@@ -10,7 +10,7 @@ import { addDays, DAY_RE, today } from "./time.js";
 import { authenticate, logCall, type Token } from "./tokens.js";
 import { KINDS, editSet, editWorkout, exerciseHistory, getWorkout, listWorkouts, logSets, trainingSummary } from "./training.js";
 import { scoresFor, trainingSets, trainingState } from "./derived.js";
-import { entriesSchema, foodDay, postEntries } from "./food.js";
+import { entriesSchema, foodDay, logSaved, logSavedSchema, postEntries, saveMeal, saveMealSchema, savedMeals } from "./food.js";
 import { getTargets, effectiveTargets } from "./targets.js";
 import { todayBody } from "./today.js";
 import { weekStartOf, weeklySets } from "./training-analytics.js";
@@ -135,9 +135,10 @@ export function buildServer(token: Token) {
   }));
 
   s.registerTool("get_food_day", { title: "Food logged on a day", annotations: READ, outputSchema: Out,
-    description: "What was eaten on a day, by meal slot, with calories and protein against the day's target (the target adapts weekly to the weight trend unless fixed), calories left and the usual for the next slot.",
+    description: "What was eaten on a day, by meal slot, with calories and protein against the day's target (the target adapts weekly to the weight trend unless fixed), calories left and the usual for the next slot. Also lists the person's saved meals (log one with log_saved_meal).",
     inputSchema: z.object({ day: day.optional().describe("default today") }) },
-  wrap(ctx, "get_food_day", (a: { day?: string }) => foodDay(a.day ?? today())));
+  wrap(ctx, "get_food_day", (a: { day?: string }) => ({ ...foodDay(a.day ?? today()),
+    saved_meals: savedMeals().map((m) => ({ id: m.id, name: m.name, kcal: m.kcal, items: m.items.length })) })));
 
   s.registerTool("get_targets", { title: "Targets", annotations: READ, outputSchema: Out,
     description: "The person's targets: what they set, what scoring uses now (steps, calories, protein, sleep need, wake time, bed-by) and the suggested defaults with their basis.",
@@ -183,6 +184,17 @@ export function buildServer(token: Token) {
     description: "Log food entries, exactly as the app does. Give every entry your own id (a UUID) and group items eaten together under one meal_id, so a retry can't double-log. Calories and macros are your estimate unless the person gave them; set estimate: true then. Returns the updated day.",
     inputSchema: entriesSchema },
   wrap(ctx, "log_food", (a: Parameters<typeof postEntries>[0]) => { const r = postEntries(a); return { accepted: r.accepted, day: foodDay(r.day) }; },
+    (r) => JSON.stringify((r as { accepted: unknown }).accepted)));
+
+  s.registerTool("save_meal", { title: "Save a meal", annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, outputSchema: Out,
+    description: "Save a meal the person repeats (a daily protein shake) so it can be logged by name later, here or with one tap in the app. Give one food's numbers inline, or `items` for several foods. Saving an existing name replaces it; delete: true removes it. Use the person's numbers; don't estimate a saved meal.",
+    inputSchema: saveMealSchema },
+  wrap(ctx, "save_meal", (a: Parameters<typeof saveMeal>[0]) => saveMeal(a), (r) => JSON.stringify(Object.keys(r as object))));
+
+  s.registerTool("log_saved_meal", { title: "Log a saved meal", annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, outputSchema: Out,
+    description: "Log one of the person's saved meals by name ('my protein shake'), optionally scaled by servings. Pass your own meal_id so a retry can't double-log. Returns the updated food day.",
+    inputSchema: logSavedSchema },
+  wrap(ctx, "log_saved_meal", (a: Parameters<typeof logSaved>[0]) => { const r = logSaved(a); return { accepted: r.accepted, day: foodDay(r.day) }; },
     (r) => JSON.stringify((r as { accepted: unknown }).accepted)));
 
   return s;
