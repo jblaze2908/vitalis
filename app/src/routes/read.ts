@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { ApiError, dayParam, handle, routeKey, withEtag } from "../http.js";
-import { catalog, exerciseDetail } from "../exercise-view.js";
+import { catalog, exerciseDetail, performedExercises } from "../exercise-view.js";
+import { heartDay } from "../heart.js";
+import { metricHistory, metricsOverview } from "../metric-view.js";
 import { sleepDay, sleepMonth, sleepWeek } from "../sleep-view.js";
 import { bodyDay } from "../weight.js";
 import { definedSplits } from "../splits.js";
@@ -24,6 +26,11 @@ readRoutes.get("/v2/training/sessions", handle("v2/training/sessions", "read", (
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new ApiError(400, "limit must be 1–50", "bad_request");
   return withEtag(c, routeKey(c), () => sessionHistory(c.req.query("before") || undefined, limit));
 }));
+readRoutes.get("/v2/training/exercises", handle("v2/training/exercises", "read", (c) => withEtag(c, routeKey(c), () => performedExercises())));
+readRoutes.get("/v2/heart", handle("v2/heart", "read", (c) => withEtag(c, routeKey(c), () => heartDay(dayParam(c)), { clock: true })));
+readRoutes.get("/v2/metrics", handle("v2/metrics", "read", (c) => withEtag(c, routeKey(c), () => metricsOverview(dayParam(c)))));
+readRoutes.get("/v2/metrics/:key", handle("v2/metric", "read", (c) => withEtag(c, routeKey(c),
+  () => metricHistory(c.req.param("key") ?? "", Number(c.req.query("days") ?? 30), dayParam(c, "end")))));
 readRoutes.get("/v2/training/sessions/:id", handle("v2/training/session", "read", (c) => withEtag(c, routeKey(c), () => sessionDetail(c.req.param("id") ?? ""))));
 readRoutes.get("/v2/exercises", handle("v2/exercises", "read", (c) => withEtag(c, routeKey(c), () => catalog(c.req.query("q") || undefined, c.req.query("since") || undefined))));
 readRoutes.get("/v2/exercises/:id", handle("v2/exercise", "read", (c) => withEtag(c, routeKey(c), () => exerciseDetail(c.req.param("id") ?? ""))));

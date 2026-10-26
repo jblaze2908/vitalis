@@ -10,6 +10,7 @@ import { addDays, isoAt, ownerOffsetMin, today } from "./time.js";
 import { e1rm, liveSets, listWorkouts, sessionView, type SessionRow, type SetRow } from "./training.js";
 import { SLUGS, sessionHeat, weekStartOf, weeklySets, type TrainingSet } from "./training-analytics.js";
 import { dateLabel } from "./today.js";
+import { workoutHeart } from "./heart.js";
 
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const dm = (day: string) => `${Number(day.slice(8))} ${MON[Number(day.slice(5, 7)) - 1]}`;
@@ -82,7 +83,9 @@ export function trainingWeek(dayInWeek: string, at = Date.now()) {
     stats: { sessions: strength.length, working_sets: strength.reduce((n, s) => n + s.working_sets, 0), muscles_hit: ws.muscles_hit, muscles_total: ws.muscles_total },
     weekly_sets: { min: ws.min, max: ws.max, by_muscle: ws.by_muscle },
     sessions: list.map(sessionRow),
-    empty: !one("SELECT 1 FROM sessions s WHERE s.deleted_at IS NULL AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL)"),
+    // Apple Watch workouts count: the empty state has no history list, so it must never hide one.
+    empty: !one("SELECT 1 FROM sessions s WHERE s.deleted_at IS NULL AND EXISTS (SELECT 1 FROM sets x WHERE x.session_id=s.id AND x.deleted_at IS NULL)")
+      && !one("SELECT 1 FROM hk_workouts LIMIT 1"),
     freshness: freshnessBlock(at),
   };
 }
@@ -117,15 +120,19 @@ const MONTH_DAY = (iso: string) => `${dateLabel(iso.slice(0, 10))} · ${iso.slic
 export function sessionDetail(id: string, at = Date.now()) {
   const s = one<SessionRow>("SELECT * FROM sessions WHERE id=?", id);
   if (!s) {
-    const w = one<Record<string, unknown>>("SELECT id,name,start,end,day,duration_s,active_kcal,hr_min,hr_avg,hr_max,distance_km,source FROM hk_workouts WHERE id=?", id);
+    const w = one<Record<string, unknown> & { start_ms: number; end_ms: number; source: string | null }>(
+      "SELECT id,name,start,end,start_ms,end_ms,day,duration_s,active_kcal,hr_min,hr_avg,hr_max,distance_km,source FROM hk_workouts WHERE id=?", id);
     if (!w) throw new ApiError(404, `No workout ${id}`);
-    return { ...w, kind: "cardio", freshness: freshnessBlock(at) };
+    const { start_ms, end_ms, ...rest } = w;
+    return { ...rest, kind: "cardio", hr: workoutHeart(start_ms, end_ms, w.source), freshness: freshnessBlock(at) };
   }
   if (s.deleted_at) throw new ApiError(404, `Workout ${id} was deleted`);
   const sets = liveSets([s.id]), v = sessionView(s, sets, true);
   const pr = new Set(prs(s.id).map((p) => p.exercise_id));
   const heat = sessionHeat(sets.map((x) => toTraining({ ...x, tz_offset_min: s.tz_offset_min })));
   const watch = typeof v.watch === "object" ? v.watch : null;
+  const hk = watch ? one<{ start_ms: number; end_ms: number; source: string | null }>("SELECT start_ms,end_ms,source FROM hk_workouts WHERE id=?", watch.workout_id) : null;
+  const hr = hk ? workoutHeart(hk.start_ms, hk.end_ms, hk.source) : workoutHeart(Date.parse(v.start), Math.min(at, Date.parse(v.end)), null);
   return {
     id: s.id, kind: "strength", title: s.title ?? "Workout", template: s.template ?? null, client_source: s.client_source ?? null,
     start: v.start, end: v.end, duration_min: v.duration_min, context_label: `${MONTH_DAY(v.start)} · ${v.duration_min} MIN`,
@@ -139,6 +146,8 @@ export function sessionDetail(id: string, at = Date.now()) {
         sets: xs.map((x) => ({ id: x.id, kind: x.kind, weight_kg: x.weight_kg, reps: x.reps, at: isoAt(x.performed_at, s.tz_offset_min) })) };
     }),
     watch: watch ? { workout_id: watch.workout_id, hr_avg: watch.hr_avg, hr_max: watch.hr_max } : null,
+    // Set times are offsets from here, so the app can mark each set on the heart-rate line.
+    hr: hr && { ...hr, start: hk ? isoAt(hk.start_ms, s.tz_offset_min) : v.start },
     freshness: freshnessBlock(at),
   };
 }

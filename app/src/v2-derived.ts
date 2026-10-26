@@ -2,7 +2,7 @@ import { BY_KEY } from "./catalog.js";
 import { now } from "./config.js";
 import { all, one, run } from "./db.js";
 import { dayAt, HK_METRICS, HR_TYPE, nativeValue, SLEEP_TYPE, splitDays, STAND_TYPE } from "./v2-metrics.js";
-import { blobFor, unpack } from "./v2-storage.js";
+import { heartReadings, ownOrAll } from "./hr-readings.js";
 import { sleepBlocks, type SleepBlock } from "./sleep-split.js";
 import { addDays } from "./time.js";
 import type { DailyStat, Sample } from "./v2-schema.js";
@@ -193,22 +193,7 @@ export class Derivations {
       const cv = (v: number | null | undefined) => v == null ? null : nativeValue("heart_rate", v, statistic.unit);
       hr = { min: cv(statistic.min), avg: cv(statistic.avg), max: cv(statistic.max) };
     } else {
-      // Use the end-time range index. The maintained maximum duration also includes unusually long series.
-      const type = one<{ id: number; duration_ms: number }>("SELECT id,duration_ms FROM hk_types WHERE identifier=?", HR_TYPE);
-      const readings: { source: string; bundle: string; value: number }[] = [];
-      if (type) for (const h of all<RawRow & { value: number; unit: string }>(`SELECT * FROM hk_raw
-        WHERE type_id=? AND kind='quantity' AND deleted_at IS NULL AND series_start IS NULL AND end_ms BETWEEN ? AND ? AND start_ms>=?
-        UNION ALL SELECT r.* FROM hk_blobs b JOIN hk_raw r ON r.id=b.sample_id
-        WHERE r.type_id=? AND r.kind='quantity' AND r.deleted_at IS NULL AND b.end_ms BETWEEN ? AND ? AND b.start_ms<=?`,
-        type.id, r.start_ms, r.end_ms, r.start_ms, type.id, r.start_ms, r.end_ms + type.duration_ms, r.end_ms)) {
-        const blob = blobFor(h.uuid);
-        const points = blob ? unpack(blob) as [string, string, number][] : [[h.start_iso, h.end_iso, h.value] as [string, string, number]];
-        for (const [start, end, value] of points) if (Date.parse(start) >= r.start_ms && Date.parse(start) <= r.end_ms && Date.parse(end) <= r.end_ms) {
-          const v = nativeValue("heart_rate", value, h.unit); if (v !== null) readings.push({ source: h.source_name, bundle: h.source_bundle, value: v });
-        }
-      }
-      const own = readings.filter((h) => h.source === r.source_name && h.bundle === r.source_bundle);
-      const values = (own.length ? own : readings).map((h) => h.value);
+      const values = ownOrAll(heartReadings(r.start_ms, r.end_ms), r.source_name, r.source_bundle).map((h) => h.bpm);
       let min = Infinity, max = -Infinity, total = 0;
       for (const v of values) { min = Math.min(min, v); max = Math.max(max, v); total += v; }
       hr = { min: values.length ? min : null, avg: values.length ? total / values.length : null, max: values.length ? max : null };

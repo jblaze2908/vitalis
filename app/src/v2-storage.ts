@@ -55,3 +55,11 @@ export function unpack(bytes: Uint8Array): unknown[][] | number[] {
   return out as unknown[][] | number[];
 }
 export const blobFor = (uuid: string) => one<{ data: Uint8Array }>('SELECT data FROM hk_blobs WHERE sample_id=(SELECT id FROM hk_samples WHERE uuid=?)', uuid)?.data;
+/** A quantity series blob as [start_ms, end_ms, value] rows, skipping the ISO rebuild `unpack` does for every point. */
+export function quantitySeries(bytes: Uint8Array): [number, number, number][] {
+  const b = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (b[0] !== 1 || KINDS[b[1]] !== 'quantity') return [];
+  const stride = b.readUInt16LE(2), count = b.readUInt32LE(4), out: [number, number, number][] = [];
+  for (let i = 0; i < count; i++) { const at = HEADER + i * stride; out.push([b.readDoubleLE(at), b.readDoubleLE(at + 8), b.readDoubleLE(at + 16)]); }
+  return out;
+}
