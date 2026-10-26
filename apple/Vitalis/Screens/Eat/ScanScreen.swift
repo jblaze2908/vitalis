@@ -14,6 +14,8 @@ struct ScanScreen: View {
     @State private var photo: LabelImage?
     @State private var reading = false
     @State private var typedCode = ""
+    @State private var access: CameraAccess = .checking
+    @Environment(\.scenePhase) private var scenePhase
     /// Share of the pack (or serving) eaten, set before adding: half a bag of chips is ½.
     @State private var amount: Double = 1
 
@@ -34,6 +36,8 @@ struct ScanScreen: View {
         }
         .background(VColor.ground.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        // Re-checked on return from Settings, where camera access may have just been turned on.
+        .task(id: scenePhase) { if scenePhase == .active { access = await CameraAccess.resolve() } }
         .sheet(item: $form) { f in
             ManualFoodForm(food: f, slot: slot) { item, draft in
                 form = nil
@@ -93,7 +97,7 @@ struct ScanScreen: View {
     private var camera: some View {
         ZStack(alignment: .top) {
             VColor.camera
-            if case .scanning = barcode.phase, BarcodeScannerView.isAvailable {
+            if case .scanning = barcode.phase, access == .ready {
                 BarcodeScannerView { raw in Task { await barcode.scanned(raw) } }
             }
             VStack(spacing: 18) {
@@ -116,7 +120,7 @@ struct ScanScreen: View {
 
     private var codeLine: (text: String, tint: VTint)? {
         switch barcode.phase {
-        case .scanning: BarcodeScannerView.isAvailable ? ("Point at the barcode", .steel) : nil
+        case .scanning: access == .ready ? ("Point at the barcode", .steel) : nil
         case .looking(let c): ("Looking up · \(BarcodeStore.grouped(c))", .steel)
         case .found(let r): ("Found · \(BarcodeStore.grouped(r.code))", .bone)
         case .notFound: nil
@@ -134,7 +138,12 @@ struct ScanScreen: View {
             MonoLabel(line, tint: .watch)
             SecondaryButton("Scan again", size: .full) { barcode.rescan() }.padding(.top, 16)
         }
-        case .scanning: if !BarcodeScannerView.isAvailable { typeCodePanel }
+        case .scanning:
+            switch access {
+            case .checking, .ready: EmptyView()
+            case .denied: typeCodePanel("Camera access is off for Vitalis", settings: true)
+            case .unsupported: typeCodePanel("Camera scanning isn't available here", settings: false)
+            }
         case .looking: EmptyView()
         }
     }
@@ -205,10 +214,13 @@ struct ScanScreen: View {
         }
     }
 
-    /// Simulator and devices without VisionKit scanning: type the digits instead.
-    private var typeCodePanel: some View {
+    /// No camera to scan with (simulator, no VisionKit, or access refused): type the digits instead.
+    private func typeCodePanel(_ reason: String, settings: Bool) -> some View {
         sheetPanel {
-            MonoLabel("Camera scanning isn't available here")
+            MonoLabel(reason)
+            if settings, let url = URL(string: UIApplication.openSettingsURLString) {
+                SecondaryButton("Turn on in Settings", size: .full) { UIApplication.shared.open(url) }.padding(.top, 14)
+            }
             HStack(spacing: 12) {
                 TextField("", text: $typedCode, prompt: Text("Barcode digits").foregroundStyle(VColor.steel))
                     .vReading(14).keyboardType(.numberPad).tint(VColor.bone)

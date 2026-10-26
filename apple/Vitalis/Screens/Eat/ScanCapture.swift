@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 import Vision
@@ -9,6 +10,16 @@ import VisionKit
 struct BarcodeScannerView: UIViewControllerRepresentable {
     let onCode: (String) -> Void
 
+    /// The device can scan at all (not the simulator, has VisionKit's scanner).
+    static var isSupported: Bool {
+        #if canImport(VisionKit) && !targetEnvironment(simulator)
+        DataScannerViewController.isSupported
+        #else
+        false
+        #endif
+    }
+
+    /// Supported and allowed right now. VisionKit reports false until camera access is granted, so ask with `CameraAccess.resolve()` first.
     static var isAvailable: Bool {
         #if canImport(VisionKit) && !targetEnvironment(simulator)
         DataScannerViewController.isSupported && DataScannerViewController.isAvailable
@@ -48,6 +59,22 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
 }
 
 /// Camera (or the photo library when there is no camera, e.g. the simulator) for a nutrition-label photo.
+/// Whether the barcode camera can run. Without an explicit request the system prompt never appears,
+/// because the scanner is only created once VisionKit says it's available.
+enum CameraAccess: Equatable {
+    case checking, ready, denied, unsupported
+
+    @MainActor static func resolve() async -> CameraAccess {
+        guard BarcodeScannerView.isSupported else { return .unsupported }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: break
+        case .notDetermined: guard await AVCaptureDevice.requestAccess(for: .video) else { return .denied }
+        default: return .denied
+        }
+        return BarcodeScannerView.isAvailable ? .ready : .denied
+    }
+}
+
 struct LabelPhotoPicker: UIViewControllerRepresentable {
     let done: (LabelImage?) -> Void
 
