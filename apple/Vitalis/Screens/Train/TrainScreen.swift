@@ -42,6 +42,7 @@ struct TrainWeekView: View {
             .padding(.bottom, VSpace.gutter)
         }
         .scrollIndicators(.hidden)
+        .refreshable { await store.load() }
         .vScreen()
     }
 

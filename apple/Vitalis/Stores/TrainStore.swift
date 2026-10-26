@@ -49,11 +49,31 @@ final class TrainStore {
     func load() async {
         guard let api = api() else { return }
         await week.load(cached: { await api.cached(TrainingResponse.self, path: "v2/training") }) { try await api.training() }
-        if history.isEmpty, nextCursor == nil { await loadMore() }
+        await refreshHistory(api)
         pulse = await Self.cachedPulse(api: api, now: Date())
     }
 
     /// Next page of `GET /v2/training/sessions`; overlapping rows (the first page repeats this week) are skipped.
+    /// The first page again on every load: the list kept in memory otherwise outlives server changes (a merged visit, a deletion).
+    private func refreshHistory(_ api: VitalisAPI) async {
+        guard !isPaging else { return }
+        isPaging = true
+        defer { isPaging = false }
+        do {
+            let page = try await api.sessions().value
+            history = page.sessions
+            nextCursor = page.next
+            hasMore = page.next != nil
+            pageError = nil
+        } catch {
+            pageError = error
+            // Offline on a cold start: the last saved first page beats an empty list.
+            if history.isEmpty, let cached = await api.cached(SessionsPage.self, path: "v2/training/sessions")?.value {
+                history = cached.sessions; nextCursor = cached.next; hasMore = cached.next != nil
+            }
+        }
+    }
+
     func loadMore() async {
         guard hasMore, !isPaging, let api = api() else { return }
         isPaging = true
