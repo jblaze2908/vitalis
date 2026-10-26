@@ -9,6 +9,7 @@ import VitalisUI
         ("vitalis://train", .tab(.train)), ("vitalis://eat", .tab(.eat)), ("vitalis://digest", .digest),
         ("vitalis://eat/add?slot=lunch", .eatAdd(slot: "lunch")), ("vitalis://eat/add", .eatAdd(slot: nil)),
         ("vitalis://eat/add?slot=brunch", .eatAdd(slot: nil)), ("vitalis://workout/start", .workoutStart),
+        ("vitalis://workout/live", .workoutLive),
         ("vitalis://settings", .settings), ("vitalis://settings/sync", .settingsSync), ("VITALIS://Today", .tab(.today)),
     ])
     func parses(_ link: String, _ route: Route) {
@@ -30,5 +31,7 @@ import VitalisUI
         #expect(r.tab == .today); #expect(r.showsDigest); #expect(!r.showsSettings)
         r.open(.workoutStart)
         #expect(r.tab == .train); #expect(r.sheet == .workoutStart); #expect(!r.showsDigest)
+        r.open(.workoutLive)
+        #expect(r.tab == .train); #expect(r.showsLiveWorkout); #expect(r.sheet == nil)
     }
 }

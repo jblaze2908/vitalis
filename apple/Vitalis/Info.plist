@@ -37,6 +37,8 @@
 	<string>Vitalis saves the weights, meals and iPhone workouts you log to Apple Health, so they sit alongside your other health data.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Export your Health samples to your own Vitalis server.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchScreen</key>

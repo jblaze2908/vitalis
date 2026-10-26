@@ -84,6 +84,7 @@ public struct WidgetModel: Sendable, Equatable {
 public enum WidgetLink {
     public static let today = URL(string: "vitalis://today")!
     public static let logMeal = URL(string: "vitalis://eat/add")!
+    public static let liveWorkout = URL(string: "vitalis://workout/live")!
 }
 
 public struct WidgetEntryModel: Sendable, Equatable {

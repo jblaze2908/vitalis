@@ -94,9 +94,15 @@ enum RestTimer {
 
 @MainActor @Observable
 final class LiveSessionStore {
-    static let shared = LiveSessionStore(fileURL: LiveSessionStore.defaultFileURL(), api: { Services.shared.api },
-                                         send: { _ = await Services.shared.send($0) },
-                                         health: HealthWriter(store: AppModel.shared.healthStore))
+    static let shared: LiveSessionStore = {
+        let store = LiveSessionStore(fileURL: LiveSessionStore.defaultFileURL(), api: { Services.shared.api },
+                                     send: { _ = await Services.shared.send($0) },
+                                     health: HealthWriter(store: AppModel.shared.healthStore))
+        store.liveActivity = { WorkoutActivityController.shared.sync($0) }
+        // A session restored from disk picks up (or restarts) its Live Activity.
+        store.liveActivity?(store.session)
+        return store
+    }()
 
     private(set) var session: LiveSession?
     /// True while a Watch session is live; the phone can join it instead of starting its own.
@@ -105,6 +111,8 @@ final class LiveSessionStore {
     private(set) var liveWatch: WorkoutSessionRecord?
     /// Phone → Watch path for a joined workout's own sets; wired to `PhoneSessionDelegate` in the app.
     @ObservationIgnored var sendToWatch: (@MainActor (WatchPhoneSets) -> Void)?
+    /// Every persisted change (nil = ended); drives the Live Activity in the app, unset in tests.
+    @ObservationIgnored var liveActivity: (@MainActor (LiveSession?) -> Void)?
 
     @ObservationIgnored private let fileURL: URL?
     @ObservationIgnored private let api: @MainActor () -> VitalisAPI?
@@ -445,6 +453,7 @@ final class LiveSessionStore {
     }
 
     private func persist() {
+        liveActivity?(session)
         guard let fileURL else { return }
         do {
             if let session {

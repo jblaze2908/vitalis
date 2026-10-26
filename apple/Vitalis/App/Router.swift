@@ -36,6 +36,7 @@ final class Router {
         case .digest: dismissAll(); tab = .today; showsDigest = true
         case .eatAdd(let slot): dismissAll(); tab = .eat; sheet = .quickAdd(slot: slot)
         case .workoutStart: dismissAll(); tab = .train; sheet = .workoutStart
+        case .workoutLive: dismissAll(); tab = .train; showsLiveWorkout = true
         case .settings: sheet = nil; showsDigest = false; settingsPath = []; showsSettings = true
         case .settingsSync: sheet = nil; showsDigest = false; settingsPath = [.sync]; showsSettings = true
         }

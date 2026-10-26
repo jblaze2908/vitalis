@@ -7,6 +7,8 @@ enum Route: Equatable, Sendable {
     case digest
     case eatAdd(slot: String?)
     case workoutStart
+    /// The running workout's logger (the Live Activity's links); with none running it shows its closed state.
+    case workoutLive
     case settings
     case settingsSync
 }
@@ -31,6 +33,7 @@ enum DeepLinks {
             return .eatAdd(slot: slot.flatMap { slots.contains($0) ? $0 : nil })
         case ("digest", []): return .digest
         case ("workout", ["start"]): return .workoutStart
+        case ("workout", ["live"]): return .workoutLive
         case ("settings", []): return .settings
         case ("settings", ["sync"]): return .settingsSync
         default: return nil

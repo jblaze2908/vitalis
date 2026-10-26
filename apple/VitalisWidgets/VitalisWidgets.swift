@@ -6,7 +6,10 @@ import WidgetKit
 @main
 struct VitalisWidgetBundle: WidgetBundle {
     init() { VFont.register() }
-    var body: some Widget { TodayWidget() }
+    var body: some Widget {
+        TodayWidget()
+        WorkoutLiveActivity()
+    }
 }
 
 /// Home and Lock Screen widgets, frame 29 (`lDPxhnSr9k`).

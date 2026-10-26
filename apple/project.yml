@@ -61,7 +61,10 @@ targets:
   VitalisWidgets:
     type: app-extension
     platform: iOS
-    sources: [VitalisWidgets]
+    # The Live Activity's buttons need the intent types; their perform() runs in the app.
+    sources:
+      - VitalisWidgets
+      - Vitalis/Intents/WorkoutActivityIntents.swift
     dependencies:
       - package: VitalisKit
       - package: VitalisKit

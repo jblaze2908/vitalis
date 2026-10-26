@@ -42,6 +42,9 @@ public enum VColor {
     public static let camera = Color(hex: 0x141414)
     public static let muscleBase = Color(hex: 0x272727)
     public static let tickMajor = Color(hex: 0x666666)
+    // Live Activity (Draft frame "05 · Live workout"): rest bar/ring track, and text on a pulse-filled button.
+    public static let activityTrack = Color(hex: 0x2A2A2A)
+    public static let onPulse = Color(hex: 0x1A0503)
 
     /// Muscle heat 0–4 as load: grey for none, red as load rises. Server 1 is "recovered" (load < 0.5), so it shares 0's grey.
     public static func heat(_ level: Int) -> Color {
