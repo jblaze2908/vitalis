@@ -109,6 +109,9 @@ final class TodayStore {
 
     private var refreshFailed: Bool { previewFailed || today.error != nil }
 
+    /// When the shown body came from the server, for the header's freshness line (previews inject it).
+    var fetchedAt: Date? { previewFetchedAt ?? today.fetchedAt }
+
     var phase: Phase {
         if today.value == nil { return refreshFailed || notConfigured ? .failed : .loading }
         return refreshFailed ? .cached : .loaded

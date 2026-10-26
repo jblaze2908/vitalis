@@ -2,9 +2,25 @@ import SwiftUI
 import VitalisKit
 import VitalisUI
 
+/// The tab headline: one `.display` line per entry.
+private struct SleepHeadline: View {
+    let lines: [String]
+    var placeholder = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line).vText(.display, color: placeholder ? VColor.text3 : nil).lineLimit(1).minimumScaleFactor(0.6)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 /// Sleep tab (2e): Night (stages across the clock, naps apart), Week (bed→wake per night) and Month (a calendar of hours).
 struct SleepScreen: View {
     @State private var store: SleepStore
+    @Environment(\.scenePhase) private var scenePhase
     private let live: Bool
 
     init() { _store = State(initialValue: SleepStore.shared); live = true }
@@ -16,15 +32,15 @@ struct SleepScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                TabHeader("Sleep").padding(.horizontal, 20).padding(.top, 2)
+                VHeader("Sleep", freshness: DataFreshness(fetchedAt: store.night.fetchedAt, refreshing: store.night.isLoading))
                 HStack {
                     PillPicker(SleepStore.Range.allCases.map { ($0, $0.rawValue) }, selection: Binding(get: { store.range }, set: { r in choose(r) }))
-                    Spacer(minLength: 8)
+                    Spacer(minLength: VSpace.s2)
                     stepper
                 }
-                .padding(.horizontal, 16).padding(.top, 12)
+                .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
                 if v == nil, store.night.error != nil, !store.night.isLoading {
-                    unreachable.padding(.horizontal, 20)
+                    unreachable.padding(.horizontal, VSpace.edge)
                 } else {
                     switch store.range {
                     case .night: nightView
@@ -33,17 +49,20 @@ struct SleepScreen: View {
                     }
                 }
             }
-            .padding(.bottom, 32)
+            .padding(.bottom, VSpace.s6)
         }
         .scrollIndicators(.hidden)
         .refreshable { if live { await store.load(force: true) } }
-        .task {
+        // First appearance and every return to the foreground.
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
             if live { await store.load() }
             #if DEBUG
             // Screenshots without taps: `-VitalisSleepRange Week`.
             if let raw = UserDefaults.standard.string(forKey: "VitalisSleepRange"), let r = SleepStore.Range(rawValue: raw) { await store.select(r) }
             #endif
         }
+        .onChange(of: live ? Services.shared.writesVersion : 0) { Task { await store.load() } }
     }
 
     private func choose(_ r: SleepStore.Range) { Task { await store.select(r) } }
@@ -69,33 +88,30 @@ struct SleepScreen: View {
 
     @ViewBuilder private var nightView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HeadlineLines(SleepCopy.headline(v), size: 36, colors: v == nil ? [VColor.steel] : []).padding(.top, 14).padding(.horizontal, 20)
+            SleepHeadline(lines: SleepCopy.headline(v), placeholder: v == nil).padding(.top, VSpace.s4).padding(.horizontal, VSpace.edge)
             if v?.hasNight == false {
-                Text("No sleep recorded for this night.").vBody().padding(.top, 16).padding(.horizontal, 20)
+                Text("No sleep recorded for this night.").vText(.body).padding(.top, VSpace.s4).padding(.horizontal, VSpace.edge)
             } else {
                 HStack(alignment: .lastTextBaseline) {
-                    Figure(v?.night.flatMap { $0.asleepH.map(SleepCopy.hm) } ?? "–", unit: "asleep", size: 52)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(v?.score.map(String.init) ?? "–").vFigure(28)
-                        Text("Score").vLabel()
-                    }
+                    Figure(v?.night.flatMap { $0.asleepH.map(SleepCopy.hm) } ?? "–", unit: "asleep", size: 56)
+                    Spacer(minLength: VSpace.s2)
+                    Figure(v?.score.map(String.init) ?? "–", unit: "score", size: 28)
                 }
-                .padding(.horizontal, 16).padding(.top, 16)
+                .padding(.horizontal, VSpace.edge).padding(.top, VSpace.s4)
                 if let segs = v?.night?.segments, !segs.isEmpty {
-                    StageChart(segments: segs).frame(height: 134).padding(.horizontal, 16).padding(.top, 14)
-                    stageLegend.padding(.horizontal, 16).padding(.top, 10)
+                    StageChart(segments: segs).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
+                    stageLegend.padding(.horizontal, VSpace.edge).padding(.top, VSpace.s3)
                 }
-                ForEach(Array((v?.naps ?? []).enumerated()), id: \.offset) { _, nap in napRow(nap).padding(.horizontal, 16).padding(.top, 12) }
-                ReadoutRow(SleepCopy.readouts(v)).padding(.horizontal, 16).padding(.top, 18)
-                tonightCard.padding(.horizontal, 16).padding(.top, 18)
+                naps
+                ReadoutRow(SleepCopy.readouts(v)).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
+                tonight
             }
         }
     }
 
     private var stageLegend: some View {
         let st = v?.stages
-        return HStack(spacing: 14) {
+        return HStack(spacing: VSpace.s3) {
             legend(VColor.sleepDeep, "Deep", st?.deepH)
             legend(VColor.sleepCore, "Core", st?.coreH)
             legend(VColor.sleepREM, "REM", st?.remH)
@@ -104,43 +120,46 @@ struct SleepScreen: View {
     }
 
     private func legend(_ color: Color, _ name: String, _ h: Double?) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: VSpace.s1) {
             RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 9, height: 9)
-            Text(name).vUI(12, weight: 400, color: VColor.muted)
-            Text(h.map(SleepCopy.hm) ?? "–").vUI(12, weight: 600)
+            Text(name).vText(.secondary)
+            Text(h.map(SleepCopy.hm) ?? "–").vText(.secondary, color: VColor.text)
         }
-    }
-
-    private func napRow(_ nap: SleepResponse.Nap) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: "moon").font(.system(size: 13, weight: .medium)).foregroundStyle(VColor.sleepREM)
-            Text("Nap").vUI(14, weight: 600)
-            Text("\(APIDate.clockText(nap.start) ?? "")–\(APIDate.clockText(nap.end) ?? "")").vUI(14, weight: 400, color: VColor.muted)
-            Text(SleepCopy.hm(nap.asleepH)).vFigure(14)
-            Spacer(minLength: 4)
-            Text("not in score").vUI(12, weight: 400, color: Color(hex: 0x7A8A96))
-        }
-        .padding(.horizontal, 12).padding(.vertical, 10)
-        .background(Color(hex: 0x111820), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
-    @ViewBuilder private var tonightCard: some View {
-        if let t = v?.tonight, let bed = t.bedBy, v?.nextDay == nil {
-            VCard {
-                HStack(spacing: 12) {
-                    Image(systemName: "moon").font(.system(size: 18)).foregroundStyle(VColor.sleepCore)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Bed by \(bed)").vUI(16, weight: 600)
-                        Text(SleepCopy.tonightLine(t, napCredit: v?.duration?.napCreditH)).vUI(13, weight: 400, color: VColor.muted)
-                    }
-                    Spacer(minLength: 8)
-                    if store.reminder != .set {
-                        Button("Remind me") { Task { await store.remindMe() } }.buttonStyle(.plain).font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(VColor.sleepCore)
-                    } else { Text("Reminder set").vUI(13, weight: 500, color: VColor.muted) }
+    /// Naps sit apart from the night: they count toward need but not toward the score.
+    @ViewBuilder private var naps: some View {
+        let list = v?.naps ?? []
+        if !list.isEmpty {
+            SectionLabel("Naps")
+            ListCard {
+                ForEach(Array(list.enumerated()), id: \.offset) { _, nap in
+                    ListRow("Nap", subtitle: "\(APIDate.clockText(nap.start) ?? "")–\(APIDate.clockText(nap.end) ?? "") · not in score",
+                            value: SleepCopy.hm(nap.asleepH), chevron: false)
                 }
             }
+            .padding(.horizontal, VSpace.edge)
+        }
+    }
+
+    @ViewBuilder private var tonight: some View {
+        if let t = v?.tonight, let bed = t.bedBy, v?.nextDay == nil {
+            SectionLabel("Tonight")
+            VCard {
+                HStack(spacing: VSpace.s3) {
+                    Image(systemName: "moon").font(.system(size: 18)).foregroundStyle(VColor.sleepCore)
+                    VStack(alignment: .leading, spacing: VSpace.s1) {
+                        Text("Bed by \(bed)").vText(.title)
+                        Text(SleepCopy.tonightLine(t, napCredit: v?.duration?.napCreditH)).vText(.secondary)
+                    }
+                    Spacer(minLength: VSpace.s2)
+                    if store.reminder != .set {
+                        SecondaryButton("Remind me") { Task { await store.remindMe() } }
+                    } else { Text("Reminder set").vText(.secondary) }
+                }
+            }
+            .padding(.horizontal, VSpace.edge)
         }
     }
 
@@ -149,15 +168,13 @@ struct SleepScreen: View {
     @ViewBuilder private var weekView: some View {
         let w = store.shownWeek
         VStack(alignment: .leading, spacing: 0) {
-            HeadlineLines(SleepCopy.weekHeadline(w?.avg), size: 36, colors: w == nil ? [VColor.steel] : []).padding(.top, 14).padding(.horizontal, 20)
-            ReadoutRow(SleepCopy.weekReadouts(w)).padding(.horizontal, 16).padding(.top, 18)
-            HStack {
-                Text("Each night").vUI(14, weight: 600)
-                Spacer()
-                Text("Bed → wake · hours").vLabel()
+            SleepHeadline(lines: SleepCopy.weekHeadline(w?.avg), placeholder: w == nil).padding(.top, VSpace.s4).padding(.horizontal, VSpace.edge)
+            ReadoutRow(SleepCopy.weekReadouts(w)).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
+            SectionLabel("Each night", note: "Bed → wake · hours")
+            if let w {
+                VCard { WeekSchedule(nights: w.nights, aimBed: v?.tonight?.bedBy, aimWake: v?.tonight?.wakeTime) }
+                    .padding(.horizontal, VSpace.edge)
             }
-            .padding(.horizontal, 16).padding(.top, 22)
-            if let w { WeekSchedule(nights: w.nights, aimBed: v?.tonight?.bedBy, aimWake: v?.tonight?.wakeTime).padding(.horizontal, 16).padding(.top, 10) }
         }
     }
 
@@ -166,101 +183,119 @@ struct SleepScreen: View {
     @ViewBuilder private var monthView: some View {
         let m = store.shownMonth
         VStack(alignment: .leading, spacing: 0) {
-            HeadlineLines(SleepCopy.monthHeadline(m?.avg), size: 36, colors: m == nil ? [VColor.steel] : []).padding(.top, 14).padding(.horizontal, 20)
-            ReadoutRow(SleepCopy.monthReadouts(m)).padding(.horizontal, 16).padding(.top, 18)
-            if let m { MonthCalendar(month: m.month, days: m.days).padding(.horizontal, 16).padding(.top, 18) }
+            SleepHeadline(lines: SleepCopy.monthHeadline(m?.avg), placeholder: m == nil).padding(.top, VSpace.s4).padding(.horizontal, VSpace.edge)
+            ReadoutRow(SleepCopy.monthReadouts(m)).padding(.horizontal, VSpace.edge).padding(.top, VSpace.s5)
+            if let m {
+                SectionLabel("Each night", note: "Hours asleep")
+                VCard { MonthCalendar(month: m.month, days: m.days) }.padding(.horizontal, VSpace.edge)
+            }
         }
     }
 
     // MARK: Error without cache
 
     private var unreachable: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Connect to your server to see your sleep.").vBody()
+        VStack(alignment: .leading, spacing: VSpace.s4) {
+            Text("Connect to your server to see your sleep.").vText(.body)
             SecondaryButton("Try again") { Task { await store.load(force: true) } }
         }
-        .padding(.top, 24)
+        .padding(.top, VSpace.s5)
     }
 }
 
-/// The night across the clock: Awake, REM, Core and Deep rows, one block per stage spell.
+/// The night across the clock: Awake, REM, Core and Deep rows, one block per stage spell; row names in the right lane.
 private struct StageChart: View {
     let segments: [SleepResponse.Segment]
     @State private var sx: Double?
+    private static let rowH: CGFloat = 26, lane: CGFloat = 40
+    private static let rows = ["Awake", "REM", "Core", "Deep"]
+
     var body: some View {
         let spans = segments.compactMap { s -> (String, Date, Date)? in
             guard let a = APIDate.parse(s.start), let b = APIDate.parse(s.end) else { return nil }; return (s.stage, a, b)
         }
         let start = spans.map(\.1).min() ?? Date(), end = spans.map(\.2).max() ?? Date()
-        VStack(spacing: 6) {
-            Canvas { ctx, size in
-                let total = max(end.timeIntervalSince(start), 60), rowH: CGFloat = 26, gap: CGFloat = 4
-                for i in 0..<4 {
-                    var line = Path(); let y = CGFloat(i) * (rowH + gap) + rowH / 2
-                    line.move(to: CGPoint(x: 0, y: y)); line.addLine(to: CGPoint(x: size.width, y: y))
-                    ctx.stroke(line, with: .color(Color(hex: 0x1C1C1C)), lineWidth: 1)
-                }
-                for (stage, a, b) in spans {
-                    let row: Int, color: Color
-                    switch stage {
-                    case "awake": row = 0; color = VColor.watch
-                    case "rem": row = 1; color = VColor.sleepREM
-                    case "deep": row = 3; color = VColor.sleepDeep
-                    default: row = 2; color = VColor.sleepCore
+        let plotH = Self.rowH * 4 + VSpace.s1 * 3
+        VStack(spacing: VSpace.s2) {
+            HStack(alignment: .top, spacing: VSpace.s2) {
+                Canvas { ctx, size in
+                    let total = max(end.timeIntervalSince(start), 60), rowH = Self.rowH, gap = VSpace.s1
+                    for i in 0..<4 {
+                        var line = Path(); let y = CGFloat(i) * (rowH + gap) + rowH / 2
+                        line.move(to: CGPoint(x: 0, y: y)); line.addLine(to: CGPoint(x: size.width, y: y))
+                        ctx.stroke(line, with: .color(VColor.grid), lineWidth: 1)
                     }
-                    let x0 = size.width * a.timeIntervalSince(start) / total, x1 = size.width * b.timeIntervalSince(start) / total
-                    let rect = CGRect(x: x0, y: CGFloat(row) * (rowH + gap), width: max(x1 - x0, row == 0 ? 3 : 2), height: rowH)
-                    ctx.fill(Path(roundedRect: rect, cornerRadius: row == 0 ? 2 : 3), with: .color(color))
-                }
-            }
-            .frame(height: 116)
-            .overlay {
-                GeometryReader { g in
-                    if let sx {
-                        let t = start.addingTimeInterval(end.timeIntervalSince(start) * sx)
-                        let hit = spans.first { $0.1 <= t && t < $0.2 }
-                        Rectangle().fill(VColor.bone.opacity(0.5)).frame(width: 1, height: g.size.height).offset(x: g.size.width * sx)
-                        ChartCallout(hit.map { "\(SleepCopy.stageName($0.0)) · \(SleepCopy.clock($0.1, like: segments.first?.start))–\(SleepCopy.clock($0.2, like: segments.first?.start))" }
-                                     ?? SleepCopy.clock(t, like: segments.first?.start))
-                            .position(x: min(max(g.size.width * sx, 80), g.size.width - 80), y: -12)
+                    for (stage, a, b) in spans {
+                        let row: Int, color: Color
+                        switch stage {
+                        case "awake": row = 0; color = VColor.watch
+                        case "rem": row = 1; color = VColor.sleepREM
+                        case "deep": row = 3; color = VColor.sleepDeep
+                        default: row = 2; color = VColor.sleepCore
+                        }
+                        let x0 = size.width * a.timeIntervalSince(start) / total, x1 = size.width * b.timeIntervalSince(start) / total
+                        let rect = CGRect(x: x0, y: CGFloat(row) * (rowH + gap), width: max(x1 - x0, row == 0 ? 3 : 2), height: rowH)
+                        ctx.fill(Path(roundedRect: rect, cornerRadius: row == 0 ? 2 : 3), with: .color(color))
                     }
                 }
-            }
-            .scrub($sx)
-            HStack {
-                ForEach(0..<4, id: \.self) { i in
-                    let t = start.addingTimeInterval(end.timeIntervalSince(start) * Double(i) / 3)
-                    Text(SleepCopy.clock(t, like: segments.first?.start)).vLabel(.standard, tint: .steel)
-                    if i < 3 { Spacer() }
+                .frame(height: plotH)
+                .overlay {
+                    GeometryReader { g in
+                        if let sx {
+                            let t = start.addingTimeInterval(end.timeIntervalSince(start) * sx)
+                            let hit = spans.first { $0.1 <= t && t < $0.2 }
+                            Rectangle().fill(VColor.text.opacity(0.5)).frame(width: 1, height: g.size.height).offset(x: g.size.width * sx)
+                            ChartCallout(hit.map { "\(SleepCopy.stageName($0.0)) · \(SleepCopy.clock($0.1, like: segments.first?.start))–\(SleepCopy.clock($0.2, like: segments.first?.start))" }
+                                         ?? SleepCopy.clock(t, like: segments.first?.start))
+                                .position(x: min(max(g.size.width * sx, 80), g.size.width - 80), y: -12)
+                        }
+                    }
                 }
+                .scrub($sx)
+                VStack(alignment: .leading, spacing: VSpace.s1) {
+                    ForEach(Self.rows, id: \.self) { Text($0).vText(.axis).frame(height: Self.rowH) }
+                }
+                .frame(width: Self.lane, alignment: .leading)
+                .accessibilityHidden(true)
+            }
+            HStack(spacing: VSpace.s2) {
+                HStack {
+                    ForEach(0..<4, id: \.self) { i in
+                        let t = start.addingTimeInterval(end.timeIntervalSince(start) * Double(i) / 3)
+                        Text(SleepCopy.clock(t, like: segments.first?.start)).vText(.axis)
+                        if i < 3 { Spacer() }
+                    }
+                }
+                Color.clear.frame(width: Self.lane, height: 1)
             }
         }
         .accessibilityLabel("Sleep stages across the night")
     }
 }
 
-/// One bar per night from bed to wake on a 22:00–10:00 clock, hours on the right, score under it.
+/// One bar per night from bed to wake on a 22:00–10:00 clock, the aim window as a band behind, hours on the right.
 private struct WeekSchedule: View {
     let nights: [SleepNightRow]
     let aimBed: String?
     let aimWake: String?
     private static let from = 22 * 60, span = 12 * 60
+    private static let dayLane: CGFloat = 40, valueLane: CGFloat = 64, rowH: CGFloat = 40
 
     var body: some View {
         VStack(spacing: 0) {
             ForEach(nights, id: \.day) { n in row(n) }
-            HStack {
-                Color.clear.frame(width: 40)
+            HStack(spacing: 0) {
+                Color.clear.frame(width: Self.dayLane)
                 GeometryReader { g in
                     ForEach([0, 4, 8, 12], id: \.self) { h in
-                        Text(String(format: "%02d:00", (22 + h) % 24)).vLabel(.standard, tint: .steel)
-                            .position(x: g.size.width * Double(h) / 12, y: 8)
+                        Text(String(format: "%02d:00", (22 + h) % 24)).vText(.axis)
+                            .position(x: g.size.width * Double(h) / 12, y: VSpace.s2)
                     }
                 }
-                .frame(height: 16)
-                Color.clear.frame(width: 64)
+                .frame(height: VSpace.s4)
+                Color.clear.frame(width: Self.valueLane)
             }
-            .padding(.top, 8)
+            .padding(.top, VSpace.s2)
         }
     }
 
@@ -274,28 +309,27 @@ private struct WeekSchedule: View {
 
     private func row(_ n: SleepNightRow) -> some View {
         HStack(spacing: 0) {
-            Text(SleepCopy.weekday(n.day)).vUI(13, weight: 600, color: VColor.muted).frame(width: 40, alignment: .leading)
+            Text(SleepCopy.weekday(n.day)).vText(.secondary).frame(width: Self.dayLane, alignment: .leading)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    ForEach([aimBed, aimWake].compactMap { $0 }, id: \.self) { aim in
-                        if let ax = x("T\(aim)") {
-                            Rectangle().fill(Color(hex: 0x3A3A3A)).frame(width: 1, height: 34).offset(x: g.size.width * ax)
-                        }
+                    // Rows touch, so the aim window reads as one band down the chart.
+                    if let a = x(aimBed.map { "T\($0)" }), let b = x(aimWake.map { "T\($0)" }), b > a {
+                        Rectangle().fill(VColor.range).frame(width: g.size.width * (b - a)).offset(x: g.size.width * a)
                     }
                     if let a = x(n.sleepStart), let b = x(n.sleepEnd), b > a {
-                        Capsule().fill(VColor.sleepCore).frame(width: g.size.width * (b - a), height: 16).offset(x: g.size.width * a)
+                        Capsule().fill(VColor.sleepCore).frame(width: g.size.width * (b - a), height: VBar.meter).offset(x: g.size.width * a)
                     } else if n.asleepH == nil {
-                        Text("No data").vUI(12, weight: 400, color: Color(hex: 0x6E6E6E)).frame(maxWidth: .infinity)
+                        Text("No data").vText(.secondary, color: VColor.text3).frame(maxWidth: .infinity)
                     }
                 }
-                .frame(height: 40)
+                .frame(height: Self.rowH)
             }
-            .frame(height: 40)
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(n.asleepH.map(SleepCopy.hm) ?? "–").vFigure(15, color: (n.asleepH ?? 9) < 6 ? VColor.watch : nil)
-                if let s = n.score { Text("score \(s)").vUI(11, weight: 500, color: Color(hex: 0x7A7A7A)).lineLimit(1) }
+            .frame(height: Self.rowH)
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(n.asleepH.map(SleepCopy.hm) ?? "–").vText(.headline, color: (n.asleepH ?? 9) < 6 ? VColor.watch : nil)
+                if let s = n.score { Text("score \(s)").vText(.secondary).lineLimit(1) }
             }
-            .frame(width: 64, alignment: .trailing)
+            .frame(width: Self.valueLane, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
     }
@@ -309,27 +343,31 @@ private struct MonthCalendar: View {
         let lead = SleepCopy.leadingBlanks(month)
         let byDay = Dictionary(uniqueKeysWithValues: days.map { ($0.day, $0) })
         let count = SleepCopy.daysIn(month)
-        let cols = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
-        VStack(spacing: 12) {
-            LazyVGrid(columns: cols, spacing: 6) {
+        let cols = Array(repeating: GridItem(.flexible(), spacing: VSpace.s1), count: 7)
+        VStack(spacing: VSpace.s3) {
+            LazyVGrid(columns: cols, spacing: VSpace.s1) {
                 // One id space for headers, blanks and days: shared Int ids made the grid drop the 1st and 2nd.
                 ForEach((0..<7).map { "h\($0)" } + (0..<lead).map { "b\($0)" } + (1...count).map { "d\($0)" }, id: \.self) { key in
                     let n = Int(key.dropFirst()) ?? 0
                     switch key.first {
-                    case "h": Text(String(Array("MTWTFSS")[n])).vUI(11, weight: 600, color: Color(hex: 0x7A7A7A))
+                    case "h": Text(String(Array("MTWTFSS")[n])).vText(.axis)
                     case "b": Color.clear.frame(height: 44)
                     default: cell(n, byDay[String(format: "%@-%02d", month, n)])
                     }
                 }
             }
-            HStack(spacing: 6) {
+            HStack(spacing: VSpace.s2) {
                 ForEach(Array(SleepCopy.hourBands.enumerated()), id: \.offset) { _, band in
-                    RoundedRectangle(cornerRadius: 3).fill(band.1).frame(width: 14, height: 10)
-                    Text(band.0).vUI(12, weight: 400, color: VColor.muted)
+                    HStack(spacing: VSpace.s1) {
+                        RoundedRectangle(cornerRadius: 2).fill(band.1).frame(width: 14, height: 10)
+                        Text(band.0).vText(.secondary)
+                    }
                 }
-                Spacer()
-                Circle().fill(VColor.sleepREM).frame(width: 7, height: 7)
-                Text("nap").vUI(12, weight: 400, color: VColor.muted)
+                Spacer(minLength: 0)
+                HStack(spacing: VSpace.s1) {
+                    Circle().fill(VColor.sleepREM).frame(width: 7, height: 7)
+                    Text("nap").vText(.secondary)
+                }
             }
         }
     }
@@ -337,17 +375,17 @@ private struct MonthCalendar: View {
     private func cell(_ d: Int, _ n: SleepNightRow?) -> some View {
         let h = n?.asleepH
         let fill = h.map(SleepCopy.hourColor) ?? .clear
-        let dark = (h ?? 0) >= 7
-        return VStack(alignment: .leading) {
-            Text("\(d)").vUI(11, weight: 600, color: dark ? Color(hex: 0x0B1630) : VColor.bone.opacity(0.72))
+        let dark = h.map(SleepCopy.darkInk) ?? false
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("\(d)").vText(.axis, color: dark ? VColor.ground : VColor.text2)
             Spacer(minLength: 0)
-            HStack { Spacer(minLength: 0); Text(h.map(SleepCopy.hm) ?? "").vUI(13, weight: 700, color: dark ? Color(hex: 0x0B1630) : VColor.bone).lineLimit(1).minimumScaleFactor(0.8) }
+            HStack { Spacer(minLength: 0); Text(h.map(SleepCopy.hm) ?? "").vText(.headline, color: dark ? VColor.ground : VColor.text).lineLimit(1).minimumScaleFactor(0.7) }
         }
-        .padding(5)
+        .padding(VSpace.s1)
         .frame(height: 44)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(fill))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(h == nil ? Color(hex: 0x222222) : .clear, lineWidth: 1))
-        .overlay(alignment: .topTrailing) { if (n?.napH ?? 0) > 0 { Circle().fill(VColor.sleepREM).frame(width: 6, height: 6).padding(6) } }
+        .background(RoundedRectangle(cornerRadius: VRadius.control, style: .continuous).fill(fill))
+        .overlay(RoundedRectangle(cornerRadius: VRadius.control, style: .continuous).stroke(h == nil ? VColor.line : .clear, lineWidth: 1))
+        .overlay(alignment: .topTrailing) { if (n?.napH ?? 0) > 0 { Circle().fill(VColor.sleepREM).frame(width: 6, height: 6).padding(VSpace.s1) } }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(d): \(h.map(SleepCopy.hm) ?? "no data")")
     }
@@ -415,7 +453,9 @@ enum SleepCopy {
                 Readout("Nights", a.map { String($0.nights) } ?? "–", status: a.flatMap { $0.missing > 0 ? ("\($0.missing) missing", .quiet) : nil })]
     }
 
-    static let hourBands: [(String, Color)] = [("<6h", Color(hex: 0x1A2030)), ("6–7h", Color(hex: 0x2F3F5E)), ("7–7½h", VColor.sleepCore), ("7½h+", Color(hex: 0xAEBFDB))]
+    /// Darker to lighter as the night gets longer; the two lightest take dark ink (`darkInk`).
+    static let hourBands: [(String, Color)] = [("<6h", VColor.barTrack), ("6–7h", VColor.sleepDeep), ("7–7½h", VColor.sleepCore), ("7½h+", VColor.sleepREM)]
+    static func darkInk(_ h: Double) -> Bool { h >= 7 }
     static func hourColor(_ h: Double) -> Color { h < 6 ? hourBands[0].1 : h < 7 ? hourBands[1].1 : h < 7.5 ? hourBands[2].1 : hourBands[3].1 }
 
     private static let iso: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"; return f }()
@@ -448,26 +488,6 @@ enum SleepCopy {
     }
 }
 
-/// Stages one tap down from the hero, with the server's note that they are estimates.
-private struct SleepStagesSheet: View {
-    let stages: SleepResponse.Stages?
-
-    var body: some View {
-        SheetChrome {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Stages").vHeadline(22).padding(.top, 20).padding(.bottom, 12)
-                ReadingRow("Core", value: SleepBodyFormat.hours(stages?.coreH))
-                ReadingRow("Deep", value: SleepBodyFormat.hours(stages?.deepH))
-                ReadingRow("REM", value: SleepBodyFormat.hours(stages?.remH))
-                ReadingRow("Awake", value: SleepBodyFormat.hours(stages?.awakeH), showsRule: false)
-                if let note = stages?.note { Text(note).vBody().padding(.top, 16) }
-            }
-            .padding(.horizontal, VSpace.gutter)
-        }
-        .presentationDetents([.height(340)])
-    }
-}
-
 @MainActor private func previewStore(_ value: SleepResponse?, week: SleepWeekResponse? = SleepBodyPreviewData.week) -> SleepStore {
     let store = SleepStore(api: { nil })
     store.preload(value, week: week)
@@ -488,9 +508,4 @@ private struct SleepStagesSheet: View {
 
 #Preview("Sleep · loading") {
     SleepScreen(store: previewStore(nil, week: nil)).vScreen().onAppear { VFont.register() }
-}
-
-#Preview("Sleep · stages sheet") {
-    Color.clear.sheet(isPresented: .constant(true)) { SleepStagesSheet(stages: SleepBodyPreviewData.sleep?.stages) }
-        .vScreen().onAppear { VFont.register() }
 }
