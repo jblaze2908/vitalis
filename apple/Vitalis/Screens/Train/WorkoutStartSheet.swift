@@ -30,28 +30,28 @@ struct WorkoutStartSheet: View {
         SheetChrome {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    MonoLabel(splits.isEmpty ? "Pick exercises as you go" : "Your splits · you pick").padding(.top, 28)
-                    HeadlineLines([split?.name ?? "Workout"], size: 56).padding(.top, 6)
+                    DetailSection(splits.isEmpty ? "Pick exercises as you go" : "Your splits · you pick")
+                    TabHeadline(lines: [split?.name ?? "Workout"])
                     if let split, !split.exercises.isEmpty {
-                        Text(split.exercises.map(\.name).joined(separator: " · ")).vReading(14, tint: .steel).textCase(.uppercase)
-                            .lineSpacing(6).fixedSize(horizontal: false, vertical: true).padding(.top, 14)
+                        Text(split.exercises.map(\.name).joined(separator: " · ")).vText(.secondary)
+                            .fixedSize(horizontal: false, vertical: true).padding(.top, VSpace.s2)
                     }
-                    if !splits.isEmpty { choices.padding(.top, 20) }
+                    if !splits.isEmpty { choices.padding(.top, VSpace.s5) }
 
                     if live.watchSessionLive, live.liveWatch != nil {
                         // Already running on the Watch: open that same workout here.
-                        PrimaryButton("Join Watch workout", icon: "applewatch") { joinWatch() }.padding(.top, 28)
-                        caption("Add sets here too · the Watch keeps recording", tint: .steel)
+                        PrimaryButton("Join Watch workout", icon: "applewatch") { joinWatch() }.padding(.top, VSpace.s5)
+                        caption("Add sets here too · the Watch keeps recording", color: VColor.text2)
                     } else {
                         PrimaryButton(starting ? "Starting" : "Start workout") { Task { await start() } }
                             .disabled(starting)
-                            .padding(.top, 28)
+                            .padding(.top, VSpace.s5)
                         caption(watchError ?? "One workout on this iPhone and your Watch · the Watch records heart rate",
-                                tint: watchError == nil ? .steel : .watch)
+                                color: watchError == nil ? VColor.text2 : VColor.watch)
                     }
                 }
-                .padding(.horizontal, VSpace.gutter)
-                .padding(.bottom, VSpace.gutter)
+                .gutter()
+                .padding(.bottom, VSpace.s4)
             }
         }
         .presentationDetents([.large])
@@ -60,8 +60,7 @@ struct WorkoutStartSheet: View {
 
     /// One row per split, in server order; loaded ones stay tappable because the owner decides.
     private var choices: some View {
-        VStack(spacing: 0) {
-            Rule()
+        ListCard {
             ForEach(splits) { s in choiceRow(s.name, detail: Self.detail(s), dim: !s.ready, on: chosen == s.id) { pick(s.id) } }
             choiceRow("Empty workout", detail: "Pick as you go", dim: false, on: picked && chosen == nil) { pick(nil) }
         }
@@ -74,17 +73,10 @@ struct WorkoutStartSheet: View {
 
     private func choiceRow(_ name: String, detail: String, dim: Bool, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 0) {
-                HStack(spacing: 14) {
-                    Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? VColor.bone : VColor.future)
-                    Text(name).vReading(15, tint: dim ? .steel : .bone).textCase(.uppercase).lineLimit(1)
-                    Spacer(minLength: 8)
-                    MonoLabel(detail, tint: dim ? .steel : .good)
-                }
-                .frame(minHeight: 52)
-                Rule()
+            ListRow(name, chevron: false) {
+                StatusWord(detail, tone: dim ? .quiet : .good)
+                Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? VColor.accent : VColor.chevron)
             }
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -93,11 +85,11 @@ struct WorkoutStartSheet: View {
 
     private func pick(_ id: String?) { chosen = id; picked = true }
 
-    private func caption(_ text: String, tint: VTint) -> some View {
-        MonoLabel(text, size: .small, tint: tint)
+    private func caption(_ text: String, color: Color) -> some View {
+        Text(text).vText(.secondary, color: color)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
-            .padding(.top, 12)
+            .padding(.top, VSpace.s3)
     }
 
     /// One workout for both devices (20 §4): the phone mints the id, the Watch app opens on it and records Health;

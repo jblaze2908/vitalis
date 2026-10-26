@@ -28,7 +28,7 @@ struct LiveWorkoutScreen: View {
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button { focus = nil; Task { await store.commitEdits() } } label: { Text("Done").vAction(17) }
+                    Button { focus = nil; Task { await store.commitEdits() } } label: { Text("Done").vText(.headline) }
                 }
             }
             .vScreen()
@@ -48,17 +48,18 @@ struct LiveWorkoutScreen: View {
 
     private func content(_ s: LiveSession) -> some View {
         VStack(spacing: 0) {
-            TrainTopBar(status: readOnly ? "Live on Watch · read only" : s.isJoined ? "Shared with Watch · live" : "Workout · live", pulse: train.pulse)
-                .overlay(alignment: .topLeading) {
-                    // Minimise: the workout keeps running; a resume bar sits above the tab bar.
-                    Button { focus = nil; router.showsLiveWorkout = false } label: {
-                        Image(systemName: "chevron.down").vLabel().frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, VSpace.statusSide - 12)
-                    .padding(.top, VSpace.statusTop - 14)
-                    .accessibilityLabel("Minimise workout")
+            HStack(spacing: VSpace.s2) {
+                // Minimise: the workout keeps running; a resume bar sits above the tab bar.
+                Button { focus = nil; router.showsLiveWorkout = false } label: {
+                    Image(systemName: "chevron.down").font(.system(size: 17, weight: .semibold)).foregroundStyle(VColor.text)
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Minimise workout")
+                Spacer(minLength: VSpace.s2)
+                StatusWord(readOnly ? "Live on Watch · read only" : s.isJoined ? "Shared with Watch · live" : "Workout · live", tone: .load)
+            }
+            .padding(.leading, VSpace.s1).padding(.trailing, VSpace.edge)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     TimelineView(.periodic(from: s.startedAt, by: 1)) { tick in
@@ -70,8 +71,8 @@ struct LiveWorkoutScreen: View {
                     if let ex = s.current { CurrentExercise(store: store, exercise: ex, index: s.currentIndex, readOnly: readOnly, focus: $focus) }
                     others(s)
                 }
-                .padding(.horizontal, VSpace.gutter)
-                .padding(.bottom, VSpace.buttonHeight + 50)
+                .gutter()
+                .padding(.bottom, VSpace.buttonHeight + VSpace.s7)
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
@@ -79,8 +80,8 @@ struct LiveWorkoutScreen: View {
                 if !readOnly && focus == nil {
                     SecondaryButton("+ Add exercise", size: .full) { addingExercise = true }
                         .background(VColor.ground)
-                        .padding(.horizontal, VSpace.gutter)
-                        .padding(.bottom, 34)
+                        .gutter()
+                        .padding(.bottom, VSpace.s6)
                 }
             }
         }
@@ -106,7 +107,18 @@ struct LiveWorkoutScreen: View {
     private func header(_ s: LiveSession, now: Date) -> some View {
         let logged = s.sets.count + (s.watchSets?.count ?? 0)
         let context = "\(TrainFormat.elapsed(now.timeIntervalSince(s.startedAt))) · \(logged) of \(max(s.plannedSets, logged)) sets"
-        return ScreenHeader(context: context, title: s.title) {
+        return VStack(alignment: .leading, spacing: VSpace.s1) {
+            Text(context).vText(.secondary)
+            HStack(alignment: .lastTextBaseline, spacing: VSpace.s2) {
+                TabHeadline(lines: [s.title])
+                Spacer(minLength: VSpace.s2)
+                headerAction(s)
+            }
+        }
+        .padding(.top, VSpace.s3)
+    }
+
+    @ViewBuilder private func headerAction(_ s: LiveSession) -> some View {
             if s.isJoined {
                 // The Watch ends the workout; leaving only stops logging from this phone.
                 SecondaryButton("Leave", enabled: !finishing) { focus = nil; Task { await finish() } }
@@ -117,25 +129,24 @@ struct LiveWorkoutScreen: View {
                     if s.title == "Workout", !s.sets.isEmpty { name = ""; naming = true } else { confirmFinish = true }
                 }
             }
-        }
-        .padding(.top, VSpace.sectionTop)
     }
 
     @ViewBuilder private func rest(_ s: LiveSession, now: Date) -> some View {
         let remaining = RestTimer.remaining(end: s.restEnd, now: now)
         if remaining > 0 {
-            VSection {
-                MonoLabel("Rest · next \(nextSet(s) ?? TrainFormat.dash)")
-                HStack(alignment: .center, spacing: 8) {
-                    Text(RestTimer.text(remaining)).vNumber(52).monospacedDigit().lineLimit(1)
-                        .accessibilityLabel("Rest, \(Int(remaining.rounded(.up))) seconds left")
-                    Spacer(minLength: 8)
-                    SecondaryButton("-15s", size: .mini) { store.adjustRest(by: -RestTimer.step) }
-                    SecondaryButton("Skip", size: .mini) { store.skipRest() }
-                    SecondaryButton("+15s", size: .mini) { store.adjustRest(by: RestTimer.step) }
+            DetailSection("Rest", trailing: "Next \(nextSet(s) ?? TrainFormat.dash)")
+            VCard {
+                VStack(alignment: .leading, spacing: VSpace.s3) {
+                    HStack(alignment: .center, spacing: VSpace.s2) {
+                        Text(RestTimer.text(remaining)).vText(.numXL).lineLimit(1).minimumScaleFactor(0.7)
+                            .accessibilityLabel("Rest, \(Int(remaining.rounded(.up))) seconds left")
+                        Spacer(minLength: VSpace.s2)
+                        SecondaryButton("-15s", size: .mini) { store.adjustRest(by: -RestTimer.step) }
+                        SecondaryButton("Skip", size: .mini) { store.skipRest() }
+                        SecondaryButton("+15s", size: .mini) { store.adjustRest(by: RestTimer.step) }
+                    }
+                    Meter(fraction: RestTimer.fraction(end: s.restEnd, total: s.restTotal, now: now), fill: VColor.accent)
                 }
-                .padding(.top, 4)
-                ProgressTrack(RestTimer.fraction(end: s.restEnd, total: s.restTotal, now: now)).padding(.top, 14)
             }
             .disabled(readOnly)
         }
@@ -151,23 +162,19 @@ struct LiveWorkoutScreen: View {
     @ViewBuilder private func others(_ s: LiveSession) -> some View {
         let rest = s.exercises.indices.filter { $0 != s.currentIndex }
         if !rest.isEmpty {
-            VSection(top: 0) {
-                VStack(spacing: 0) {
-                    ForEach(Array(rest.enumerated()), id: \.element) { n, i in
-                        if n > 0 { Rule() }
-                        Button { focus = nil; store.select(i) } label: { OtherExerciseRow(exercise: s.exercises[i]) }
-                            .buttonStyle(.plain)
-                    }
-                    Rule()
+            DetailSection("Up next")
+            ListCard {
+                ForEach(rest, id: \.self) { i in
+                    Button { focus = nil; store.select(i) } label: { OtherExerciseRow(exercise: s.exercises[i]) }
+                        .buttonStyle(.plain)
                 }
             }
-            .padding(.top, VSpace.sectionPad)
         }
     }
 
     private var closed: some View {
-        VStack(spacing: 16) {
-            Text("No workout running.").vBody()
+        VStack(spacing: VSpace.s4) {
+            Text("No workout running.").vText(.body, color: VColor.text2)
             SecondaryButton("Close") { router.showsLiveWorkout = false }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -189,7 +196,7 @@ enum SetField: Hashable {
     case weight(UUID), reps(UUID)
 }
 
-/// Name + best, the set table and `+ ADD SET`.
+/// Name + best, the set table and `+ Add set`, in one card.
 struct CurrentExercise: View {
     let store: LiveSessionStore
     let exercise: LiveExercise
@@ -198,25 +205,30 @@ struct CurrentExercise: View {
     var focus: FocusState<SetField?>.Binding
 
     var body: some View {
-        VSection {
-            HStack(alignment: .firstTextBaseline) {
-                Text(exercise.name).vHeadline(26).lineLimit(2).minimumScaleFactor(0.7)
-                Spacer(minLength: 12)
-                MonoLabel("Best \(TrainFormat.serverSet(exercise.best) ?? TrainFormat.dash)")
+        VStack(alignment: .leading, spacing: 0) {
+            DetailSection("Now")
+            VCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(exercise.name).vText(.title).lineLimit(2).minimumScaleFactor(0.7)
+                        Spacer(minLength: VSpace.s3)
+                        Text("Best \(TrainFormat.serverSet(exercise.best) ?? TrainFormat.dash)").vText(.secondary)
+                    }
+                    SetTableHeader().padding(.top, VSpace.s3).padding(.bottom, VSpace.s1)
+                    let current = exercise.pendingRowIndex
+                    ForEach(Array(exercise.rows.enumerated()), id: \.element.id) { i, row in
+                        Hairline()
+                        SetRowView(store: store, row: row, exerciseIndex: index, label: label(i),
+                                   state: row.isDone ? .done : i == current ? .current : .upcoming, readOnly: readOnly || row.byWatch == true, focus: focus)
+                    }
+                    Hairline()
+                    Button { store.addSet(to: index) } label: {
+                        Text("+ Add set").vText(.headline).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(readOnly)
+                }
             }
-            SetTableHeader().padding(.top, 14)
-            let current = exercise.pendingRowIndex
-            ForEach(Array(exercise.rows.enumerated()), id: \.element.id) { i, row in
-                if i > 0 { Rule() }
-                SetRowView(store: store, row: row, exerciseIndex: index, label: label(i),
-                           state: row.isDone ? .done : i == current ? .current : .upcoming, readOnly: readOnly || row.byWatch == true, focus: focus)
-            }
-            Rule()
-            Button { store.addSet(to: index) } label: {
-                MonoLabel("+ Add set", tint: .bone).frame(maxWidth: .infinity, minHeight: 52).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(readOnly)
         }
     }
 
@@ -235,17 +247,17 @@ private enum SetGrid {
 struct SetTableHeader: View {
     var body: some View {
         HStack(spacing: SetGrid.gap) {
-            MonoLabel("Set", size: .small).frame(width: SetGrid.set)
-            MonoLabel("Last", size: .small).frame(maxWidth: .infinity, alignment: .leading)
-            MonoLabel("Kg", size: .small).frame(width: SetGrid.kg)
-            MonoLabel("Reps", size: .small).frame(width: SetGrid.reps)
+            Text("Set").vText(.secondary, color: VColor.text3).frame(width: SetGrid.set)
+            Text("Last").vText(.secondary, color: VColor.text3).frame(maxWidth: .infinity, alignment: .leading)
+            Text("kg").vText(.secondary, color: VColor.text3).frame(width: SetGrid.kg)
+            Text("Reps").vText(.secondary, color: VColor.text3).frame(width: SetGrid.reps)
             Color.clear.frame(width: SetGrid.check, height: 1)
         }
         .accessibilityHidden(true)
     }
 }
 
-/// One table row (46): done rows are steel, the current row carries the screen's one red action (its check).
+/// One table row (46): done rows dim, the current row carries the screen's one accent action (its check).
 struct SetRowView: View {
     enum Phase { case done, current, upcoming }
 
@@ -259,8 +271,8 @@ struct SetRowView: View {
 
     var body: some View {
         HStack(spacing: SetGrid.gap) {
-            Text(label).vRole(.reading(14), color: state == .current ? VColor.pulse : textColor).frame(width: SetGrid.set)
-            Text(row.last ?? TrainFormat.dash).vRole(.reading(14), color: state == .current ? VColor.bone : textColor)
+            Text(label).vText(.headline, color: state == .current ? VColor.accent : textColor).frame(width: SetGrid.set)
+            Text(row.last ?? TrainFormat.dash).vText(.body, color: state == .current ? VColor.text : textColor)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
             field(.weight(row.id), text: row.weight, keyboard: .decimalPad, width: SetGrid.kg) {
@@ -276,66 +288,64 @@ struct SetRowView: View {
         .accessibilityLabel("Set \(label)")
     }
 
-    private var textColor: Color { state == .done ? VColor.steel : VColor.disabled }
+    private var textColor: Color { state == .done ? VColor.text2 : VColor.text3 }
 
     private func field(_ id: SetField, text: String, keyboard: UIKeyboardType, width: CGFloat, set: @escaping @MainActor @Sendable (String) -> Void) -> some View {
         let focused = focus.wrappedValue == id
-        let ring = focused ? VColor.pulse : state == .current ? VColor.future : VColor.rule
+        let ring = focused ? VColor.accent : state == .current ? VColor.dashed : VColor.line
         // Binding wants a Sendable setter; SwiftUI calls it on the main actor.
-        return TextField("", text: Binding(get: { text }, set: { v in MainActor.assumeIsolated { set(v) } }), prompt: Text(TrainFormat.dash).foregroundStyle(VColor.disabled))
+        return TextField("", text: Binding(get: { text }, set: { v in MainActor.assumeIsolated { set(v) } }), prompt: Text(TrainFormat.dash).foregroundStyle(VColor.text3))
             .focused(focus, equals: id)
             .keyboardType(keyboard)
             .multilineTextAlignment(.center)
-            .vNumber(17, color: state == .current ? VColor.bone : textColor)
+            .vText(.headline, color: state == .current ? VColor.text : textColor)
             .frame(width: width, height: 34)
-            .overlay(RoundedRectangle(cornerRadius: VRadius.field, style: .continuous).inset(by: 0.75).stroke(ring, lineWidth: 1.5))
+            .overlay(RoundedRectangle(cornerRadius: VRadius.control, style: .continuous).inset(by: 0.75).stroke(ring, lineWidth: 1.5))
             .disabled(readOnly || state == .upcoming)
             .accessibilityLabel(id.isWeight ? "Kilograms" : "Reps")
     }
 
     @ViewBuilder private var check: some View {
-        let shape = RoundedRectangle(cornerRadius: VRadius.field, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: VRadius.control, style: .continuous)
         switch state {
         case .done:
-            Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(VColor.bone)
-                .frame(width: 34, height: 34).overlay(shape.inset(by: 0.75).stroke(VColor.future, lineWidth: 1.5))
+            Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(VColor.text)
+                .frame(width: 34, height: 34).overlay(shape.inset(by: 0.75).stroke(VColor.dashed, lineWidth: 1.5))
                 .accessibilityLabel("Logged")
         case .current:
             Button {
                 if LiveSessionStore.canLog(row) { focus.wrappedValue = nil; Task { await store.check() } }
                 else { focus.wrappedValue = .reps(row.id) }
             } label: {
-                Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(VColor.ground)
-                    .frame(width: 34, height: 34).background(VColor.pulse, in: shape)
+                Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(VColor.onAccent)
+                    .frame(width: 34, height: 34).background(VColor.accent, in: shape)
             }
             .buttonStyle(.plain)
             .disabled(readOnly)
             .opacity(readOnly ? 0 : 1)
             .accessibilityLabel("Log set")
         case .upcoming:
-            shape.inset(by: 0.75).stroke(VColor.rule, lineWidth: 1.5).frame(width: 34, height: 34).accessibilityHidden(true)
+            shape.inset(by: 0.75).stroke(VColor.line, lineWidth: 1.5).frame(width: 34, height: 34).accessibilityHidden(true)
         }
     }
+}
+
+/// The 1 pt rule between rows inside a card.
+private struct Hairline: View {
+    var body: some View { Rectangle().fill(VColor.line).frame(height: 1) }
 }
 
 private extension SetField {
     var isWeight: Bool { if case .weight = self { true } else { false } }
 }
 
-/// Collapsed exercise (48): name in steel, `3 SETS · LAST 95 X 8`.
+/// Collapsed exercise: its name, `3 sets · last 95 x 8`.
 struct OtherExerciseRow: View {
     let exercise: LiveExercise
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(exercise.name).vHeadline(20, color: VColor.steel).lineLimit(1).minimumScaleFactor(0.7)
-            Spacer(minLength: 8)
-            MonoLabel(summary, size: .small)
-        }
-        .frame(minHeight: 48)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        ListRow(exercise.name, subtitle: summary, chevron: false)
+            .accessibilityAddTraits(.isButton)
     }
 
     private var summary: String {

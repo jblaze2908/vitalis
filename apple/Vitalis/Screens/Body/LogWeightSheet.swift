@@ -25,45 +25,40 @@ struct LogWeightSheet: View {
     var body: some View {
         SheetChrome {
             VStack(spacing: 0) {
-                titleRow.padding(.top, 22)
-                HStack(alignment: .lastTextBaseline, spacing: 6) {
-                    Text(kgText).vNumber(84).monospacedDigit().lineLimit(1)
-                    MonoLabel("kg")
-                }
-                .padding(.top, 22)
-                .accessibilityHidden(true)
-                if let caption { MonoLabel(caption, size: .small).padding(.top, 8).lineLimit(1).minimumScaleFactor(0.8) }
-                WeightRuler(tenths: $tenths).frame(height: 60).padding(.top, 18)
-                VStack(spacing: 0) {
-                    Rule()
+                titleRow.padding(.top, VSpace.s4)
+                Figure(kgText, unit: "kg", size: 56)
+                    .padding(.top, VSpace.s5)
+                    .accessibilityHidden(true)
+                if let caption { Text(caption).vText(.secondary).padding(.top, VSpace.s2).lineLimit(1).minimumScaleFactor(0.8) }
+                WeightRuler(tenths: $tenths).frame(height: 60).padding(.top, VSpace.s4)
+                ListCard {
                     whenRow
-                    Rule()
                     healthRow
                 }
-                .padding(.top, 20)
-                .padding(.horizontal, VSpace.gutter)
-                Spacer(minLength: 12)
-                PrimaryButton("Save \(kgText) kg", action: save)
-                    .padding(.horizontal, VSpace.gutter)
-                    .padding(.bottom, 38)
+                .gutter()
+                .padding(.top, VSpace.s5)
+                Spacer(minLength: VSpace.s3)
+                PrimaryButton("Save \(kgText) kg", fill: VColor.body, ink: VColor.onBody, action: save)
+                    .gutter()
+                    .padding(.bottom, VSpace.s6)
             }
         }
-        .presentationDetents([.height(486)])
+        .presentationDetents([.height(540)])
         .sheet(isPresented: $editingWhen) { whenPicker }
     }
 
     private var titleRow: some View {
         ZStack {
-            Text("Log weight").vHeadline(22)
+            Text("Log weight").vText(.title)
             HStack {
-                Button { dismiss() } label: { MonoLabel("Cancel", tint: .bone).frame(minHeight: 44) }.buttonStyle(.plain)
+                Button { dismiss() } label: { Text("Cancel").vText(.body).frame(minHeight: 44) }.buttonStyle(.plain)
                 Spacer()
             }
         }
-        .padding(.horizontal, VSpace.gutter)
+        .gutter()
     }
 
-    /// `LAST 76.8 YESTERDAY · TREND 76.4` from the server's weight block.
+    /// `Last 76.8 Yesterday · Trend 76.4` from the server's weight block.
     private var caption: String? {
         guard let w = store.weight else { return nil }
         var parts: [String] = []
@@ -77,14 +72,7 @@ struct LogWeightSheet: View {
 
     private var whenRow: some View {
         Button { editingWhen = true } label: {
-            HStack {
-                Text("When").vReading(13, tint: .steel).textCase(.uppercase)
-                Spacer()
-                Text("\(StaleState.dayLabel(when, now: Date(), calendar: .current)) · \(StaleState.clock(when, calendar: .current))")
-                    .vReading(13).textCase(.uppercase)
-            }
-            .frame(height: 52)
-            .contentShape(Rectangle())
+            ListRow("When", value: "\(StaleState.dayLabel(when, now: Date(), calendar: .current)) · \(StaleState.clock(when, calendar: .current))")
         }
         .buttonStyle(.plain)
         .accessibilityHint("Changes when the weight was measured")
@@ -92,20 +80,20 @@ struct LogWeightSheet: View {
 
     private var healthRow: some View {
         Toggle(isOn: $alsoHealth) {
-            Text("Also save to Apple Health").vReading(13, tint: .steel).textCase(.uppercase).lineLimit(1).minimumScaleFactor(0.8)
+            Text("Also save to Apple Health").vText(.body).lineLimit(1).minimumScaleFactor(0.8)
         }
-        .toggleStyle(BoneToggleStyle())
-        .frame(height: 52)
+        .toggleStyle(BodyToggleStyle())
+        .frame(minHeight: VSpace.rowMin).padding(.vertical, VSpace.s3)
     }
 
     private var whenPicker: some View {
         SheetChrome {
-            VStack(spacing: 12) {
+            VStack(spacing: VSpace.s3) {
                 DatePicker("When", selection: $when, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                     .datePickerStyle(.wheel).labelsHidden()
                 SecondaryButton("Done", size: .full) { editingWhen = false }
             }
-            .padding(.horizontal, VSpace.gutter).padding(.top, 12)
+            .gutter().padding(.top, VSpace.s3)
         }
         .presentationDetents([.height(340)])
     }
@@ -120,7 +108,7 @@ struct LogWeightSheet: View {
     }
 }
 
-/// Ruler picker: a tick per 0.1 kg (major every 0.5 with its label), bone centre indicator, light haptic per step.
+/// Ruler picker: a tick per 0.1 kg (major every 0.5 with its label), a text-colour centre indicator, light haptic per step.
 struct WeightRuler: View {
     @Binding var tenths: Int
     @State private var dragStart: Int?
@@ -135,15 +123,15 @@ struct WeightRuler: View {
                 ForEach((tenths - half)...(tenths + half), id: \.self) { t in
                     let x = mid + CGFloat(t - tenths) * Self.spacing
                     let major = t % 5 == 0
-                    Rectangle().fill(major ? VColor.tickMajor : VColor.future)
+                    Rectangle().fill(major ? VColor.text3 : VColor.dashed)
                         .frame(width: 1, height: major ? 26 : 14)
                         .position(x: x, y: 8 + (major ? 13 : 7))
                     if major {
-                        Text(String(format: "%.1f", Double(t) / 10)).vLabel(.small)
+                        Text(String(format: "%.1f", Double(t) / 10)).vText(.axis)
                             .fixedSize().position(x: x, y: 50)
                     }
                 }
-                Rectangle().fill(VColor.bone).frame(width: 2, height: 44).position(x: mid, y: 22)
+                Rectangle().fill(VColor.text).frame(width: 2, height: 44).position(x: mid, y: 22)
             }
             .frame(width: g.size.width, height: g.size.height)
             .clipped()
@@ -171,17 +159,17 @@ struct WeightRuler: View {
     }
 }
 
-/// Bone track with a black knob when on (frame 08); `future` track when off.
-private struct BoneToggleStyle: ToggleStyle {
+/// Body-violet track when on, bar track when off; the knob in text colour.
+private struct BodyToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {
             HStack {
                 configuration.label
-                Spacer(minLength: 12)
-                Capsule().fill(configuration.isOn ? VColor.bone : VColor.future)
+                Spacer(minLength: VSpace.s3)
+                Capsule().fill(configuration.isOn ? VColor.body : VColor.barTrack)
                     .frame(width: 46, height: 28)
                     .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                        Circle().fill(configuration.isOn ? VColor.ground : VColor.steel).frame(width: 22, height: 22).padding(3)
+                        Circle().fill(configuration.isOn ? VColor.text : VColor.text2).frame(width: 22, height: 22).padding(3)
                     }
                     .animation(.snappy(duration: 0.15), value: configuration.isOn)
             }

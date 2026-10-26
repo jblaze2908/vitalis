@@ -9,12 +9,12 @@ struct ExerciseDetailScreen: View {
 
     var body: some View {
         let detail = store.exercise(id), d = detail.value
-        DetailScaffold(d?.exercise.name ?? "Exercise", subtitle: d.map(subtitle)) {
+        DetailScaffold(d?.exercise.name ?? "Exercise", subtitle: d.map(subtitle), refresh: { await store.loadExercise(id) }) {
             if let d {
                 content(d)
-                if let error = detail.error as? APIError { MonoLabel(error.statusLine, tint: .watch).padding(.top, 12) }
+                if let error = detail.error as? APIError { Text(error.statusLine).vText(.secondary, color: VColor.watch).padding(.top, VSpace.s3) }
             } else {
-                LoadState(error: detail.error) { Task { await store.loadExercise(id) } }.padding(.top, 40)
+                LoadState(error: detail.error) { Task { await store.loadExercise(id) } }.padding(.top, VSpace.s6)
             }
         }
         .task(id: Services.shared.writesVersion) { await store.loadExercise(id) }
@@ -25,43 +25,39 @@ struct ExerciseDetailScreen: View {
     }
 
     @ViewBuilder private func content(_ d: ExerciseDetail) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Estimated 1-rep max").vUI(13, weight: 500, color: VColor.muted)
-            Figure(d.e1rm?.currentKg.map { TrainFormat.kg($0) } ?? TrainFormat.dash, unit: "kg", size: 44, color: d.e1rm?.currentKg == nil ? VColor.steel : nil)
+        VStack(alignment: .leading, spacing: VSpace.s2) {
+            Text("Estimated 1-rep max").vText(.secondary)
+            Figure(d.e1rm?.currentKg.map { TrainFormat.kg($0) } ?? TrainFormat.dash, unit: "kg", size: 40, color: d.e1rm?.currentKg == nil ? VColor.text3 : nil)
             if let change = d.e1rm?.change8wKg {
                 StatusWord("\(change >= 0 ? "+" : "−")\(TrainFormat.kg(abs(change))) kg in 8 weeks", tone: change > 0 ? .good : .usual)
             }
         }
-        .padding(.top, 8)
-        VCard { E1RMHistoryChart(points: d.e1rm?.points ?? []).frame(height: 190) }.padding(.top, 14)
+        .padding(.top, VSpace.s2)
+        VCard { E1RMHistoryChart(points: d.e1rm?.points ?? []).frame(height: 190) }.padding(.top, VSpace.s4)
         ReadoutRow([
             Readout("Heaviest", heaviest(d.records)),
             Readout("Best e1RM", d.records?.bestE1rmKg.map { "\(TrainFormat.kg($0)) kg" } ?? TrainFormat.dash,
                     status: d.records?.on.map { (MetricFormat.day($0), .quiet) }),
             Readout("Sessions", TrainFormat.int(d.sessionsTotal)),
         ])
-        .padding(.top, 14)
+        .padding(.top, VSpace.s3)
         if let next = d.next, next.weightKg != nil || next.suggestion != nil {
             DetailSection("Next time")
             VCard {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: VSpace.s2) {
                     Figure(TrainFormat.set(next.weightKg, next.reps).map { $0.replacingOccurrences(of: " x ", with: " × ") } ?? TrainFormat.dash,
-                           unit: next.sets.map { TrainFormat.plural($0, "set", "sets") }, size: 26)
-                    if let s = next.suggestion { Text(s).vUI(13, weight: 400, color: VColor.muted).fixedSize(horizontal: false, vertical: true) }
+                           unit: next.sets.map { TrainFormat.plural($0, "set", "sets") }, size: 28)
+                    if let s = next.suggestion { Text(s).vText(.secondary).fixedSize(horizontal: false, vertical: true) }
                 }
             }
         }
         if let history = d.history, !history.isEmpty {
             DetailSection("History", trailing: TrainFormat.plural(history.count, "session", "sessions"))
-            RowsCard {
+            ListCard {
                 ForEach(history, id: \.sessionId) { p in
-                    DrillRow(.session(id: p.sessionId), value: p.volumeKg.map { "\(TrainFormat.grouped($0)) kg" }) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text([MetricFormat.day(p.day, "EEE d MMM"), p.title].compactMap { $0 }.joined(separator: " · ")).vUI(14, weight: 600).lineLimit(1)
-                            Text(p.sets.filter { $0.kind != "warmup" }.compactMap { TrainFormat.set($0.weightKg, $0.reps) }.joined(separator: "  ·  "))
-                                .vUI(12, weight: 500, color: VColor.muted).lineLimit(2)
-                        }
-                    }
+                    DrillRow([MetricFormat.day(p.day, "EEE d MMM"), p.title].compactMap { $0 }.joined(separator: " · "),
+                             subtitle: p.sets.filter { $0.kind != "warmup" }.compactMap { TrainFormat.set($0.weightKg, $0.reps) }.joined(separator: "  ·  "),
+                             value: p.volumeKg.map { "\(TrainFormat.grouped($0)) kg" }, route: .session(id: p.sessionId))
                 }
             }
         } else if let last = d.lastSession {
@@ -85,24 +81,17 @@ struct LastSessionSets: View {
 
     var body: some View {
         let top = last.sets.indices.filter { last.sets[$0].kind != "warmup" }.max { (last.sets[$0].weightKg ?? 0) < (last.sets[$1].weightKg ?? 0) }
-        VSection(top: VSpace.sectionTop) {
-            HStack {
-                MonoLabel(TrainFormat.day(last.day).map { TrainFormat.dayText($0, "EEE d MMM") } ?? last.day, tint: .bone)
-                Spacer()
-                MonoLabel(TrainFormat.plural(last.sets.count, "set", "sets"))
+        DetailSection(MetricFormat.day(last.day, "EEE d MMM"), trailing: TrainFormat.plural(last.sets.count, "set", "sets"))
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: VSpace.s2), count: 4), spacing: VSpace.s2) {
+            ForEach(Array(last.sets.enumerated()), id: \.offset) { i, s in
+                let isTop = i == top
+                Text(TrainFormat.set(s.weightKg, s.reps) ?? TrainFormat.dash)
+                    .vText(isTop ? .headline : .body, color: isTop ? VColor.text : VColor.text2)
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, minHeight: 34)
+                    .overlay(RoundedRectangle(cornerRadius: VRadius.control, style: .continuous)
+                        .stroke(isTop ? VColor.dashed : VColor.line, lineWidth: 1.5))
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
-                ForEach(Array(last.sets.enumerated()), id: \.offset) { i, s in
-                    let isTop = i == top
-                    Text(TrainFormat.set(s.weightKg, s.reps) ?? TrainFormat.dash)
-                        .vReading(14, tint: isTop ? .bone : .steel)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                        .frame(maxWidth: .infinity, minHeight: 34)
-                        .overlay(RoundedRectangle(cornerRadius: VRadius.field, style: .continuous)
-                            .stroke(isTop ? VColor.future : VColor.rule, lineWidth: 1.5))
-                }
-            }
-            .padding(.top, VSpace.sectionPad)
         }
     }
 }
