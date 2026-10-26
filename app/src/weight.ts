@@ -1,5 +1,6 @@
 // Body tab and manual weigh-ins (spec 10 §5, 12 §2.3). A manual entry is projected into metric_days as source
 // 'Vitalis manual' in the same transaction, so every reader (scores, MCP, trend) sees one weight per day via pickPerDay.
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { now } from "./config.js";
 import { all, one, run, tx } from "./db.js";
@@ -10,7 +11,7 @@ import { ApiError } from "./http.js";
 import { roundHalfAway } from "./scoring-config.js";
 import { compare, daily } from "./stats.js";
 import { effectiveTargets } from "./targets.js";
-import { addDays, isoAt, localDay, parseStamp, today } from "./time.js";
+import { addDays, isoAt, localDay, ownerOffsetMin, parseStamp, today } from "./time.js";
 
 export const MANUAL_SOURCE = "Vitalis manual";
 const r1 = (v: number | null) => (v === null ? null : roundHalfAway(v, 1));
@@ -121,3 +122,25 @@ export function deleteWeight(id: string) {
 }
 
 export const weightNow = (at = Date.now()) => weightBlock(today(at), at);
+
+/** The last few weigh-ins logged by hand (app, Siri or an agent), with ids, so a wrong one can be found and deleted. */
+export const recentWeights = (n = 5) => all<Entry>("SELECT * FROM weight_entries WHERE deleted_at IS NULL ORDER BY measured_at DESC LIMIT ?", n)
+  .map((e) => ({ id: e.id, kg: e.kg, measured_at: isoAt(e.measured_at, e.tz_offset_min), day: e.day }));
+
+/** MCP log_weight: one weigh-in now or at a time, or `delete` one by id. Server-side only: it doesn't reach Apple Health. */
+export const logWeightSchema = z.strictObject({
+  kg: z.number().gt(0).lt(500).optional().describe("required unless deleting"),
+  measured_at: z.string().min(10).max(40).optional().describe("ISO 8601 with offset; default now"),
+  id: z.string().min(1).max(64).optional().describe("your own id so a retry can't double-log; the id to delete"),
+  delete: z.boolean().optional(),
+});
+export function logWeight(input: z.infer<typeof logWeightSchema>, at = Date.now()) {
+  if (input.delete) {
+    if (!input.id) throw new ApiError(422, "id is required to delete; recent entries are listed by log_weight and get_metrics weight_kg", "invalid");
+    deleteWeight(input.id);
+    return { deleted: input.id, weight: weightNow(at), recent: recentWeights() };
+  }
+  if (input.kg === undefined) throw new ApiError(422, "kg is required", "invalid");
+  const r = postWeight({ id: input.id ?? randomUUID(), kg: input.kg, measured_at: input.measured_at ?? isoAt(at, ownerOffsetMin(at)) });
+  return { entry: { id: r.id, kg: r.kg, day: r.day, changed: r.changed }, weight: weightNow(at), recent: recentWeights() };
+}

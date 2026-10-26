@@ -10,8 +10,10 @@ import { addDays, DAY_RE, today } from "./time.js";
 import { authenticate, logCall, type Token } from "./tokens.js";
 import { KINDS, editSet, editWorkout, exerciseHistory, getWorkout, listWorkouts, logSets, trainingSummary } from "./training.js";
 import { scoresFor, trainingSets, trainingState } from "./derived.js";
-import { entriesSchema, foodDay, logSaved, logSavedSchema, postEntries, saveMeal, saveMealSchema, savedMeals } from "./food.js";
-import { getTargets, effectiveTargets } from "./targets.js";
+import { deleteEntries, entriesSchema, foodDay, logSaved, logSavedSchema, postEntries, saveMeal, saveMealSchema, savedMeals } from "./food.js";
+import { logWeight, logWeightSchema } from "./weight.js";
+import { definedSplits, deleteSplit, putSplit, splitSchema } from "./splits.js";
+import { getTargets, effectiveTargets, putSchema, putTargets } from "./targets.js";
 import { todayBody } from "./today.js";
 import { weekStartOf, weeklySets } from "./training-analytics.js";
 import { daysBetween, ownerOffsetMin } from "./time.js";
@@ -196,6 +198,39 @@ export function buildServer(token: Token) {
     inputSchema: logSavedSchema },
   wrap(ctx, "log_saved_meal", (a: Parameters<typeof logSaved>[0]) => { const r = logSaved(a); return { accepted: r.accepted, day: foodDay(r.day) }; },
     (r) => JSON.stringify((r as { accepted: unknown }).accepted)));
+
+  // Everything the app can change, an agent can change too (README: MCP parity).
+  const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+  s.registerTool("log_weight", { title: "Log or delete a weigh-in", annotations: { ...WRITE, destructiveHint: true }, outputSchema: Out,
+    description: "Log a body weight in kg (now, or at measured_at), or delete one with delete: true and its id. Pass your own id so a retry can't double-log. Returns the weight trend and the last few logged entries with their ids. Saved in Vitalis only: it doesn't reach Apple Health (the app writes there when the person logs on the phone).",
+    inputSchema: logWeightSchema },
+  wrap(ctx, "log_weight", (a: Parameters<typeof logWeight>[0]) => logWeight(a), (r) => ("deleted" in (r as object) ? "deleted" : "logged")));
+
+  s.registerTool("delete_food", { title: "Delete logged food", annotations: { ...WRITE, destructiveHint: true }, outputSchema: Out,
+    description: "Delete one logged food by its entry id, or a whole add by meal_id (ids are in get_food_day). To correct a food instead, call log_food again with the same id and the right numbers.",
+    inputSchema: z.strictObject({ id: z.string().min(1).max(64).optional(), meal_id: z.string().min(1).max(64).optional() }) },
+  wrap(ctx, "delete_food", (a: { id?: string; meal_id?: string }) => {
+    if (!!a.id === !!a.meal_id) throw new HttpError(422, "Give exactly one of id or meal_id");
+    const r = a.id ? deleteEntries("id", a.id) : deleteEntries("meal_id", a.meal_id!);
+    return { ...r, day: foodDay((r as { day?: string }).day ?? today()) };
+  }));
+
+  s.registerTool("set_targets", { title: "Set targets", annotations: WRITE, outputSchema: Out,
+    description: "Change targets the person asks for: goal (lose/maintain/gain) and goal weight, fixed calories or protein, steps, exercise minutes, weekly sets per muscle, rest time. Send only the keys to change; null resets a key to its default. Returns every target and where it comes from.",
+    inputSchema: putSchema },
+  wrap(ctx, "set_targets", (a: Parameters<typeof putTargets>[0]) => { putTargets(a); return getTargets(); }, (r) => "ok"));
+
+  s.registerTool("edit_split", { title: "Create, edit or delete a training split", annotations: { ...WRITE, destructiveHint: true }, outputSchema: Out,
+    description: "A split is a named group of muscles the person trains together (e.g. Push: chest, shoulders, triceps). Saving an existing name or id replaces it; delete: true removes it. Muscles use the slugs from get_training_summary.",
+    inputSchema: splitSchema.extend({ id: z.string().regex(/^[\w-]{1,64}$/).optional(), delete: z.boolean().optional(),
+      muscles: splitSchema.shape.muscles.optional() }) },
+  wrap(ctx, "edit_split", (a: { id?: string; name: string; muscles?: string[]; ord?: number; delete?: boolean }) => {
+    const existing = definedSplits().find((x) => x.id === a.id || x.name.toLowerCase() === a.name.toLowerCase());
+    if (a.delete) { if (!existing) throw new HttpError(404, `No split ${a.id ?? a.name}`); return deleteSplit(existing.id); }
+    if (!a.muscles) throw new HttpError(422, "muscles is required unless deleting");
+    const id = existing?.id ?? a.id ?? (a.name.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "split");
+    return putSplit(id, { name: a.name, muscles: a.muscles, ord: a.ord });
+  }));
 
   return s;
 }
