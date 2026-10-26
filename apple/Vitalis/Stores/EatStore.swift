@@ -62,6 +62,8 @@ final class EatStore {
     /// Single entries deleted from Eat, hidden until the server's day stops listing them.
     private(set) var deletedEntries: Set<String> = []
     private(set) var toast: Toast?
+    /// Saved-meal changes still in the outbox, by id (nil = deleted); applied over the server's list until it shows them.
+    private(set) var savedEdits: [String: SavedMealInfo?] = [:]
     private(set) var todayPulse: Pulse?
     private(set) var healthError: String?
     /// False after a 503 from describe: the tile hides everywhere for this launch.
@@ -105,6 +107,12 @@ final class EatStore {
             guard let api = self.api() else { throw APIError.transport(URLError(.notConnectedToInternet)) }
             return try await api.foodQuick(slot: slot)
         }
+        // Drop edits the server now reflects.
+        guard quick.error == nil, let server = quick.value?.saved else { return }
+        for (id, edit) in savedEdits {
+            let row = server.first { $0.id == id }
+            if (edit == nil && row == nil) || (edit != nil && row?.name == edit?.name && row?.kcal == edit?.kcal) { savedEdits[id] = nil }
+        }
     }
 
     func goBack() async { guard let prev = day.value?.prevDay else { return }; date = prev; await load() }
@@ -114,6 +122,7 @@ final class EatStore {
     func writesDelivered() async {
         await refreshPending()
         await load()
+        if !savedEdits.isEmpty { await loadQuick(slot: nil) }
     }
 
     // MARK: Adds
@@ -161,6 +170,34 @@ final class EatStore {
         adds[mealID] = (outboxID, healthUUIDs)
         showToast(Toast(mealID: mealID, text: "ADDED TO \(Self.slotName(slot).uppercased()) · \(FoodFormat.kcal(entries.reduce(0) { $0 + $1.kcal })) KCAL"))
         await settle()
+    }
+
+    // MARK: Saved meals
+
+    /// The server's saved meals with this launch's unsent edits on top, by name.
+    var savedMeals: [SavedMealInfo] {
+        var byID = Dictionary((quick.value?.saved ?? []).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for (id, edit) in savedEdits { byID[id] = edit }
+        return byID.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Create or replace a saved meal (same id = edit). Goes through the outbox, so it survives being offline.
+    func saveMeal(id: String = UUID().uuidString.lowercased(), name: String, items: [SavedMeal.Item]) async {
+        guard let request = try? APIRequest.postSavedMeal(SavedMeal(id: id, name: name, items: items)) else { return }
+        savedEdits[id] = SavedMealInfo(id: id, name: name, slot: nil, kcal: items.reduce(0) { $0 + $1.kcal }.rounded(),
+                                       items: items.map { FoodItem(name: $0.name, portionText: $0.portionText, grams: $0.grams, kcal: $0.kcal,
+                                                                   proteinG: $0.proteinG, carbsG: $0.carbsG, fatG: $0.fatG) })
+        await queue.send(request)
+    }
+
+    func deleteSavedMeal(_ id: String) async {
+        savedEdits[id] = .some(nil)
+        await queue.send(.deleteSavedMeal(id: id))
+    }
+
+    /// One tap: every item of the saved meal into the next meal of the day.
+    func logSaved(_ meal: SavedMealInfo, slot: String? = nil) async {
+        await log(meal.items.map(FoodDraft.init), slot: slot ?? day.value?.nextSlot ?? defaultSlot, source: "saved", sourceRef: meal.id)
     }
 
     /// Queues the owner's numbers for an unknown barcode so the next scan finds them.

@@ -12,6 +12,7 @@ struct QuickAddSheet: View {
     @State private var search = FoodSearchStore.live()
     @State private var describe: DescribeStore?
     @State private var scanning = false
+    @State private var savedForm: SavedFormTarget?
 
     init(slot: String?, store: EatStore = .shared) {
         self.slot = slot; self.store = store
@@ -47,6 +48,7 @@ struct QuickAddSheet: View {
             store.requestedMode = nil
             await store.loadQuick(slot: slot)
         }
+        .sheet(item: $savedForm) { t in SavedMealForm(store: store, meal: t.meal) }
         .fullScreenCover(isPresented: $scanning) {
             ScanScreen(store: store, slot: currentSlot, onDescribe: { code in scanning = false; go(.describe(text: "", barcode: code)) },
                        onDone: { scanning = false; router.sheet = nil })
@@ -187,15 +189,26 @@ struct QuickAddSheet: View {
                 }
             }
         }
-        if !quick.saved.isEmpty {
-            MonoLabel("Saved meals").padding(.top, 24).padding(.bottom, 4)
-            ForEach(quick.saved, id: \.id) { s in
-                FoodRow(name: s.name, detail: s.items.map(\.name).joined(separator: " · "), kcal: s.kcal) {
-                    add(s.items.map(FoodDraft.init), source: "saved", sourceRef: s.id)
-                }
+        MonoLabel("Saved meals").padding(.top, 24).padding(.bottom, 4)
+        ForEach(store.savedMeals, id: \.id) { s in
+            FoodRow(name: s.name, detail: s.items.map(\.name).joined(separator: " · "), kcal: s.kcal) {
+                add(s.items.map(FoodDraft.init), source: "saved", sourceRef: s.id)
+            }
+            .contextMenu {
+                Button { savedForm = SavedFormTarget(meal: s) } label: { Label("Edit", systemImage: "pencil") }
+                Button(role: .destructive) { Task { await store.deleteSavedMeal(s.id) } } label: { Label("Delete", systemImage: "trash") }
             }
         }
-        if quick.usual == nil && quick.recent.isEmpty && quick.saved.isEmpty {
+        Button { savedForm = SavedFormTarget(meal: nil) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "plus").font(.body.weight(.semibold)).foregroundStyle(VColor.eat)
+                Text("New saved meal").vUI(15, weight: 600)
+                Spacer()
+            }
+            .frame(minHeight: 52).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        if quick.usual == nil && quick.recent.isEmpty && store.savedMeals.isEmpty {
             Text("Meals you repeat become one tap after a few days.").vBody().padding(.top, 26)
         }
     }

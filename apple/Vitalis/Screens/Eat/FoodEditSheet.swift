@@ -66,6 +66,7 @@ struct FoodEditSheet: View {
     @State private var factor: Double = 1
     @State private var slot: String
     @State private var time: Date
+    @State private var savedNow = false
 
     init(entry: FoodDayEntry, day: String, slot: String, mealTime: String?, store: EatStore) {
         self.entry = entry; self.day = day; self.mealTime = mealTime; self.store = store
@@ -115,6 +116,20 @@ struct FoodEditSheet: View {
                             .background(VColor.eat, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(.plain).padding(.top, 24)
+                    let already = savedNow || store.savedMeals.contains { $0.name.caseInsensitiveCompare(entry.name) == .orderedSame }
+                    // This food at the amount shown becomes a saved meal: one tap from Eat next time.
+                    Button {
+                        let f = { (v: Double?) in v.map { ($0 * factor * 10).rounded() / 10 } }
+                        Task { await store.saveMeal(name: entry.name, items: [SavedMeal.Item(name: entry.name, portionText: portion, grams: f(entry.grams),
+                                                                                              kcal: scaled.rounded(), proteinG: f(entry.proteinG), carbsG: f(entry.carbsG), fatG: f(entry.fatG))]) }
+                        savedNow = true
+                    } label: {
+                        Label(already ? "In your saved meals" : "Save for one tap", systemImage: already ? "checkmark" : "bookmark")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(already ? VColor.muted : VColor.bone)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(VColor.cardRaised, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain).disabled(already).padding(.top, 10)
                     Button { Task { await store.delete(entry) }; dismiss() } label: {
                         Text("Delete from \(day == today ? "today" : "this day")").vUI(15, weight: 600, color: VColor.pulse).frame(maxWidth: .infinity, minHeight: 44)
                     }

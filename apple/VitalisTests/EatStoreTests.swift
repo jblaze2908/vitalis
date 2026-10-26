@@ -91,6 +91,25 @@ final class FoodServer: @unchecked Sendable {
         #expect(server.requests("GET").count == 2, "delivered add refetches the day for JUST NOW")
     }
 
+    @Test func savedMealIsTypedOnceThenLoggedInOneTap() async throws {
+        await store.load()
+        let shake = SavedMeal.Item(name: "Protein shake", portionText: "1 scoop + 300 ml milk", kcal: 310, proteinG: 40, carbsG: 18, fatG: 8)
+        await store.saveMeal(id: "shake", name: "Protein shake", items: [shake])
+        let sent = try #require(server.requests("POST").first { $0.url.path == "/v2/food/saved" }?.body)
+        let meal = try APICoding.decoder().decode(SavedMeal.self, from: sent)
+        #expect(meal.id == "shake" && meal.items == [shake])
+        #expect(store.savedMeals.map(\.name) == ["Protein shake"], "shown before the server answers")
+
+        await store.logSaved(try #require(store.savedMeals.first))
+        let entries = try postedEntries(server.requests("POST").firstIndex { $0.url.path == "/v2/food/entries" }!)
+        #expect(entries.count == 1 && entries[0].kcal == 310 && entries[0].proteinG == 40)
+        #expect(entries[0].source == "saved" && entries[0].sourceRef == "shake" && entries[0].slot == "breakfast")
+
+        await store.deleteSavedMeal("shake")
+        #expect(store.savedMeals.isEmpty)
+        #expect(server.requests("DELETE").contains { $0.url.path == "/v2/food/saved/shake" })
+    }
+
     @Test func undoAfterDeliveryDeletesTheMealAndTheHealthSamples() async throws {
         await store.load()
         await store.logUsual()

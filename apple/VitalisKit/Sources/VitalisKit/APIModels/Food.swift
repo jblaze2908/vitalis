@@ -11,6 +11,10 @@ public struct FoodItem: Codable, Sendable, Equatable {
     public let proteinG: Double?
     public let carbsG: Double?
     public let fatG: Double?
+    public init(name: String, portionText: String?, grams: Double?, kcal: Double, proteinG: Double?, carbsG: Double?, fatG: Double?) {
+        self.name = name; self.portionText = portionText; self.grams = grams; self.kcal = kcal
+        self.proteinG = proteinG; self.carbsG = carbsG; self.fatG = fatG
+    }
 }
 
 public struct FoodDayEntry: Codable, Sendable, Equatable {
@@ -83,6 +87,9 @@ public struct SavedMealInfo: Codable, Sendable, Equatable {
     public let slot: String?
     public let kcal: Double?
     public let items: [FoodItem]
+    public init(id: String, name: String, slot: String?, kcal: Double?, items: [FoodItem]) {
+        self.id = id; self.name = name; self.slot = slot; self.kcal = kcal; self.items = items
+    }
 }
 
 public struct FoodQuick: Codable, Sendable, Equatable {

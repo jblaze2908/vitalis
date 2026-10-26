@@ -13,6 +13,7 @@ struct EatScreen: View {
     @State private var needsGoal = false
     @State private var settingGoal = false
     @State private var editing: EditTarget?
+    @State private var savedForm: SavedFormTarget?
 
     struct EditTarget: Identifiable { let entry: FoodDayEntry; let slot: String; let time: String?; let day: String; var id: String { entry.id } }
 
@@ -28,6 +29,7 @@ struct EatScreen: View {
                         if let day = store.day.value {
                             if day.empty && !store.pending.contains(where: { $0.day == day.day }) {
                                 EmptyEat(day: day, store: store, open: open).padding(.horizontal, VSpace.gutter).padding(.top, 8)
+                                SavedStrip(store: store, form: $savedForm).padding(.top, 24)
                             } else { loaded(day) }
                         } else { placeholder.padding(.horizontal, VSpace.gutter) }
                     }
@@ -43,7 +45,8 @@ struct EatScreen: View {
         }
         .animation(.easeOut(duration: 0.2), value: store.toast)
         .sensoryFeedback(.success, trigger: store.toast?.mealID) { _, new in new != nil }
-        .task { await store.load() }
+        .task { await store.load(); await store.loadQuick(slot: nil) }
+        .sheet(item: $savedForm) { t in SavedMealForm(store: store, meal: t.meal) }
         .task(id: Services.shared.writesVersion) { await checkGoal() }
         .sheet(isPresented: $settingGoal) { GoalSheet() }
         .sheet(item: $editing) { t in FoodEditSheet(entry: t.entry, day: t.day, slot: t.slot, mealTime: t.time, store: store) }
@@ -135,6 +138,7 @@ struct EatScreen: View {
             DayCurve(meals: store.meals, target: day.kcalTarget, eaten: day.kcalEaten, isToday: day.nextDay == nil, nextSlot: day.nextSlot)
                 .frame(height: 140).padding(.horizontal, 16).padding(.top, 12)
             ReadoutRow(EatCopy.macros(day)).padding(.horizontal, 16).padding(.top, 18)
+            SavedStrip(store: store, form: $savedForm).padding(.top, 20)
             Text(day.nextDay == nil ? "Logged today" : "Logged").vLabel().padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 8)
             VCard(padding: EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)) {
                 VStack(spacing: 0) {
@@ -336,6 +340,69 @@ struct EatScreen: View {
 }
 
 /// Frame 27: nothing logged yet. Day navigation stays (the frame omits it) so earlier days remain reachable.
+/// Which saved meal the form opens on: nil = a new one.
+struct SavedFormTarget: Identifiable {
+    let meal: SavedMealInfo?
+    var id: String { meal?.id ?? "new" }
+}
+
+/// Saved meals one tap from the day: tap adds to the next meal, hold to edit or delete, New to type one in.
+struct SavedStrip: View {
+    let store: EatStore
+    @Binding var form: SavedFormTarget?
+
+    var body: some View {
+        let meals = store.savedMeals
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Saved").vLabel()
+                Spacer()
+                if !meals.isEmpty { Text("Tap to add · hold to edit").vLabel() }
+            }
+            .padding(.horizontal, 20)
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(meals, id: \.id) { m in
+                        Button { Task { await store.logSaved(m) } } label: { chip(m) }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button { form = SavedFormTarget(meal: m) } label: { Label("Edit", systemImage: "pencil") }
+                                Button(role: .destructive) { Task { await store.deleteSavedMeal(m.id) } } label: { Label("Delete", systemImage: "trash") }
+                            }
+                            .accessibilityLabel("Add \(m.name), \(FoodFormat.kcal(m.kcal)) kilocalories")
+                    }
+                    Button { form = SavedFormTarget(meal: nil) } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Image(systemName: "plus").font(.system(size: 15, weight: .semibold)).foregroundStyle(VColor.eat)
+                            Text(meals.isEmpty ? "Save a meal you repeat" : "New").vUI(14, weight: 600)
+                        }
+                        .padding(.horizontal, 14).frame(minWidth: 88, minHeight: 64, alignment: .leading)
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color(hex: 0x3A3A3A), style: StrokeStyle(lineWidth: 1.2, dash: [4, 3])))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New saved meal")
+                }
+                .padding(.horizontal, 16)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func chip(_ m: SavedMealInfo) -> some View {
+        let protein = m.items.compactMap(\.proteinG).reduce(0, +)
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(m.name).vUI(14, weight: 600).lineLimit(1)
+                Text([FoodFormat.kcal(m.kcal) + " kcal", protein > 0 ? "\(FoodFormat.grams(protein)) g protein" : nil].compactMap { $0 }.joined(separator: " · "))
+                    .vUI(12, weight: 400, color: VColor.muted).lineLimit(1)
+            }
+            Image(systemName: "plus.circle.fill").font(.system(size: 20)).foregroundStyle(VColor.eat)
+        }
+        .padding(.horizontal, 14).frame(minHeight: 64)
+        .background(VColor.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
 private struct EmptyEat: View {
     let day: FoodDay
     let store: EatStore
