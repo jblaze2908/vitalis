@@ -102,6 +102,12 @@ enum RestTimer {
 @MainActor @Observable
 final class LiveSessionStore {
     static let shared: LiveSessionStore = {
+        #if DEBUG
+        // Demo screenshots of the logger: `-VitalisDemo -VitalisRoute vitalis://workout/live` opens a fixture session.
+        if Services.shared.isDemo, UserDefaults.standard.string(forKey: "VitalisRoute") == "vitalis://workout/live" {
+            return TrainPreviewData.liveStore()
+        }
+        #endif
         let store = LiveSessionStore(fileURL: LiveSessionStore.defaultFileURL(), api: { Services.shared.api },
                                      send: { _ = await Services.shared.send($0) },
                                      health: HealthWriter(store: AppModel.shared.healthStore))

@@ -4,6 +4,21 @@ A self-hosted health app for one person: an iPhone and Apple Watch app, plus a s
 
 Your data lives on your server. One instance serves one person.
 
+<p align="center">
+  <img src="docs/screenshots/today.png" width="19%" alt="Today: recovery, HRV, resting HR, sleep, calories and steps">
+  <img src="docs/screenshots/sleep.png" width="19%" alt="Sleep: last night's stages, score and naps">
+  <img src="docs/screenshots/train.png" width="19%" alt="Train: muscle load on a body map and this week's sessions">
+  <img src="docs/screenshots/eat.png" width="19%" alt="Eat: calories through the day and macros">
+  <img src="docs/screenshots/body.png" width="19%" alt="Body: weight trend, heart rate and vitals">
+</p>
+<p align="center">
+  <img src="docs/screenshots/workout.png" width="19%" alt="Logging a workout on iPhone: rest timer and set table">
+  <img src="docs/screenshots/watch-set-entry.png" width="24%" alt="Apple Watch: set entry, prefilled from last time">
+  <img src="docs/screenshots/watch-rest.png" width="24%" alt="Apple Watch: rest timer with the next set">
+</p>
+
+<sub>iPhone and Watch simulators running the Debug build in demo mode (`-VitalisDemo`), with bundled fixture data.</sub>
+
 ## What it does
 
 - **Sleep.** Each night is scored on duration against your need, bedtime consistency, efficiency and wake-ups. You see the stages across the night, and week and month views of hours and scores. Naps are kept apart from the night, never inflate it, and shorten the next night's sleep need.
