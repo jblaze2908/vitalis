@@ -32,6 +32,11 @@ test("tool lists follow the token's scope; ingest tokens and foreign origins can
   assert.equal((await mcp(null, "tools/list")).status, 401);
   const foreign = await http("POST", "/mcp", { token: readTok, headers: { origin: "https://evil.example.net", accept: "application/json, text/event-stream" }, json: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
   assert.equal(foreign.status, 403);
+  // DNS rebinding: the page's Origin and the Host header agree, but neither is VITALIS_HOST.
+  const rebound = await http("POST", "/mcp", { token: readTok, headers: { host: "rebind.example.net", origin: "http://rebind.example.net", accept: "application/json, text/event-stream" }, json: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+  assert.equal(rebound.status, 403);
+  const own = await http("POST", "/mcp", { token: readTok, headers: { origin: "https://vitalis.example.com", accept: "application/json, text/event-stream" }, json: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+  assert.equal(own.status, 200, own.text);
   const init = await mcp(readTok, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } });
   assert.match(init.msg.result.instructions, /night of sleep belongs to the day they woke up/);
 });

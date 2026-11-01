@@ -2,7 +2,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { fileURLToPath } from "node:url";
-import { BIND, HttpError, MAX_INGEST_BYTES, PORT } from "./config.js";
+import { BIND, HOST, HttpError, MAX_INGEST_BYTES, PORT } from "./config.js";
 import { seedExercises } from "./exercises.js";
 import { afterIngest } from "./hooks.js";
 import { mcpRoute } from "./mcp.js";
@@ -95,5 +95,7 @@ app.all("/mcp", mcpRoute);
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   userAgent(); // warns once at startup when VITALIS_CONTACT_EMAIL is unset (50 Q3)
+  if (!HOST && !["127.0.0.1", "::1", "localhost"].includes(BIND))
+    console.warn(`vitalis: bound to ${BIND} without VITALIS_HOST; /mcp's Origin check then trusts the Host header. Set VITALIS_HOST.`);
   serve({ fetch: app.fetch, port: PORT, hostname: BIND }, (i) => console.log(`vitalis listening on ${BIND}:${i.port}`));
 }

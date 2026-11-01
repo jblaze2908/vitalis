@@ -11,6 +11,8 @@ RUN npm run build && npm test && npm prune --omit=dev
 
 FROM node:22.23.1-bookworm-slim
 WORKDIR /app
+# 0.0.0.0 is the container's own interface, needed for any port mapping. Publish it on loopback only (compose does:
+# VITALIS_PUBLISH defaults to 127.0.0.1:8350); a bare `docker run -p 8350:8350` exposes it on every host interface.
 ENV NODE_ENV=production VITALIS_ROOT=/srv/vitalis VITALIS_BIND=0.0.0.0 PORT=8350 NODE_OPTIONS=--no-warnings=ExperimentalWarning
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
