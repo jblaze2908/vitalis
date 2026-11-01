@@ -346,6 +346,7 @@ export async function mcpRoute(c: Context) {
   }
   return handler.fetch(c.req.raw, { authInfo: { token: "", clientId: token.id, scopes: [token.scope], extra: { token } } });
 }
+// With VITALIS_HOST set, only that host is trusted: the Host header is attacker-chosen under DNS rebinding.
 function sameHost(origin: string, host: string | undefined) {
-  try { const h = new URL(origin).host; return h === host || (!!HOST && h === HOST); } catch { return false; }
+  try { const h = new URL(origin).host; return HOST ? h === HOST : h === host; } catch { return false; }
 }
