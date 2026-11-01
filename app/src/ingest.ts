@@ -27,7 +27,9 @@ export function ingest(body: Buffer, meta: IngestMeta): IngestResult {
   const data = (parsed as Row)?.data;
   if (!data || typeof data !== "object") throw httpErr(400, "Expected Health Auto Export JSON: {\"data\": {\"metrics\": [...], \"workouts\": [...]}}");
   const sha = createHash("sha256").update(body).digest("hex");
-  const dup = one<{ id: number; counts: string | null; warnings: string | null }>("SELECT id,counts,warnings FROM payloads WHERE sha256=?", sha);
+  const dup = one<{ id: number; counts: string | null; warnings: string | null; error: string | null }>("SELECT id,counts,warnings,error FROM payloads WHERE sha256=?", sha);
+  // Same bytes as a stored body whose parse failed: parse it again rather than answer "duplicate" forever.
+  if (dup?.error) return apply(dup.id, data as Row);
   if (dup) return { payload_id: dup.id, duplicate: true, counts: JSON.parse(dup.counts ?? "null") ?? zero(), warnings: JSON.parse(dup.warnings ?? "[]") };
   const id = Number(run("INSERT INTO payloads(received_at,origin,sha256,bytes,body_gz,automation,aggregation,period) VALUES(?,?,?,?,?,?,?,?)",
     now(), meta.origin, sha, body.length, gzipSync(body), meta.automation ?? null, meta.aggregation ?? null, meta.period ?? null).lastInsertRowid);
@@ -66,6 +68,9 @@ function apply(id: number, data: Row): IngestResult {
     });
     run("UPDATE payloads SET parsed_at=?,counts=?,warnings=?,error=NULL WHERE id=?", now(), JSON.stringify(counts), JSON.stringify(warnings), id);
   } catch (e) {
+    // The transaction rolled back, so report nothing written: no counts, and no sleep.ready for a night that isn't stored.
+    Object.assign(counts, zero());
+    newNights.length = 0;
     // The raw body is safe; record why and let the push succeed so the phone doesn't retry forever.
     run("UPDATE payloads SET error=? WHERE id=?", (e as Error).message.slice(0, 500), id);
     warnings.push(`not parsed: ${(e as Error).message}`);
