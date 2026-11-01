@@ -213,6 +213,7 @@ addColumn("sleep_nights", "wakeups", "INTEGER");
 addColumn("sessions", "hk_workout_uuid", "TEXT");
 addColumn("sessions", "template", "TEXT");
 addColumn("sessions", "client_source", "TEXT");
+addColumn("hook_events", "claimed_at", "INTEGER");
 // What a device last posted per set: upsertWorkout's merge base. Seeded from the row for sets devices already sent.
 if (!db.prepare("PRAGMA table_info(sets)").all().some(c => c.name === "client_json")) {
   addColumn("sets", "client_json", "TEXT");

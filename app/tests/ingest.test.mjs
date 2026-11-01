@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { all, body, http, one, payload, tokens } from "./_env.mjs";
+import { run } from "../dist/src/db.js";
 
 const ingestTok = tokens.createToken("phone", "ingest").token;
 const readTok = tokens.createToken("agent", "read").token;
@@ -71,4 +72,20 @@ test("12-hour times with a narrow no-break space parse", async () => {
   const { parseStamp } = await import("../dist/src/time.js");
   assert.equal(parseStamp("2026-10-05 10:58:32 PM +0530").iso, "2026-10-05T22:58:32+05:30");
   assert.equal(parseStamp("2026-10-06").day, "2026-10-06");
+});
+
+test("a resend of a body whose parse failed is parsed again instead of answered as a duplicate", async () => {
+  const p = payload("2026-09-20", 1);
+  const a = await http("POST", "/ingest", { token: ingestTok, raw: body(p) });
+  const id = a.json.payload_id;
+  assert.ok(one("SELECT 1 FROM sleep_nights WHERE payload_id=?", id));
+  run("UPDATE payloads SET error='simulated failure',parsed_at=NULL WHERE id=?", id);
+  run("DELETE FROM sleep_nights WHERE payload_id=?", id);
+  const b = await http("POST", "/ingest", { token: ingestTok, raw: body(p) });
+  assert.equal(b.json.duplicate, false, b.text);
+  assert.equal(b.json.payload_id, id, "the stored payload is reused, not stored twice");
+  assert.ok(one("SELECT 1 FROM sleep_nights WHERE payload_id=?", id), "the night lands this time");
+  assert.equal(one("SELECT error FROM payloads WHERE id=?", id).error, null);
+  const c = await http("POST", "/ingest", { token: ingestTok, raw: body(p) });
+  assert.equal(c.json.duplicate, true, "once parsed, a resend is a duplicate again");
 });

@@ -13,12 +13,19 @@ export function sign(secret: string, id: string, ts: number, body: string) {
   return `v1,${createHmac("sha256", key).update(`${id}.${ts}.${body}`).digest("base64")}`;
 }
 
-/** Fire sleep.ready if `days` includes today and it hasn't fired for today yet. Never throws. */
+// A claim older than this belongs to a delivery that died mid-flight; three attempts finish in about 75 s.
+const CLAIM_TTL_MS = 5 * 60_000;
+
+/** Fire sleep.ready once today's night has arrived; every later push that day retries it until it is delivered. Never throws. */
 export async function afterIngest(days: string[] | undefined) {
-  if (!hooksOn() || !days?.length) return;
+  if (!hooksOn()) return;
   const day = today();
-  if (!days.includes(day)) return;
-  if (run("INSERT OR IGNORE INTO hook_events(event,day,created_at) VALUES('sleep.ready',?,?)", day, now()).changes === 0) return;
+  // The night is new only on its first push; the row made then is what later pushes retry from.
+  if (days?.includes(day)) run("INSERT OR IGNORE INTO hook_events(event,day,created_at) VALUES('sleep.ready',?,?)", day, now());
+  // Atomic claim, one primary-key UPDATE per push: HAE pushes (main thread) and native batches (worker) use separate connections.
+  const t = now();
+  if (run(`UPDATE hook_events SET claimed_at=? WHERE event='sleep.ready' AND day=? AND sent_at IS NULL
+           AND (claimed_at IS NULL OR claimed_at < ?)`, t, day, t - CLAIM_TTL_MS).changes === 0) return;
   await deliver("sleep.ready", day);
 }
 
@@ -36,7 +43,8 @@ async function deliver(event: string, day: string) {
     run("UPDATE hook_events SET status=?,attempts=? WHERE event=? AND day=?", status, attempt, event, day);
     if (attempt < 3) await new Promise((ok) => setTimeout(ok, attempt * 15_000));
   }
-  console.error(`hook ${event} ${day} failed after 3 attempts`);
+  run("UPDATE hook_events SET claimed_at=NULL WHERE event=? AND day=?", event, day);
+  console.error(`hook ${event} ${day} failed after 3 attempts; the next push today retries it`);
 }
 
 export const lastHook = () => one<{ event: string; day: string; sent_at: number | null; status: string | null; attempts: number }>(
